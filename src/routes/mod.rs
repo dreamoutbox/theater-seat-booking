@@ -5,9 +5,9 @@ pub mod theater;
 pub mod webhook;
 
 use axum::{
-    http::{header, Method},
-    routing::{get, post},
     Router,
+    http::{Method, header},
+    routing::{get, post},
 };
 use sqlx::PgPool;
 use std::sync::Arc;

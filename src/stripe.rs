@@ -45,10 +45,7 @@ impl StripeService {
             ("amount", amount_cents.to_string()),
             ("currency", currency.to_string()),
             ("metadata[order_id]", order_id.to_string()),
-            (
-                "automatic_payment_methods[enabled]",
-                "true".to_string(),
-            ),
+            ("automatic_payment_methods[enabled]", "true".to_string()),
         ];
 
         let response = self

@@ -17,8 +17,9 @@ impl AppConfig {
         let _ = dotenvy::dotenv();
 
         Self {
-            database_url: env::var("DATABASE_URL")
-                .unwrap_or_else(|_| "postgres://postgres:example@localhost:5432/postgres".to_string()),
+            database_url: env::var("DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://postgres:example@localhost:5432/postgres".to_string()
+            }),
             jwt_secret: env::var("JWT_SECRET")
                 .unwrap_or_else(|_| "theater_booking_poc_jwt_secret_key_default_12345".to_string()),
             port: env::var("PORT")

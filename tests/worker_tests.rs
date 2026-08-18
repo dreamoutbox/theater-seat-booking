@@ -15,7 +15,8 @@ async fn setup_test_db() -> Result<sqlx::PgPool, Box<dyn std::error::Error>> {
 }
 
 #[tokio::test]
-async fn test_scenario_1_same_seat_same_showtime_conflict() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_scenario_1_same_seat_same_showtime_conflict() -> Result<(), Box<dyn std::error::Error>>
+{
     let pool = setup_test_db().await?;
 
     // Create unique test users
@@ -37,11 +38,13 @@ async fn test_scenario_1_same_seat_same_showtime_conflict() -> Result<(), Box<dy
         .await?;
 
     let zone_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO zones (id, theater_id, name, price_cents) VALUES ($1, $2, 'Zone A', 2000)")
-        .bind(zone_id)
-        .bind(theater_id)
-        .execute(&pool)
-        .await?;
+    sqlx::query(
+        "INSERT INTO zones (id, theater_id, name, price_cents) VALUES ($1, $2, 'Zone A', 2000)",
+    )
+    .bind(zone_id)
+    .bind(theater_id)
+    .execute(&pool)
+    .await?;
 
     let seat_id = Uuid::new_v4();
     sqlx::query("INSERT INTO seats (id, theater_id, zone_id, row_label, seat_number) VALUES ($1, $2, $3, 'Z', 99)")
@@ -59,13 +62,15 @@ async fn test_scenario_1_same_seat_same_showtime_conflict() -> Result<(), Box<dy
 
     let showtime_id = Uuid::new_v4();
     let starts_at = Utc::now() + Duration::days(5);
-    sqlx::query("INSERT INTO showtimes (id, event_id, theater_id, starts_at) VALUES ($1, $2, $3, $4)")
-        .bind(showtime_id)
-        .bind(event_id)
-        .bind(theater_id)
-        .bind(starts_at)
-        .execute(&pool)
-        .await?;
+    sqlx::query(
+        "INSERT INTO showtimes (id, event_id, theater_id, starts_at) VALUES ($1, $2, $3, $4)",
+    )
+    .bind(showtime_id)
+    .bind(event_id)
+    .bind(theater_id)
+    .bind(starts_at)
+    .execute(&pool)
+    .await?;
 
     // Enqueue two booking requests for the exact same seat and showtime
     let bq1_id = Uuid::new_v4();
@@ -130,7 +135,8 @@ async fn test_scenario_1_same_seat_same_showtime_conflict() -> Result<(), Box<dy
 }
 
 #[tokio::test]
-async fn test_scenario_2_same_seat_different_showtimes_success() -> Result<(), Box<dyn std::error::Error>> {
+async fn test_scenario_2_same_seat_different_showtimes_success()
+-> Result<(), Box<dyn std::error::Error>> {
     let pool = setup_test_db().await?;
 
     let user1_id = Uuid::new_v4();
@@ -150,11 +156,13 @@ async fn test_scenario_2_same_seat_different_showtimes_success() -> Result<(), B
         .await?;
 
     let zone_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO zones (id, theater_id, name, price_cents) VALUES ($1, $2, 'Zone B', 1500)")
-        .bind(zone_id)
-        .bind(theater_id)
-        .execute(&pool)
-        .await?;
+    sqlx::query(
+        "INSERT INTO zones (id, theater_id, name, price_cents) VALUES ($1, $2, 'Zone B', 1500)",
+    )
+    .bind(zone_id)
+    .bind(theater_id)
+    .execute(&pool)
+    .await?;
 
     let seat_id = Uuid::new_v4();
     sqlx::query("INSERT INTO seats (id, theater_id, zone_id, row_label, seat_number) VALUES ($1, $2, $3, 'Y', 88)")

@@ -1,7 +1,7 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -20,15 +20,16 @@ pub struct SeatsQuery {
 pub async fn list_theaters(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Theater>>, (StatusCode, Json<serde_json::Value>)> {
-    let theaters: Vec<Theater> = sqlx::query_as("SELECT id, name, address FROM theaters ORDER BY name")
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let theaters: Vec<Theater> =
+        sqlx::query_as("SELECT id, name, address FROM theaters ORDER BY name")
+            .fetch_all(&state.pool)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?;
 
     Ok(Json(theaters))
 }

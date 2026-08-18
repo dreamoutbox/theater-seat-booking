@@ -1,7 +1,7 @@
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
-    Json,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -224,9 +224,7 @@ pub async fn list_orders(
     };
 
     let order_rows: Vec<OrderRow> = if is_elevated {
-        sqlx::query_as(orders_query)
-            .fetch_all(&state.pool)
-            .await
+        sqlx::query_as(orders_query).fetch_all(&state.pool).await
     } else {
         sqlx::query_as(orders_query)
             .bind(auth_user.id)
@@ -412,7 +410,9 @@ pub async fn confirm_mock_order(
         tx.rollback().await.ok();
         return Err((
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": format!("Order cannot be paid (status: {status})") })),
+            Json(
+                serde_json::json!({ "error": format!("Order cannot be paid (status: {status})") }),
+            ),
         ));
     }
 

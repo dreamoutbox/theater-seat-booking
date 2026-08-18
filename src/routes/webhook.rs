@@ -1,8 +1,4 @@
-use axum::{
-    extract::State,
-    http::StatusCode,
-    Json,
-};
+use axum::{Json, extract::State, http::StatusCode};
 use serde_json::Value;
 use uuid::Uuid;
 
@@ -77,18 +73,16 @@ pub async fn stripe_webhook(
 
     // Find the associated order
     let order_id: Option<Uuid> = if !payment_intent_id.is_empty() {
-        sqlx::query_scalar(
-            "SELECT id FROM orders WHERE stripe_payment_intent_id = $1 FOR UPDATE",
-        )
-        .bind(payment_intent_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?
+        sqlx::query_scalar("SELECT id FROM orders WHERE stripe_payment_intent_id = $1 FOR UPDATE")
+            .bind(payment_intent_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?
     } else {
         None
     };

@@ -1,16 +1,12 @@
 use axum::{
+    Json,
     extract::{Path, State},
     http::StatusCode,
-    Json,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    auth::AuthenticatedUser,
-    models::BookingQueueItem,
-    routes::AppState,
-};
+use crate::{auth::AuthenticatedUser, models::BookingQueueItem, routes::AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct EnqueueBookingRequest {

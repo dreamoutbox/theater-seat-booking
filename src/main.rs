@@ -2,7 +2,7 @@ use std::sync::Arc;
 use theater_seat_booking::{
     config::AppConfig,
     db::{create_pool, run_migrations},
-    routes::{create_router, AppState},
+    routes::{AppState, create_router},
     stripe::StripeService,
     worker::{run_sweeper_loop, run_worker_loop},
 };
@@ -12,9 +12,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
         .with(
-            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "theater_seat_booking=debug,tower_http=debug,info".into()
-            }),
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "theater_seat_booking=debug,tower_http=debug,info".into()),
         )
         .with(tracing_subscriber::fmt::layer())
         .init();
@@ -23,7 +22,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Initializing Theater Seat Booking backend API server...");
 
     let pool = create_pool(&config.database_url).await?;
-    tracing::info!("Connected to PostgreSQL database at {}", config.database_url);
+    tracing::info!(
+        "Connected to PostgreSQL database at {}",
+        config.database_url
+    );
 
     run_migrations(&pool).await?;
     tracing::info!("Database schema migrations verified and up to date.");
@@ -58,7 +60,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Start the Axum HTTP API server
     let app = create_router(state);
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], config.port));
-    tracing::info!("🚀 Backend API Server listening on http://0.0.0.0:{}", config.port);
+    tracing::info!(
+        "🚀 Backend API Server listening on http://0.0.0.0:{}",
+        config.port
+    );
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;

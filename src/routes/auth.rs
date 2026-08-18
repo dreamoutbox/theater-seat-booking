@@ -1,15 +1,13 @@
 use axum::{
-    extract::State,
-    http::{header, HeaderMap, HeaderValue, StatusCode},
-    response::{IntoResponse, Response},
     Json,
+    extract::State,
+    http::{HeaderMap, HeaderValue, StatusCode, header},
+    response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    auth::{
-        generate_jwt, hash_password, verify_password, AuthenticatedUser, AUTH_COOKIE_NAME,
-    },
+    auth::{AUTH_COOKIE_NAME, AuthenticatedUser, generate_jwt, hash_password, verify_password},
     models::{User, UserRole, UserSummary},
     routes::AppState,
 };
@@ -94,14 +92,13 @@ pub async fn register(
         )
     })?;
 
-    let token = generate_jwt(user.id, &user.email, user.role, &state.config.jwt_secret).map_err(
-        |e| {
+    let token =
+        generate_jwt(user.id, &user.email, user.role, &state.config.jwt_secret).map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({ "error": e.to_string() })),
             )
-        },
-    )?;
+        })?;
 
     let cookie_header = format!(
         "{}={}; HttpOnly; Path=/; SameSite=Lax; Max-Age={}",
@@ -161,14 +158,13 @@ pub async fn login(
         ));
     }
 
-    let token = generate_jwt(user.id, &user.email, user.role, &state.config.jwt_secret).map_err(
-        |e| {
+    let token =
+        generate_jwt(user.id, &user.email, user.role, &state.config.jwt_secret).map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({ "error": e.to_string() })),
             )
-        },
-    )?;
+        })?;
 
     let cookie_header = format!(
         "{}={}; HttpOnly; Path=/; SameSite=Lax; Max-Age={}",

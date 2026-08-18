@@ -1,15 +1,15 @@
 use argon2::{
-    password_hash::{rand_core::OsRng, PasswordHash, PasswordHasher, PasswordVerifier, SaltString},
     Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
 };
 use axum::{
-    extract::FromRequestParts,
-    http::{header, request::Parts, StatusCode},
-    response::{IntoResponse, Response},
     Json,
+    extract::FromRequestParts,
+    http::{StatusCode, header, request::Parts},
+    response::{IntoResponse, Response},
 };
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -169,12 +169,14 @@ pub enum AuthError {
 impl IntoResponse for AuthError {
     fn into_response(self) -> Response {
         let (status, err_msg) = match self {
-            AuthError::MissingCredentials => {
-                (StatusCode::UNAUTHORIZED, "Authentication required".to_string())
-            }
-            AuthError::InvalidToken => {
-                (StatusCode::UNAUTHORIZED, "Invalid or expired token".to_string())
-            }
+            AuthError::MissingCredentials => (
+                StatusCode::UNAUTHORIZED,
+                "Authentication required".to_string(),
+            ),
+            AuthError::InvalidToken => (
+                StatusCode::UNAUTHORIZED,
+                "Invalid or expired token".to_string(),
+            ),
             AuthError::Forbidden(msg) => (StatusCode::FORBIDDEN, msg),
         };
 
