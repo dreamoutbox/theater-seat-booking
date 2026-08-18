@@ -94,6 +94,86 @@ pub async fn enqueue_booking(
         ));
     }
 
+    // Check event-level limits: max seats per booking session and max cumulative seats per person
+    let event_limits: Option<(i32, i32)> = sqlx::query_as(
+        "SELECT e.max_seats_per_booking, e.max_seats_per_user
+         FROM showtimes s
+         JOIN events e ON s.event_id = e.id
+         WHERE s.id = $1",
+    )
+    .bind(payload.showtime_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    if let Some((max_booking, max_user)) = event_limits {
+        // A. Limit per booking session / showtime
+        let showtime_active_holds: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM seat_bookings sb
+             WHERE sb.showtime_id = $1 AND sb.user_id = $2 AND sb.status = 'held' AND sb.expires_at > now()",
+        )
+        .bind(payload.showtime_id)
+        .bind(auth_user.id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+        if showtime_active_holds + in_flight_queue_count >= max_booking as i64 {
+            tx.rollback().await.ok();
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": format!(
+                        "Booking limit reached: maximum {} seats per booking for this event.",
+                        max_booking
+                    )
+                })),
+            ));
+        }
+
+        // B. Cumulative limit per customer for this entire event
+        let total_user_event_seats: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM seat_bookings sb
+             JOIN showtimes s ON sb.showtime_id = s.id
+             WHERE s.event_id = (SELECT event_id FROM showtimes WHERE id = $1)
+               AND sb.user_id = $2
+               AND (sb.status = 'confirmed' OR (sb.status = 'held' AND sb.expires_at > now()))",
+        )
+        .bind(payload.showtime_id)
+        .bind(auth_user.id)
+        .fetch_one(&mut *tx)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+        if total_user_event_seats + in_flight_queue_count >= max_user as i64 {
+            tx.rollback().await.ok();
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({
+                    "error": format!(
+                        "Personal event limit reached: maximum {} total seats allowed per customer for this event.",
+                        max_user
+                    )
+                })),
+            ));
+        }
+    }
+
     // 2. Fetch the seat and zone to ensure existence
     let zone_id: Option<Uuid> = sqlx::query_scalar("SELECT zone_id FROM seats WHERE id = $1")
         .bind(payload.seat_id)

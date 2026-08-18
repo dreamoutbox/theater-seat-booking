@@ -122,6 +122,8 @@ pub struct SeatWithStatus {
 pub struct Event {
     pub id: Uuid,
     pub title: String,
+    pub max_seats_per_booking: i32,
+    pub max_seats_per_user: i32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

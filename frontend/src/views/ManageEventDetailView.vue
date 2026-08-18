@@ -46,9 +46,19 @@
               <h1 class="text-h4 font-weight-bold text-white mb-1">
                 {{ event.title }}
               </h1>
-              <span class="text-caption text-grey">
-                {{ eventShowtimes.length }} {{ eventShowtimes.length === 1 ? 'Showtime session scheduled' : 'Showtime sessions scheduled' }}
-              </span>
+              <div class="d-flex align-center gap-2 flex-wrap mt-2">
+                <v-chip size="small" color="indigo-lighten-2" variant="tonal" class="font-weight-bold">
+                  <v-icon start icon="mdi-ticket-percent-outline" size="14"></v-icon>
+                  Limit: {{ event.max_seats_per_booking || 6 }} seats / order
+                </v-chip>
+                <v-chip size="small" color="teal-lighten-2" variant="tonal" class="font-weight-bold">
+                  <v-icon start icon="mdi-account-lock-outline" size="14"></v-icon>
+                  Personal Limit: {{ event.max_seats_per_user || 10 }} seats / customer
+                </v-chip>
+                <span class="text-caption text-grey ml-2">
+                  {{ eventShowtimes.length }} {{ eventShowtimes.length === 1 ? 'Showtime session' : 'Showtime sessions' }}
+                </span>
+              </div>
             </div>
           </div>
 
@@ -61,7 +71,7 @@
               class="text-none font-weight-bold"
               @click="openEditEventDialog"
             >
-              Edit Title
+              Edit Event & Limits
             </v-btn>
             <v-btn
               variant="outlined"
@@ -222,9 +232,37 @@
             variant="outlined"
             density="comfortable"
             autofocus
-            class="mb-2"
-            @keyup.enter="saveEventTitle"
+            class="mb-3"
           ></v-text-field>
+
+          <v-row dense>
+            <v-col cols="6">
+              <v-text-field
+                v-model.number="editEventDialog.max_seats_per_booking"
+                label="Max Seats / Order"
+                type="number"
+                min="1"
+                max="50"
+                variant="outlined"
+                density="comfortable"
+                hint="Max held seats per checkout"
+                persistent-hint
+              ></v-text-field>
+            </v-col>
+            <v-col cols="6">
+              <v-text-field
+                v-model.number="editEventDialog.max_seats_per_user"
+                label="Max Seats / Customer"
+                type="number"
+                min="1"
+                max="100"
+                variant="outlined"
+                density="comfortable"
+                hint="Total cumulative per person"
+                persistent-hint
+              ></v-text-field>
+            </v-col>
+          </v-row>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
           <v-btn variant="text" @click="editEventDialog.show = false">Cancel</v-btn>
@@ -462,6 +500,8 @@ function openEditEventDialog() {
   editEventDialog.value = {
     show: true,
     title: event.value.title,
+    max_seats_per_booking: event.value.max_seats_per_booking || 6,
+    max_seats_per_user: event.value.max_seats_per_user || 10,
     saving: false,
   };
 }
@@ -475,10 +515,12 @@ async function saveEventTitle() {
   try {
     const res = await api.put(`/events/${event.value.id}`, {
       title: editEventDialog.value.title.trim(),
+      max_seats_per_booking: editEventDialog.value.max_seats_per_booking,
+      max_seats_per_user: editEventDialog.value.max_seats_per_user,
     });
     event.value = res.data;
     editEventDialog.value.show = false;
-    showToast('Event title updated', 'success');
+    showToast('Event settings & limits updated', 'success');
   } catch (err) {
     showToast(err.response?.data?.error || 'Failed to update event', 'error');
   } finally {

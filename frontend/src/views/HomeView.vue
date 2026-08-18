@@ -54,10 +54,10 @@
             </h3>
 
             <!-- Venue Description -->
-            <div class="d-flex align-center text-caption text-grey mb-4">
+            <!-- <div class="d-flex align-center text-caption text-grey mb-4">
               <v-icon icon="mdi-map-marker" size="14" class="mr-1 text-grey"></v-icon>
               <span>Main Hall • Dolby Atmos • Laser Projection</span>
-            </div>
+            </div> -->
 
             <!-- Pricing Tiers -->
             <div class="d-flex flex-wrap gap-2 mb-5">

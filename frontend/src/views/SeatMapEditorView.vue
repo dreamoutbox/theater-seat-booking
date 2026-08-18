@@ -9,30 +9,21 @@
           </v-btn>
           <v-icon icon="mdi-seat-passenger" color="amber-darken-1" size="22"></v-icon>
           <h1 class="text-h6 font-weight-bold text-white mb-0">Seat Map Editor</h1>
+          <v-chip v-if="currentTheaterName" size="small" color="indigo-lighten-2" variant="tonal" class="font-weight-bold ml-1">
+            <v-icon start icon="mdi-theater" size="14"></v-icon>
+            {{ currentTheaterName }}
+          </v-chip>
           <v-chip v-if="isModified" size="x-small" color="amber-darken-1" variant="flat" class="font-weight-bold ml-1">
             Unsaved ({{ draftSeats.length }} seats)
           </v-chip>
         </div>
         <span class="text-caption text-grey" style="font-size: 11px;">
-          Rows A–ZZ, Seats 1–100 • Drag seats to move • Drag box to select/create • Press Delete to remove
+          Rows A–ZZ, Seats 1–100 • Drag seats to move • Drag box over empty slots to create • Press Delete to remove
         </span>
       </div>
 
       <!-- Main Action Controls (Compact) -->
       <div class="d-flex align-center gap-2 flex-wrap">
-        <!-- Theater Selector -->
-        <v-select
-          v-model="selectedTheaterId"
-          :items="theaters"
-          item-title="name"
-          item-value="id"
-          variant="outlined"
-          density="compact"
-          hide-details
-          style="min-width: 180px; max-width: 240px;"
-          @update:model-value="fetchLayout"
-        ></v-select>
-
         <v-btn
           prepend-icon="mdi-grid"
           color="indigo-darken-1"
@@ -691,6 +682,10 @@ const loading = ref(false);
 const saving = ref(false);
 
 const originalLayout = ref({ theater: null, zones: [], seats: [] });
+const currentTheaterName = computed(() => {
+  const t = theaters.value.find(item => item.id === selectedTheaterId.value);
+  return t ? t.name : originalLayout.value.theater?.name || '';
+});
 const draftZones = ref([]);
 const draftSeats = ref([]);
 
@@ -1231,9 +1226,8 @@ function handleCanvasMouseUp() {
     // Clicked without dragging
     if (dragAction.clickedSeat) {
       handleSeatClick(dragAction.clickedSeat, { shiftKey: dragAction.isShift });
-    } else if (dragAction.clickedSlot) {
-      createSeatAtSlot(dragAction.clickedSlot.row, dragAction.clickedSlot.col);
     } else {
+      // Clicked on empty space or empty slot: deselect, do NOT create seat
       if (!dragAction.isShift) clearSelection();
     }
   } else if (dragAction.type === 'move') {

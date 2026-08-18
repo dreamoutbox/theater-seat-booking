@@ -1,38 +1,37 @@
 <template>
   <div class="seat-map-container pa-4">
-    <!-- Cinema Screen visual -->
-    <div class="screen-container text-center mb-8">
-      <div class="screen-curve mx-auto mb-2"></div>
-      <span class="text-caption text-uppercase tracking-widest text-grey-darken-1 font-weight-bold">
-        Cinema Screen
-      </span>
+    <!-- Cinema Screen visual (Matches Editor) -->
+    <div class="screen-wrapper mb-6">
+      <div class="cinema-screen">
+        <div class="screen-text">CINEMA SCREEN</div>
+      </div>
     </div>
 
     <!-- Seating Legend -->
-    <div class="d-flex flex-wrap justify-center align-center gap-4 mb-6 text-caption">
-      <div class="d-flex align-center mr-4">
-        <span class="legend-box zone-vip mr-1"></span>
-        <span>VIP ($25.00)</span>
+    <div class="d-flex flex-wrap justify-center align-center gap-3 mb-6 text-caption">
+      <div class="d-flex align-center gap-1">
+        <div class="legend-box zone-vip"></div>
+        <span class="text-grey-lighten-1">VIP</span>
       </div>
-      <div class="d-flex align-center mr-4">
-        <span class="legend-box zone-premium mr-1"></span>
-        <span>Premium ($18.00)</span>
+      <div class="d-flex align-center gap-1">
+        <div class="legend-box zone-premium"></div>
+        <span class="text-grey-lighten-1">Premium</span>
       </div>
-      <div class="d-flex align-center mr-4">
-        <span class="legend-box zone-standard mr-1"></span>
-        <span>Standard ($12.00)</span>
+      <div class="d-flex align-center gap-1">
+        <div class="legend-box zone-standard"></div>
+        <span class="text-grey-lighten-1">Standard</span>
       </div>
-      <div class="d-flex align-center mr-4">
-        <span class="legend-box seat-held-mine mr-1"></span>
-        <span>Your Hold (Click to cancel)</span>
+      <div class="d-flex align-center gap-1">
+        <div class="legend-box seat-held-mine-legend"></div>
+        <span class="text-amber-darken-1 font-weight-bold">Your Hold (Click to cancel)</span>
       </div>
-      <div class="d-flex align-center mr-4">
-        <span class="legend-box seat-processing mr-1"></span>
-        <span>In Queue</span>
+      <div class="d-flex align-center gap-1">
+        <div class="legend-box seat-processing"></div>
+        <span class="text-grey-lighten-1">In Queue</span>
       </div>
-      <div class="d-flex align-center">
-        <span class="legend-box seat-taken mr-1"></span>
-        <span>Unavailable</span>
+      <div class="d-flex align-center gap-1">
+        <div class="legend-box seat-taken"></div>
+        <span class="text-grey-lighten-1">Unavailable</span>
       </div>
     </div>
 
@@ -42,62 +41,96 @@
       type="info"
       variant="tonal"
       density="compact"
-      class="mb-6 mx-auto max-w-xl"
+      class="mb-4 mx-auto max-w-xl rounded-lg"
     >
       <div class="d-flex align-center">
-        <v-progress-circular indeterminate size="18" width="2" color="info" class="mr-3"></v-progress-circular>
-        <span>Processing seat reservation in queue... (Per-seat advisory lock ordering)</span>
+        <v-progress-circular indeterminate size="16" width="2" color="info" class="mr-3"></v-progress-circular>
+        <span class="text-caption">Processing seat reservation in queue...</span>
       </div>
     </v-alert>
 
-    <!-- Seating Grid -->
-    <div class="seating-grid mx-auto">
-      <div v-for="row in groupedRows" :key="row.label" class="seat-row d-flex align-center justify-center mb-3">
-        <!-- Row Label -->
-        <span class="row-label mr-4 text-body-2 font-weight-bold text-grey">{{ row.label }}</span>
-
-        <!-- Seats in Row -->
-        <div class="d-flex gap-2">
-          <template v-for="slot in row.slots" :key="`${row.label}-${slot.seatNumber}`">
-            <button
-              v-if="slot.seat"
-              class="seat-btn"
-              :class="getSeatClasses(slot.seat)"
-              :disabled="isSeatDisabled(slot.seat)"
-              @click="handleSeatClick(slot.seat)"
-              :title="getSeatTooltip(slot.seat)"
-            >
-              <v-progress-circular
-                v-if="isSeatProcessing(slot.seat.id)"
-                indeterminate
-                size="14"
-                width="2"
-                color="white"
-              ></v-progress-circular>
-              <v-icon
-                v-else-if="slot.seat.status === 'confirmed' || (slot.seat.status === 'held' && !slot.seat.is_mine)"
-                icon="mdi-lock"
-                size="12"
-              ></v-icon>
-              <template v-else-if="slot.seat.is_mine && slot.seat.status === 'held'">
-                <v-icon
-                  icon="mdi-check"
-                  size="14"
-                  class="seat-icon-check"
-                ></v-icon>
-                <v-icon
-                  icon="mdi-close"
-                  size="14"
-                  class="seat-icon-cancel"
-                ></v-icon>
-              </template>
-              <span v-else class="seat-num">{{ slot.seat.seat_number }}</span>
-            </button>
-            <div v-else class="seat-spacer"></div>
-          </template>
+    <!-- Interactive Seating Grid Matrix (Matching Seat Map Editor layout) -->
+    <div class="seat-canvas-container">
+      <!-- Grid Header Column Numbers -->
+      <div class="d-flex align-center gap-1 mb-1 justify-center">
+        <div class="row-header-placeholder"></div>
+        <div class="d-flex align-center gap-1 seat-row-items">
+          <div
+            v-for="col in maxSeatCol"
+            :key="col"
+            class="col-header-number text-caption text-grey font-weight-bold font-weight-mono"
+          >
+            {{ col }}
+          </div>
         </div>
+        <div class="row-header-placeholder"></div>
+      </div>
 
-        <span class="row-label ml-4 text-body-2 font-weight-bold text-grey">{{ row.label }}</span>
+      <!-- Rows of Grid Slots -->
+      <div class="d-flex flex-column gap-1 align-center">
+        <div
+          v-for="row in groupedRows"
+          :key="row.label"
+          class="seat-row d-flex align-center gap-1"
+        >
+          <!-- Row Left Header -->
+          <div class="row-header-btn">
+            {{ row.label }}
+          </div>
+
+          <!-- Slots in this row -->
+          <div class="d-flex align-center gap-1 seat-row-items">
+            <template v-for="slot in row.slots" :key="`${row.label}-${slot.seatNumber}`">
+              <!-- Active Seat -->
+              <button
+                v-if="slot.seat"
+                type="button"
+                class="seat-node"
+                :class="getSeatClasses(slot.seat)"
+                :disabled="isSeatDisabled(slot.seat)"
+                :style="getSeatStyle(slot.seat)"
+                @click="handleSeatClick(slot.seat)"
+                :title="getSeatTooltip(slot.seat)"
+              >
+                <!-- Loading Spinner -->
+                <v-progress-circular
+                  v-if="isSeatProcessing(slot.seat.id)"
+                  indeterminate
+                  size="14"
+                  width="2"
+                  color="white"
+                ></v-progress-circular>
+
+                <!-- Sold / Locked Icon -->
+                <v-icon
+                  v-else-if="slot.seat.status === 'confirmed' || (slot.seat.status === 'held' && !slot.seat.is_mine)"
+                  icon="mdi-lock"
+                  size="12"
+                  color="grey"
+                ></v-icon>
+
+                <!-- My Held Seat: Checkmark or Cancel X on hover -->
+                <template v-else-if="slot.seat.is_mine && slot.seat.status === 'held'">
+                  <v-icon icon="mdi-check" size="13" class="seat-icon-check" color="amber-darken-1"></v-icon>
+                  <v-icon icon="mdi-close" size="13" class="seat-icon-cancel" color="white"></v-icon>
+                </template>
+
+                <!-- Seat Number -->
+                <span v-else class="seat-number-label">{{ slot.seat.seat_number }}</span>
+              </button>
+
+              <!-- Walkway / Empty Slot Spacer -->
+              <div v-else class="empty-grid-slot">
+                <span class="empty-slot-number">{{ slot.seatNumber }}</span>
+              </div>
+            </template>
+          </div>
+
+          <!-- Row Right Header -->
+          <div class="row-header-label-right text-caption text-grey font-weight-bold font-weight-mono">
+            {{ row.label }}
+          </div>
+        </div>
       </div>
     </div>
 
@@ -129,7 +162,7 @@ const router = useRouter();
 
 const seats = ref([]);
 const loading = ref(false);
-const inFlightBookings = ref([]); // List of active booking_uuids being polled
+const inFlightBookings = ref([]);
 const processingSeatIds = ref(new Set());
 const countdownSeconds = ref(0);
 let countdownInterval = null;
@@ -144,36 +177,72 @@ function showToast(text, color = 'info') {
   snackbar.value = { show: true, text, color };
 }
 
+// Convert 0-based integer to row label: 0 -> A, 25 -> Z, 26 -> AA, etc.
+function indexToRowLabel(idx) {
+  let label = '';
+  idx = idx + 1;
+  while (idx > 0) {
+    const rem = (idx - 1) % 26;
+    label = String.fromCharCode(65 + rem) + label;
+    idx = Math.floor((idx - 1) / 26);
+  }
+  return label;
+}
+
+// Convert row label to 0-based integer
+function rowLabelToIndex(label) {
+  if (!label) return 0;
+  label = label.toUpperCase().trim();
+  let index = 0;
+  for (let i = 0; i < label.length; i++) {
+    const code = label.charCodeAt(i);
+    if (code >= 65 && code <= 90) {
+      index = index * 26 + (code - 64);
+    }
+  }
+  return Math.max(0, index - 1);
+}
+
 // Compute maximum seat number across the theater to preserve grid alignment
 const maxSeatCol = computed(() => {
   let max = 0;
   for (const s of seats.value) {
     if (s.seat_number > max) max = s.seat_number;
   }
-  return max || 14;
+  return Math.max(max, 14);
 });
 
-// Group seats by row with fixed slot positions
-const groupedRows = computed(() => {
-  const map = {};
+// Compute maximum row index
+const maxRowIdx = computed(() => {
+  let maxIdx = 7; // At least 'H'
   for (const s of seats.value) {
-    if (!map[s.row_label]) {
-      map[s.row_label] = {};
-    }
-    map[s.row_label][s.seat_number] = s;
+    const idx = rowLabelToIndex(s.row_label);
+    if (idx > maxIdx) maxIdx = idx;
+  }
+  return maxIdx;
+});
+
+// Group seats by 2D matrix of rows and slots (matches editor)
+const groupedRows = computed(() => {
+  const map = new Map();
+  for (const s of seats.value) {
+    map.set(`${s.row_label}-${s.seat_number}`, s);
   }
 
-  const sortedLabels = Object.keys(map).sort((a, b) => a.localeCompare(b));
-  return sortedLabels.map((label) => {
+  const rows = [];
+  for (let r = 0; r <= maxRowIdx.value; r++) {
+    const rowLabel = indexToRowLabel(r);
     const slots = [];
     for (let num = 1; num <= maxSeatCol.value; num++) {
+      const seat = map.get(`${rowLabel}-${num}`) || null;
       slots.push({
         seatNumber: num,
-        seat: map[label][num] || null,
+        seat,
       });
     }
-    return { label, slots };
-  });
+    rows.push({ label: rowLabel, slots });
+  }
+  return rows;
 });
 
 const myHeldSeats = computed(() => {
@@ -191,202 +260,208 @@ function isSeatDisabled(seat) {
   return false;
 }
 
+function getZoneColorHex(name) {
+  if (!name) return '#94a3b8';
+  if (name.toLowerCase().includes('vip')) return '#f59e0b';
+  if (name.toLowerCase().includes('premium')) return '#6366f1';
+  return '#14b8a6';
+}
+
+function getZoneBgColorHex(name) {
+  if (!name) return 'rgba(148, 163, 184, 0.15)';
+  if (name.toLowerCase().includes('vip')) return 'rgba(245, 158, 11, 0.18)';
+  if (name.toLowerCase().includes('premium')) return 'rgba(99, 102, 241, 0.18)';
+  return 'rgba(20, 184, 166, 0.18)';
+}
+
+function getSeatStyle(seat) {
+  if (seat.is_mine && seat.status === 'held') {
+    return {
+      borderColor: '#f59e0b',
+      background: 'rgba(245, 158, 11, 0.35)',
+    };
+  }
+  if (seat.status === 'confirmed' || (seat.status === 'held' && !seat.is_mine)) {
+    return {
+      borderColor: '#374151',
+      background: '#1f2937',
+    };
+  }
+  return {
+    borderColor: getZoneColorHex(seat.zone_name),
+    background: getZoneBgColorHex(seat.zone_name),
+  };
+}
+
 function getSeatClasses(seat) {
   const classes = [];
   if (isSeatProcessing(seat.id)) {
     classes.push('seat-processing');
   } else if (seat.is_mine && seat.status === 'held') {
     classes.push('seat-held-mine');
+  } else if (seat.status === 'held') {
+    classes.push('seat-held-other');
   } else if (seat.status === 'confirmed') {
     classes.push('seat-confirmed');
-  } else if (seat.status === 'held' && !seat.is_mine) {
-    classes.push('seat-held-other');
   } else {
-    // Available with zone colors
-    if (seat.zone_name.includes('VIP')) classes.push('zone-vip');
-    else if (seat.zone_name.includes('Premium')) classes.push('zone-premium');
-    else classes.push('zone-standard');
+    classes.push('seat-available');
   }
-  return classes.join(' ');
+  return classes;
 }
 
 function getSeatTooltip(seat) {
-  if (isSeatProcessing(seat.id)) return 'Enqueued in booking queue...';
-  if (seat.is_mine && seat.status === 'held') return `Held by you (${seat.row_label}${seat.seat_number}) - Click to cancel hold`;
-  if (seat.status === 'confirmed') return `Seat ${seat.row_label}${seat.seat_number} is Sold Out`;
-  if (seat.status === 'held') return `Seat ${seat.row_label}${seat.seat_number} is currently held by another customer`;
-  return `${seat.zone_name}: Row ${seat.row_label}, Seat ${seat.seat_number} ($${(seat.price_cents / 100).toFixed(2)})`;
+  const price = (seat.price_cents / 100).toFixed(2);
+  if (seat.is_mine && seat.status === 'held') {
+    return `Held by you (${seat.row_label}${seat.seat_number}) - Click to cancel hold`;
+  }
+  if (seat.status === 'confirmed') {
+    return `Seat ${seat.row_label}${seat.seat_number} - Sold / Unavailable`;
+  }
+  if (seat.status === 'held') {
+    return `Seat ${seat.row_label}${seat.seat_number} - Currently reserved by another customer`;
+  }
+  return `Row ${seat.row_label}, Seat ${seat.seat_number} • ${seat.zone_name} ($${price})`;
 }
 
-// Fetch seats from server
 async function fetchSeats() {
-  if (!props.theaterId || !props.showtimeId) return;
+  if (!props.showtimeId) return;
   try {
-    loading.value = true;
-    const res = await api.get(`/theaters/${props.theaterId}/seats?showtime_id=${props.showtimeId}`);
+    const res = await api.get(`/showtimes/${props.showtimeId}/seats`);
     seats.value = res.data;
     emit('seats-updated', seats.value);
-    emit('held-seats-changed', {
-      heldSeats: myHeldSeats.value,
-      countdownSeconds: countdownSeconds.value,
-    });
-
-    // Calculate nearest expiry for countdown
+    emit('held-seats-changed', myHeldSeats.value);
     updateCountdown();
   } catch (err) {
-    console.error('Failed to load seats', err);
-  } finally {
-    loading.value = false;
+    showToast('Failed to load theater seat layout', 'error');
   }
 }
 
-function updateCountdown() {
-  const heldWithExpiry = seats.value.filter((s) => s.is_mine && s.held_expires_at);
-  if (heldWithExpiry.length === 0) {
-    countdownSeconds.value = 0;
-    emit('held-seats-changed', {
-      heldSeats: myHeldSeats.value,
-      countdownSeconds: 0,
-    });
-    return;
-  }
-
-  // Find min expires_at
-  const earliestExpiry = Math.min(...heldWithExpiry.map((s) => new Date(s.held_expires_at).getTime()));
-  const now = Date.now();
-  const diffSecs = Math.max(0, Math.floor((earliestExpiry - now) / 1000));
-  countdownSeconds.value = diffSecs;
-  emit('held-seats-changed', {
-    heldSeats: myHeldSeats.value,
-    countdownSeconds: diffSecs,
-  });
-}
-
-// Handle Cancel Hold
-async function handleCancelHold(seat) {
-  processingSeatIds.value.add(seat.id);
-  try {
-    await api.post('/bookings/release', {
-      showtime_id: props.showtimeId,
-      seat_id: seat.id,
-    });
-    showToast(`Hold for Seat ${seat.row_label}${seat.seat_number} cancelled`, 'info');
-    await fetchSeats();
-  } catch (err) {
-    const errMsg = err.response?.data?.error || 'Failed to cancel hold';
-    showToast(errMsg, 'error');
-  } finally {
-    processingSeatIds.value.delete(seat.id);
-  }
-}
-
-// Handle Seat Click: Enqueue Booking Request or Cancel existing Hold
 async function handleSeatClick(seat) {
   if (!authStore.isAuthenticated) {
-    showToast('Please login to book seats', 'warning');
-    router.push({ name: 'Login', query: { redirect: router.currentRoute.value.fullPath } });
+    showToast('Please sign in or select a customer profile to reserve seats', 'warning');
     return;
   }
 
+  // Release hold if clicking own held seat
   if (seat.is_mine && seat.status === 'held') {
-    // Click on held seat cancels hold
-    await handleCancelHold(seat);
+    try {
+      processingSeatIds.value.add(seat.id);
+      await api.post('/release-hold', {
+        showtime_id: props.showtimeId,
+        seat_id: seat.id,
+      });
+      showToast(`Hold released for seat ${seat.row_label}${seat.seat_number}`, 'info');
+      await fetchSeats();
+    } catch (err) {
+      showToast(err.response?.data?.error || 'Failed to cancel hold', 'error');
+    } finally {
+      processingSeatIds.value.delete(seat.id);
+    }
     return;
   }
 
   if (seat.status !== 'available') return;
 
-  // Add to processing set
-  processingSeatIds.value.add(seat.id);
-
   try {
-    const res = await api.post('/bookings', {
+    processingSeatIds.value.add(seat.id);
+    const res = await api.post('/hold', {
       showtime_id: props.showtimeId,
       seat_id: seat.id,
     });
 
     const bookingUuid = res.data.booking_uuid;
     inFlightBookings.value.push(bookingUuid);
-    showToast(`Request for Seat ${seat.row_label}${seat.seat_number} enqueued...`, 'info');
-
-    // Poll this specific booking_uuid until resolved (§12 locked decision)
-    pollBookingStatus(bookingUuid, seat);
+    pollBookingStatus(bookingUuid, seat.id);
   } catch (err) {
     processingSeatIds.value.delete(seat.id);
-    const errText = err.response?.data?.error || 'Failed to enqueue booking';
-    showToast(errText, 'error');
+    showToast(err.response?.data?.error || 'Failed to queue seat hold', 'error');
   }
 }
 
-async function pollBookingStatus(uuid, seat) {
-  const maxAttempts = 30;
+async function pollBookingStatus(bookingUuid, seatId) {
+  const maxAttempts = 20;
   let attempts = 0;
 
   const interval = setInterval(async () => {
     attempts++;
     try {
-      const res = await api.get(`/bookings/${uuid}`);
-      const status = res.data.status;
+      const res = await api.get(`/booking/status/${bookingUuid}`);
+      const data = res.data;
 
-      if (status === 'success') {
+      if (data.status === 'success') {
         clearInterval(interval);
-        inFlightBookings.value = inFlightBookings.value.filter((id) => id !== uuid);
-        processingSeatIds.value.delete(seat.id);
-        showToast(`Seat ${seat.row_label}${seat.seat_number} held successfully!`, 'success');
-        // Trigger seat map refresh only on own booking resolve
+        inFlightBookings.value = inFlightBookings.value.filter((id) => id !== bookingUuid);
+        processingSeatIds.value.delete(seatId);
+        showToast('Seat hold confirmed! Complete checkout within 10 minutes.', 'success');
         await fetchSeats();
-      } else if (status === 'failed') {
+      } else if (data.status === 'failed') {
         clearInterval(interval);
-        inFlightBookings.value = inFlightBookings.value.filter((id) => id !== uuid);
-        processingSeatIds.value.delete(seat.id);
-        const reason = res.data.failure_reason === 'seat_taken' ? 'Seat was taken by another user' : (res.data.failure_reason || 'Booking failed');
-        showToast(`Seat ${seat.row_label}${seat.seat_number}: ${reason}`, 'error');
-        // Trigger seat map refresh
+        inFlightBookings.value = inFlightBookings.value.filter((id) => id !== bookingUuid);
+        processingSeatIds.value.delete(seatId);
+        showToast(`Could not hold seat: ${data.failure_reason || 'Already taken'}`, 'error');
         await fetchSeats();
       } else if (attempts >= maxAttempts) {
         clearInterval(interval);
-        inFlightBookings.value = inFlightBookings.value.filter((id) => id !== uuid);
-        processingSeatIds.value.delete(seat.id);
-        showToast(`Seat ${seat.row_label}${seat.seat_number} request timed out`, 'error');
+        inFlightBookings.value = inFlightBookings.value.filter((id) => id !== bookingUuid);
+        processingSeatIds.value.delete(seatId);
+        showToast('Queue processing timed out. Please try again.', 'warning');
         await fetchSeats();
       }
     } catch (err) {
       clearInterval(interval);
-      inFlightBookings.value = inFlightBookings.value.filter((id) => id !== uuid);
-      processingSeatIds.value.delete(seat.id);
-      console.error('Error polling booking status', err);
+      inFlightBookings.value = inFlightBookings.value.filter((id) => id !== bookingUuid);
+      processingSeatIds.value.delete(seatId);
     }
-  }, 400);
+  }, 1000);
 }
 
-onMounted(() => {
-  fetchSeats();
+function updateCountdown() {
+  const held = myHeldSeats.value;
+  if (held.length === 0) {
+    countdownSeconds.value = 0;
+    if (countdownInterval) clearInterval(countdownInterval);
+    return;
+  }
+
+  const earliestExpire = held.reduce((earliest, s) => {
+    if (!s.held_expires_at) return earliest;
+    const exp = new Date(s.held_expires_at).getTime();
+    return earliest ? Math.min(earliest, exp) : exp;
+  }, null);
+
+  if (!earliestExpire) return;
+
+  const diffSeconds = Math.max(0, Math.floor((earliestExpire - Date.now()) / 1000));
+  countdownSeconds.value = diffSeconds;
+
+  if (countdownInterval) clearInterval(countdownInterval);
   countdownInterval = setInterval(() => {
     if (countdownSeconds.value > 0) {
       countdownSeconds.value--;
-      emit('held-seats-changed', {
-        heldSeats: myHeldSeats.value,
-        countdownSeconds: countdownSeconds.value,
-      });
-      if (countdownSeconds.value === 0) {
-        // Expiry reached, refresh seats
-        fetchSeats();
-      }
+    } else {
+      clearInterval(countdownInterval);
+      fetchSeats();
     }
   }, 1000);
+}
+
+watch(
+  () => [props.showtimeId, props.theaterId],
+  () => {
+    fetchSeats();
+  }
+);
+
+onMounted(() => {
+  fetchSeats();
 });
 
 onUnmounted(() => {
   if (countdownInterval) clearInterval(countdownInterval);
 });
 
-watch(() => [props.theaterId, props.showtimeId], () => {
-  fetchSeats();
-});
-
 defineExpose({
   fetchSeats,
-  handleCancelHold,
 });
 </script>
 
@@ -400,87 +475,144 @@ defineExpose({
   overflow-x: auto;
 }
 
-.seating-grid {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  overflow-x: auto;
-  padding: 10px 0;
-}
-
-.seat-row {
-  min-width: max-content;
-}
-
-.screen-container {
+.screen-wrapper {
   perspective: 400px;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-.screen-curve {
-  width: 70%;
-  height: 14px;
+.cinema-screen {
+  height: 20px;
   background: linear-gradient(180deg, #f59e0b 0%, rgba(245, 158, 11, 0.1) 100%);
-  border-radius: 50% / 100% 100% 0 0;
-  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.4);
-}
-
-.tracking-widest {
-  letter-spacing: 0.25em;
-}
-
-.legend-box {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-}
-
-.seat-btn {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  border: none;
+  transform: rotateX(-20deg);
+  border-radius: 50% 50% 0 0;
+  box-shadow: 0 8px 20px rgba(245, 158, 11, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.screen-text {
+  font-size: 9px;
+  letter-spacing: 4px;
   color: #fff;
+  font-weight: 900;
+  opacity: 0.9;
 }
 
-.seat-btn:hover:not(:disabled) {
-  transform: translateY(-2px) scale(1.08);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+.legend-box {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
 }
 
-/* Zone Styles */
 .zone-vip {
-  background: linear-gradient(135deg, #d97706, #b45309);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(217, 119, 6, 0.3);
+  background: rgba(245, 158, 11, 0.25);
+  border: 1.5px solid #f59e0b;
 }
 
 .zone-premium {
-  background: linear-gradient(135deg, #4f46e5, #3730a3);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);
+  background: rgba(99, 102, 241, 0.25);
+  border: 1.5px solid #6366f1;
 }
 
 .zone-standard {
-  background: linear-gradient(135deg, #0d9488, #0f766e);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(13, 148, 136, 0.3);
+  background: rgba(20, 184, 166, 0.25);
+  border: 1.5px solid #14b8a6;
 }
 
-/* Status Styles */
+.seat-held-mine-legend {
+  background: #f59e0b;
+  border: 1.5px solid #f59e0b;
+}
+
+.seat-canvas-container {
+  position: relative;
+  min-height: 480px;
+  padding: 16px;
+  background: #131722;
+  border-radius: 12px;
+  border: 1px dashed #2a3142;
+  overflow-x: auto;
+}
+
+.seat-row {
+  flex-wrap: nowrap;
+  min-width: max-content;
+}
+
+.row-header-placeholder {
+  min-width: 32px;
+}
+
+.col-header-number {
+  min-width: 32px;
+  width: 32px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.row-header-btn {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 2px;
+  border-radius: 6px;
+  border: 1px solid #3b4256;
+  background: #1e2330;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.row-header-label-right {
+  min-width: 32px;
+  text-align: center;
+}
+
+.seat-node {
+  position: relative;
+  min-width: 32px;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1.5px solid #4b5563;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.seat-available:hover {
+  transform: scale(1.15);
+  z-index: 5;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
 .seat-held-mine {
-  background: #10b981 !important;
-  color: #fff !important;
-  box-shadow: 0 0 12px #10b981;
-  animation: pulse-border 2s infinite;
+  border-color: #f59e0b !important;
+  border-width: 2px !important;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.6) !important;
+  transform: scale(1.08);
+  animation: pulse-hold 2s infinite ease-in-out;
+}
+
+@keyframes pulse-hold {
+  0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
+  50% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.9); }
 }
 
 .seat-held-mine .seat-icon-check {
@@ -493,6 +625,7 @@ defineExpose({
 
 .seat-held-mine:hover {
   background: #ef4444 !important;
+  border-color: #ef4444 !important;
   box-shadow: 0 0 14px rgba(239, 68, 68, 0.8) !important;
   animation: none !important;
 }
@@ -507,46 +640,62 @@ defineExpose({
 
 .seat-processing {
   background: #3b82f6 !important;
+  border-color: #3b82f6 !important;
   color: #fff !important;
   opacity: 0.8;
   animation: pulse-opac 1s infinite alternate;
 }
 
+@keyframes pulse-opac {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
 .seat-held-other,
 .seat-confirmed,
 .seat-taken {
-  background: #2b3245 !important;
+  background: #1f2937 !important;
+  border-color: #374151 !important;
   color: #64748b !important;
   cursor: not-allowed;
   opacity: 0.5;
 }
 
-.seat-spacer {
+.empty-grid-slot {
+  position: relative;
+  min-width: 32px;
   width: 32px;
   height: 32px;
-  visibility: hidden;
+  border-radius: 6px;
+  border: 1px dashed rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.01);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
-.gap-2 {
-  gap: 8px;
+.empty-slot-number {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.08);
+  font-family: monospace;
 }
 
-.gap-4 {
-  gap: 16px;
+.seat-number-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.gap-1 {
+  gap: 4px;
+}
+
+.gap-3 {
+  gap: 12px;
 }
 
 .max-w-xl {
   max-width: 600px;
-}
-
-@keyframes pulse-border {
-  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
-  70% { box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
-}
-
-@keyframes pulse-opac {
-  from { opacity: 0.6; }
-  to { opacity: 1; }
 }
 </style>

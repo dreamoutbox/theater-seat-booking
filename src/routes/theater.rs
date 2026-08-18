@@ -30,6 +30,8 @@ pub struct CreateTheaterPayload {
 #[derive(Debug, Deserialize)]
 pub struct CreateEventPayload {
     pub title: String,
+    pub max_seats_per_booking: Option<i32>,
+    pub max_seats_per_user: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -210,15 +212,17 @@ pub async fn delete_theater(
 pub async fn list_events(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Event>>, (StatusCode, Json<serde_json::Value>)> {
-    let events: Vec<Event> = sqlx::query_as("SELECT id, title FROM events ORDER BY title")
-        .fetch_all(&state.pool)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let events: Vec<Event> = sqlx::query_as(
+        "SELECT id, title, max_seats_per_booking, max_seats_per_user FROM events ORDER BY title",
+    )
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
 
     Ok(Json(events))
 }
@@ -251,10 +255,17 @@ pub async fn create_event(
         ));
     }
 
+    let max_booking = payload.max_seats_per_booking.unwrap_or(6).max(1);
+    let max_user = payload.max_seats_per_user.unwrap_or(10).max(1);
+
     let event: Event = sqlx::query_as(
-        "INSERT INTO events (title) VALUES ($1) RETURNING id, title",
+        "INSERT INTO events (title, max_seats_per_booking, max_seats_per_user)
+         VALUES ($1, $2, $3)
+         RETURNING id, title, max_seats_per_booking, max_seats_per_user",
     )
     .bind(title)
+    .bind(max_booking)
+    .bind(max_user)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| {
@@ -298,10 +309,18 @@ pub async fn update_event(
         ));
     }
 
+    let max_booking = payload.max_seats_per_booking.unwrap_or(6).max(1);
+    let max_user = payload.max_seats_per_user.unwrap_or(10).max(1);
+
     let event: Option<Event> = sqlx::query_as(
-        "UPDATE events SET title = $1 WHERE id = $2 RETURNING id, title",
+        "UPDATE events
+         SET title = $1, max_seats_per_booking = $2, max_seats_per_user = $3
+         WHERE id = $4
+         RETURNING id, title, max_seats_per_booking, max_seats_per_user",
     )
     .bind(title)
+    .bind(max_booking)
+    .bind(max_user)
     .bind(id)
     .fetch_optional(&state.pool)
     .await
@@ -314,7 +333,7 @@ pub async fn update_event(
 
     match event {
         Some(e) => {
-            tracing::info!(event_id = %id, title = %e.title, "Updated event");
+            tracing::info!(event_id = %id, title = %e.title, max_booking = %e.max_seats_per_booking, max_user = %e.max_seats_per_user, "Updated event");
             Ok(Json(e))
         }
         None => Err((

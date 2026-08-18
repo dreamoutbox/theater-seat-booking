@@ -11,33 +11,18 @@
       Showtimes
     </v-btn>
 
-    <v-btn 
-      v-if="authStore.isStaff" 
-      variant="text" 
-      prepend-icon="mdi-theater" 
-      to="/manage/theaters" 
-      class="text-none font-weight-medium text-amber-darken-1"
-    >
-      Theaters
+    <v-btn v-if="authStore.isStaff" variant="text" prepend-icon="mdi-theater" to="/manage/theaters"
+      class="text-none font-weight-medium text-amber-darken-1">
+      Manage Theaters
     </v-btn>
 
-    <v-btn 
-      v-if="authStore.isElevated" 
-      variant="text" 
-      prepend-icon="mdi-movie-edit" 
-      to="/manage/events" 
-      class="text-none font-weight-medium text-amber-darken-1"
-    >
+    <v-btn v-if="authStore.isElevated" variant="text" prepend-icon="mdi-movie-edit" to="/manage/events"
+      class="text-none font-weight-medium text-amber-darken-1">
       Manage Events
     </v-btn>
 
-    <v-btn 
-      v-if="authStore.isAuthenticated" 
-      variant="text" 
-      prepend-icon="mdi-ticket-confirmation" 
-      to="/orders" 
-      class="text-none font-weight-medium"
-    >
+    <v-btn v-if="authStore.isAuthenticated" variant="text" prepend-icon="mdi-ticket-confirmation" to="/orders"
+      class="text-none font-weight-medium">
       {{ authStore.isElevated ? 'Manage Orders' : 'My Orders' }}
     </v-btn>
 
@@ -46,26 +31,15 @@
     <!-- Demo Role Switcher Menu -->
     <v-menu location="bottom end">
       <template #activator="{ props }">
-        <v-btn
-          v-bind="props"
-          variant="outlined"
-          color="amber-darken-1"
-          size="small"
-          prepend-icon="mdi-account-switch"
-          class="text-none mr-2"
-        >
+        <v-btn v-bind="props" variant="outlined" color="amber-darken-1" size="small" prepend-icon="mdi-account-switch"
+          class="text-none mr-2">
           Demo Switcher
         </v-btn>
       </template>
       <v-list density="compact" bg-color="#1e222d" class="pa-1">
         <v-list-subheader class="text-caption text-grey">SWITCH DEMO ACCOUNT</v-list-subheader>
-        <v-list-item
-          v-for="acc in demoAccounts"
-          :key="acc.email"
-          @click="quickLogin(acc.email, acc.password)"
-          class="rounded mb-1"
-          :active="authStore.user?.email === acc.email"
-        >
+        <v-list-item v-for="acc in demoAccounts" :key="acc.email" @click="quickLogin(acc.email, acc.password)"
+          class="rounded mb-1" :active="authStore.user?.email === acc.email">
           <template #prepend>
             <v-chip size="x-small" :color="getRoleColor(acc.role)" class="mr-2 font-weight-bold">
               {{ acc.role.toUpperCase() }}
@@ -79,12 +53,8 @@
 
     <!-- User Profile or Login -->
     <template v-if="authStore.isAuthenticated">
-      <v-chip
-        size="small"
-        :color="getRoleColor(authStore.role)"
-        variant="tonal"
-        class="mr-2 text-capitalize font-weight-bold"
-      >
+      <v-chip size="small" :color="getRoleColor(authStore.role)" variant="tonal"
+        class="mr-2 text-capitalize font-weight-bold">
         <v-icon start icon="mdi-shield-account" size="14"></v-icon>
         {{ formatRole(authStore.role) }}
       </v-chip>
@@ -93,14 +63,8 @@
         {{ authStore.user?.email }}
       </span>
 
-      <v-btn
-        variant="text"
-        icon="mdi-logout"
-        size="small"
-        color="red-lighten-2"
-        @click="handleLogout"
-        title="Logout"
-      ></v-btn>
+      <v-btn variant="text" icon="mdi-logout" size="small" color="red-lighten-2" @click="handleLogout"
+        title="Logout"></v-btn>
     </template>
     <template v-else>
       <v-btn variant="text" to="/login" class="text-none mr-2">
