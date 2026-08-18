@@ -1,0 +1,63 @@
+import { createRouter, createWebHistory } from 'vue-router';
+import HomeView from '../views/HomeView.vue';
+import BookingView from '../views/BookingView.vue';
+import OrdersView from '../views/OrdersView.vue';
+import LoginView from '../views/LoginView.vue';
+import RegisterView from '../views/RegisterView.vue';
+import { useAuthStore } from '../stores/auth';
+
+const routes = [
+  {
+    path: '/',
+    name: 'Home',
+    component: HomeView,
+  },
+  {
+    path: '/booking/:showtimeId',
+    name: 'Booking',
+    component: BookingView,
+    props: true,
+  },
+  {
+    path: '/orders',
+    name: 'Orders',
+    component: OrdersView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: LoginView,
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: RegisterView,
+  },
+];
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes,
+});
+
+router.beforeEach(async (to, from, next) => {
+  const authStore = useAuthStore();
+  if (!authStore.initialized) {
+    await authStore.fetchMe();
+  }
+
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    return next({ name: 'Login', query: { redirect: to.fullPath } });
+  }
+
+  if (to.meta.roles && Array.isArray(to.meta.roles)) {
+    if (!to.meta.roles.includes(authStore.role)) {
+      return next({ name: 'Home' });
+    }
+  }
+
+  next();
+});
+
+export default router;
