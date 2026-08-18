@@ -324,7 +324,7 @@ async function handleCreateAndPayOrder() {
   try {
     // 1. Create order: POST /api/orders
     const orderRes = await api.post('/orders', {
-      seat_booking_ids: myHeldSeats.value.map((s) => s.id),
+      seat_booking_ids: myHeldSeats.value.map((s) => s.seat_booking_id || s.id),
     });
 
     const orderId = orderRes.data.order_id;

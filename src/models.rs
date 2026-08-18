@@ -87,6 +87,7 @@ pub struct SeatWithStatus {
     pub status: String, // "available", "held", "confirmed"
     pub is_mine: bool,
     pub held_expires_at: Option<DateTime<Utc>>,
+    pub seat_booking_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

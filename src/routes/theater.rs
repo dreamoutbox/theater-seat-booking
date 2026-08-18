@@ -105,7 +105,13 @@ pub async fn get_theater_seats(
             CASE
                 WHEN sb.status = 'held' AND sb.expires_at > now() THEN sb.expires_at
                 ELSE NULL
-            END AS held_expires_at
+            END AS held_expires_at,
+            CASE
+                WHEN sb.id IS NOT NULL 
+                     AND (sb.status = 'confirmed' OR (sb.status = 'held' AND sb.expires_at > now()))
+                     AND sb.user_id = $3 THEN sb.id
+                ELSE NULL
+            END AS seat_booking_id
         FROM seats s
         JOIN zones z ON z.id = s.zone_id
         LEFT JOIN seat_bookings sb 

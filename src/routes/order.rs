@@ -58,7 +58,7 @@ pub async fn create_order(
          FROM seat_bookings sb
          JOIN seats s ON s.id = sb.seat_id
          JOIN zones z ON z.id = s.zone_id
-         WHERE sb.id = ANY($1) 
+         WHERE (sb.id = ANY($1) OR sb.seat_id = ANY($1))
            AND sb.user_id = $2 
            AND sb.status = 'held' 
            AND sb.expires_at > now()
