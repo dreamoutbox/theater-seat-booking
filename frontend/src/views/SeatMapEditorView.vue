@@ -1607,9 +1607,10 @@ async function saveLayout() {
   try {
     const payload = {
       zones: draftZones.value.map(z => ({
-        id: z.id || null,
+        id: (z.id && !z.id.toString().startsWith('temp-') && !z.id.toString().startsWith('zone_')) ? z.id : null,
         name: z.name.trim(),
         price_cents: z.price_cents,
+        color: z.color || '#14b8a6',
       })),
       seats: draftSeats.value.map(s => ({
         id: s.id || null,
