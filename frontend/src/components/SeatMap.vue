@@ -58,41 +58,43 @@
 
         <!-- Seats in Row -->
         <div class="d-flex gap-2">
-          <button
-            v-for="seat in row.seats"
-            :key="seat.id"
-            class="seat-btn"
-            :class="getSeatClasses(seat)"
-            :disabled="isSeatDisabled(seat)"
-            @click="handleSeatClick(seat)"
-            :title="getSeatTooltip(seat)"
-          >
-            <v-progress-circular
-              v-if="isSeatProcessing(seat.id)"
-              indeterminate
-              size="14"
-              width="2"
-              color="white"
-            ></v-progress-circular>
-            <v-icon
-              v-else-if="seat.status === 'confirmed' || (seat.status === 'held' && !seat.is_mine)"
-              icon="mdi-lock"
-              size="12"
-            ></v-icon>
-            <template v-else-if="seat.is_mine && seat.status === 'held'">
-              <v-icon
-                icon="mdi-check"
+          <template v-for="slot in row.slots" :key="`${row.label}-${slot.seatNumber}`">
+            <button
+              v-if="slot.seat"
+              class="seat-btn"
+              :class="getSeatClasses(slot.seat)"
+              :disabled="isSeatDisabled(slot.seat)"
+              @click="handleSeatClick(slot.seat)"
+              :title="getSeatTooltip(slot.seat)"
+            >
+              <v-progress-circular
+                v-if="isSeatProcessing(slot.seat.id)"
+                indeterminate
                 size="14"
-                class="seat-icon-check"
-              ></v-icon>
+                width="2"
+                color="white"
+              ></v-progress-circular>
               <v-icon
-                icon="mdi-close"
-                size="14"
-                class="seat-icon-cancel"
+                v-else-if="slot.seat.status === 'confirmed' || (slot.seat.status === 'held' && !slot.seat.is_mine)"
+                icon="mdi-lock"
+                size="12"
               ></v-icon>
-            </template>
-            <span v-else class="seat-num">{{ seat.seat_number }}</span>
-          </button>
+              <template v-else-if="slot.seat.is_mine && slot.seat.status === 'held'">
+                <v-icon
+                  icon="mdi-check"
+                  size="14"
+                  class="seat-icon-check"
+                ></v-icon>
+                <v-icon
+                  icon="mdi-close"
+                  size="14"
+                  class="seat-icon-cancel"
+                ></v-icon>
+              </template>
+              <span v-else class="seat-num">{{ slot.seat.seat_number }}</span>
+            </button>
+            <div v-else class="seat-spacer"></div>
+          </template>
         </div>
 
         <span class="row-label ml-4 text-body-2 font-weight-bold text-grey">{{ row.label }}</span>
@@ -142,16 +144,36 @@ function showToast(text, color = 'info') {
   snackbar.value = { show: true, text, color };
 }
 
-// Group seats by row
+// Compute maximum seat number across the theater to preserve grid alignment
+const maxSeatCol = computed(() => {
+  let max = 0;
+  for (const s of seats.value) {
+    if (s.seat_number > max) max = s.seat_number;
+  }
+  return max || 14;
+});
+
+// Group seats by row with fixed slot positions
 const groupedRows = computed(() => {
   const map = {};
   for (const s of seats.value) {
     if (!map[s.row_label]) {
-      map[s.row_label] = { label: s.row_label, seats: [] };
+      map[s.row_label] = {};
     }
-    map[s.row_label].seats.push(s);
+    map[s.row_label][s.seat_number] = s;
   }
-  return Object.values(map).sort((a, b) => a.label.localeCompare(b.label));
+
+  const sortedLabels = Object.keys(map).sort((a, b) => a.localeCompare(b));
+  return sortedLabels.map((label) => {
+    const slots = [];
+    for (let num = 1; num <= maxSeatCol.value; num++) {
+      slots.push({
+        seatNumber: num,
+        seat: map[label][num] || null,
+      });
+    }
+    return { label, slots };
+  });
 });
 
 const myHeldSeats = computed(() => {
@@ -482,6 +504,12 @@ defineExpose({
   color: #64748b !important;
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.seat-spacer {
+  width: 32px;
+  height: 32px;
+  visibility: hidden;
 }
 
 .gap-2 {

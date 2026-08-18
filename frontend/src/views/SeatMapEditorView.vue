@@ -113,7 +113,7 @@
 
             <!-- Quick Selection Helpers -->
             <div class="d-flex align-center gap-2">
-              <span class="text-caption text-grey">Drag box to select • Press Delete to remove</span>
+              <span class="text-caption text-grey">Drag box to select / create • Press Delete to remove</span>
               <v-btn size="x-small" variant="text" color="amber-darken-1" @click="selectAllSeats">
                 Select All ({{ draftSeats.length }})
               </v-btn>
@@ -130,7 +130,7 @@
             </div>
           </div>
 
-          <!-- Interactive Drag-Select Canvas -->
+          <!-- Interactive Drag-Select Canvas with Fixed Grid Structure -->
           <div
             ref="canvasRef"
             class="seat-canvas-container"
@@ -151,64 +151,90 @@
               }"
             ></div>
 
-            <!-- Empty State -->
-            <div v-if="draftSeats.length === 0" class="text-center pa-12">
-              <v-icon icon="mdi-seat-outline" size="56" color="grey" class="mb-3"></v-icon>
-              <div class="text-h6 text-grey font-weight-medium">No seats in this theater yet</div>
-              <div class="text-caption text-grey-darken-1 mt-1">
-                Drag on the canvas or click Seat Generator to create auditorium rows in seconds.
+            <!-- Grid Header Column Numbers -->
+            <div class="d-flex align-center gap-2 mb-2 justify-center">
+              <div class="row-header-placeholder"></div>
+              <div class="d-flex align-center gap-1 seat-row-items">
+                <div
+                  v-for="col in gridMaxCols"
+                  :key="col"
+                  class="col-header-number text-caption text-grey font-weight-bold font-weight-mono"
+                >
+                  {{ col }}
+                </div>
               </div>
-              <v-btn color="indigo-darken-1" variant="flat" prepend-icon="mdi-grid" class="mt-4 text-none font-weight-bold" @click="openGridGeneratorDialog">
-                Open Seat Generator
-              </v-btn>
+              <div class="row-header-placeholder"></div>
             </div>
 
-            <!-- Rows of Seats -->
-            <div v-else class="d-flex flex-column gap-3 align-center">
+            <!-- Rows of Grid Slots (Seats + Walkway/Empty Placeholders) -->
+            <div class="d-flex flex-column gap-2 align-center">
               <div
-                v-for="row in sortedRows"
+                v-for="row in gridRows"
                 :key="row.label"
                 class="seat-row d-flex align-center gap-2"
               >
-                <!-- Row Selector Header Button -->
+                <!-- Row Left Selector Header Button -->
                 <button
                   type="button"
                   class="row-header-btn"
-                  :class="{ 'row-header-selected': isRowFullySelected(row.label) }"
+                  :class="{
+                    'row-header-selected': isRowFullySelected(row.label),
+                    'row-header-empty': !hasSeatsInRow(row.label),
+                  }"
                   :title="`Click to toggle selection for Row ${row.label}`"
                   @click.stop="toggleRowSelection(row.label)"
                 >
                   {{ row.label }}
                 </button>
 
-                <!-- Seats in this row -->
+                <!-- Grid Slots in this row -->
                 <div class="d-flex align-center gap-1 seat-row-items">
-                  <div
-                    v-for="seat in row.seats"
-                    :key="`${seat.row_label}-${seat.seat_number}`"
-                    :ref="el => registerSeatElement(el, seat.row_label, seat.seat_number)"
-                    class="seat-node"
-                    :class="{
-                      'seat-node-selected': isSeatSelected(seat.row_label, seat.seat_number),
-                    }"
-                    :style="{
-                      borderColor: getZoneColorHex(getZoneName(seat.zone_id)),
-                      background: isSeatSelected(seat.row_label, seat.seat_number)
-                        ? 'rgba(245, 158, 11, 0.35)'
-                        : getZoneBgColorHex(getZoneName(seat.zone_id)),
-                    }"
-                    :title="`Row ${seat.row_label}, Seat ${seat.seat_number} (${getZoneName(seat.zone_id)} - $${(getZonePrice(seat.zone_id) / 100).toFixed(2)})`"
-                    @click.stop="handleSeatClick(seat, $event)"
-                  >
-                    <span class="seat-number-label">{{ seat.seat_number }}</span>
-                    <v-icon
-                      v-if="isSeatSelected(seat.row_label, seat.seat_number)"
-                      icon="mdi-check"
-                      size="12"
-                      color="amber-darken-1"
-                      class="selected-check-icon"
-                    ></v-icon>
-                  </div>
+                  <template v-for="slot in row.slots" :key="`${slot.rowLabel}-${slot.seatNumber}`">
+                    <!-- Case 1: Active Seat exists -->
+                    <div
+                      v-if="slot.seat"
+                      :ref="el => registerSlotElement(el, slot.rowLabel, slot.seatNumber)"
+                      class="seat-node"
+                      :class="{
+                        'seat-node-selected': isSeatSelected(slot.rowLabel, slot.seatNumber),
+                      }"
+                      :style="{
+                        borderColor: getZoneColorHex(getZoneName(slot.seat.zone_id)),
+                        background: isSeatSelected(slot.rowLabel, slot.seatNumber)
+                          ? 'rgba(245, 158, 11, 0.35)'
+                          : getZoneBgColorHex(getZoneName(slot.seat.zone_id)),
+                      }"
+                      :title="`Row ${slot.rowLabel}, Seat ${slot.seatNumber} (${getZoneName(slot.seat.zone_id)} - $${(getZonePrice(slot.seat.zone_id) / 100).toFixed(2)})`"
+                      @click.stop="handleSeatClick(slot.seat, $event)"
+                    >
+                      <span class="seat-number-label">{{ slot.seatNumber }}</span>
+                      <v-icon
+                        v-if="isSeatSelected(slot.rowLabel, slot.seatNumber)"
+                        icon="mdi-check"
+                        size="12"
+                        color="amber-darken-1"
+                        class="selected-check-icon"
+                      ></v-icon>
+                    </div>
+
+                    <!-- Case 2: Empty Grid Slot (Walkway or Vacant Slot) -->
+                    <div
+                      v-else
+                      :ref="el => registerSlotElement(el, slot.rowLabel, slot.seatNumber)"
+                      class="empty-grid-slot"
+                      :class="{
+                        'hint-slot-active': isSlotInHint(slot.rowLabel, slot.seatNumber),
+                      }"
+                      :title="`Empty Slot: Row ${slot.rowLabel}, Seat ${slot.seatNumber} (Click to create seat)`"
+                      @click.stop="createSeatAtSlot(slot.rowLabel, slot.seatNumber)"
+                    >
+                      <template v-if="isSlotInHint(slot.rowLabel, slot.seatNumber)">
+                        <v-icon icon="mdi-plus" size="12" color="amber-darken-1"></v-icon>
+                        <span class="hint-label">{{ slot.rowLabel }}{{ slot.seatNumber }}</span>
+                      </template>
+                      <span v-else class="empty-slot-number">{{ slot.seatNumber }}</span>
+                    </div>
+                  </template>
                 </div>
 
                 <!-- Row Right Header Label -->
@@ -235,12 +261,43 @@
             </v-chip>
           </div>
 
-          <!-- Empty selection helper or selection info -->
-          <div v-if="selectedSeatKeys.size === 0" class="pa-3 rounded-lg bg-surface-variant border border-dashed mb-4 text-center">
+          <!-- Hint Slots creation prompt if empty slots dragged -->
+          <div v-if="hintSlotsToCreate.size > 0 && selectedSeatKeys.size === 0" class="pa-3 rounded-lg bg-indigo-darken-4 border mb-4">
+            <div class="d-flex align-center gap-2 mb-1">
+              <v-icon icon="mdi-creation" color="amber-darken-1" size="18"></v-icon>
+              <span class="text-body-2 font-weight-bold text-white">{{ hintSlotsToCreate.size }} Empty Slots Selected</span>
+            </div>
+            <div class="text-caption text-grey-lighten-2 mb-3">
+              Create seats across highlighted grid slots in rows <strong>{{ inferredRange.startRow }}–{{ inferredRange.endRow }}</strong>.
+            </div>
+            <v-btn
+              color="amber-darken-1"
+              variant="flat"
+              block
+              size="small"
+              prepend-icon="mdi-plus"
+              class="text-none font-weight-bold mb-2"
+              @click="createSeatsFromHintSlots"
+            >
+              Create {{ hintSlotsToCreate.size }} Seats Here
+            </v-btn>
+            <v-btn
+              variant="text"
+              block
+              size="x-small"
+              class="text-none text-grey"
+              @click="hintSlotsToCreate.clear()"
+            >
+              Cancel Preview
+            </v-btn>
+          </div>
+
+          <!-- Empty selection helper -->
+          <div v-else-if="selectedSeatKeys.size === 0" class="pa-3 rounded-lg bg-surface-variant border border-dashed mb-4 text-center">
             <v-icon icon="mdi-cursor-default-click" size="24" color="grey" class="mb-1"></v-icon>
             <div class="text-caption text-grey font-weight-medium">No seats selected</div>
             <div class="text-caption text-grey-darken-1 mt-1">
-              Click seats or drag a box on the canvas to bulk reassign zones, rename rows, or delete.
+              Click seats or drag a box on the grid to bulk reassign zones, rename rows, or delete.
             </div>
           </div>
 
@@ -587,7 +644,8 @@ const draftZones = ref([]);
 const draftSeats = ref([]);
 
 const selectedSeatKeys = ref(new Set()); // Set of "ROW-SEATNUM" strings
-const seatElementMap = new Map(); // "ROW-SEATNUM" -> DOMElement
+const hintSlotsToCreate = ref(new Set()); // Set of "ROW-SEATNUM" empty slots currently in marquee
+const slotElementMap = new Map(); // "ROW-SEATNUM" -> DOMElement (both seats and empty slots)
 
 const bulkZoneId = ref(null);
 const bulkRowLabel = ref('');
@@ -643,27 +701,58 @@ function showToast(text, color = 'info') {
   snackbar.value = { show: true, text, color };
 }
 
-function registerSeatElement(el, rowLabel, seatNumber) {
+function registerSlotElement(el, rowLabel, seatNumber) {
   if (el) {
-    seatElementMap.set(`${rowLabel}-${seatNumber}`, el);
+    slotElementMap.set(`${rowLabel}-${seatNumber}`, el);
   }
 }
 
-// Group and sort draft seats into rows
-const sortedRows = computed(() => {
-  const rowMap = new Map();
+// Compute maximum row and columns for the structured 2D grid matrix
+const gridMaxRowChar = computed(() => {
+  let maxCode = 'H'.charCodeAt(0);
   for (const s of draftSeats.value) {
-    if (!rowMap.has(s.row_label)) {
-      rowMap.set(s.row_label, []);
-    }
-    rowMap.get(s.row_label).push(s);
+    const code = s.row_label.toUpperCase().charCodeAt(0);
+    if (code > maxCode) maxCode = code;
+  }
+  return String.fromCharCode(maxCode);
+});
+
+const gridMaxCols = computed(() => {
+  let maxNum = 14;
+  for (const s of draftSeats.value) {
+    if (s.seat_number > maxNum) maxNum = s.seat_number;
+  }
+  return maxNum;
+});
+
+// Build 2D matrix of rows and slots (maintains fixed grid geometry without shrinking)
+const gridRows = computed(() => {
+  const startCode = 'A'.charCodeAt(0);
+  const endCode = gridMaxRowChar.value.charCodeAt(0);
+  const rows = [];
+
+  const seatMap = new Map();
+  for (const s of draftSeats.value) {
+    seatMap.set(`${s.row_label}-${s.seat_number}`, s);
   }
 
-  const sortedLabels = Array.from(rowMap.keys()).sort((a, b) => a.localeCompare(b));
-  return sortedLabels.map(label => {
-    const seats = rowMap.get(label).sort((a, b) => a.seat_number - b.seat_number);
-    return { label, seats };
-  });
+  for (let c = startCode; c <= endCode; c++) {
+    const rowLabel = String.fromCharCode(c);
+    const slots = [];
+    for (let num = 1; num <= gridMaxCols.value; num++) {
+      const seat = seatMap.get(`${rowLabel}-${num}`) || null;
+      slots.push({
+        rowLabel,
+        seatNumber: num,
+        seat,
+      });
+    }
+    rows.push({
+      label: rowLabel,
+      slots,
+    });
+  }
+  return rows;
 });
 
 const isModified = computed(() => {
@@ -719,6 +808,14 @@ function isSeatSelected(rowLabel, seatNumber) {
   return selectedSeatKeys.value.has(`${rowLabel}-${seatNumber}`);
 }
 
+function isSlotInHint(rowLabel, seatNumber) {
+  return hintSlotsToCreate.value.has(`${rowLabel}-${seatNumber}`);
+}
+
+function hasSeatsInRow(rowLabel) {
+  return draftSeats.value.some(s => s.row_label === rowLabel);
+}
+
 function isRowFullySelected(rowLabel) {
   const rowSeats = draftSeats.value.filter(s => s.row_label === rowLabel);
   if (rowSeats.length === 0) return false;
@@ -727,8 +824,25 @@ function isRowFullySelected(rowLabel) {
 
 function toggleRowSelection(rowLabel) {
   const rowSeats = draftSeats.value.filter(s => s.row_label === rowLabel);
-  const fullySelected = isRowFullySelected(rowLabel);
 
+  if (rowSeats.length === 0) {
+    // If row is empty, fill row with default zone seats across all cols
+    const defaultZoneId = draftZones.value[0]?.id;
+    if (defaultZoneId) {
+      for (let num = 1; num <= gridMaxCols.value; num++) {
+        draftSeats.value.push({
+          id: null,
+          zone_id: defaultZoneId,
+          row_label: rowLabel,
+          seat_number: num,
+        });
+      }
+      showToast(`Created Row ${rowLabel} with ${gridMaxCols.value} seats`, 'success');
+    }
+    return;
+  }
+
+  const fullySelected = isRowFullySelected(rowLabel);
   const nextSet = new Set(selectedSeatKeys.value);
   for (const s of rowSeats) {
     const key = `${s.row_label}-${s.seat_number}`;
@@ -761,7 +875,57 @@ function handleSeatClick(seat, event) {
     }
   }
   selectedSeatKeys.value = nextSet;
+  hintSlotsToCreate.value.clear();
   updateInferredRangeFromSelection();
+}
+
+function createSeatAtSlot(rowLabel, seatNumber) {
+  const defaultZoneId = bulkZoneId.value || draftZones.value[0]?.id;
+  if (!defaultZoneId) {
+    showToast('Please create a zone first', 'warning');
+    return;
+  }
+
+  draftSeats.value.push({
+    id: null,
+    zone_id: defaultZoneId,
+    row_label: rowLabel,
+    seat_number: seatNumber,
+  });
+
+  const key = `${rowLabel}-${seatNumber}`;
+  const nextSet = new Set(selectedSeatKeys.value);
+  nextSet.add(key);
+  selectedSeatKeys.value = nextSet;
+  hintSlotsToCreate.value.clear();
+  showToast(`Seat ${rowLabel}${seatNumber} created`, 'success');
+}
+
+function createSeatsFromHintSlots() {
+  const defaultZoneId = bulkZoneId.value || draftZones.value[0]?.id;
+  if (!defaultZoneId || hintSlotsToCreate.value.size === 0) return;
+
+  const count = hintSlotsToCreate.value.size;
+  const newSelected = new Set(selectedSeatKeys.value);
+
+  for (const key of hintSlotsToCreate.value) {
+    const [row, numStr] = key.split('-');
+    const num = parseInt(numStr, 10);
+    const existing = draftSeats.value.find(s => s.row_label === row && s.seat_number === num);
+    if (!existing) {
+      draftSeats.value.push({
+        id: null,
+        zone_id: defaultZoneId,
+        row_label: row,
+        seat_number: num,
+      });
+    }
+    newSelected.add(key);
+  }
+
+  selectedSeatKeys.value = newSelected;
+  hintSlotsToCreate.value.clear();
+  showToast(`Created ${count} seats in selected grid area`, 'success');
 }
 
 function selectAllSeats() {
@@ -770,11 +934,13 @@ function selectAllSeats() {
     nextSet.add(`${s.row_label}-${s.seat_number}`);
   }
   selectedSeatKeys.value = nextSet;
+  hintSlotsToCreate.value.clear();
   updateInferredRangeFromSelection();
 }
 
 function clearSelection() {
   selectedSeatKeys.value = new Set();
+  hintSlotsToCreate.value.clear();
 }
 
 function updateInferredRangeFromSelection() {
@@ -818,6 +984,7 @@ function handleCanvasMouseDown(e) {
 
   if (!e.shiftKey && !e.ctrlKey) {
     selectedSeatKeys.value = new Set();
+    hintSlotsToCreate.value.clear();
   }
 }
 
@@ -833,7 +1000,7 @@ function handleCanvasMouseMove(e) {
   marquee.width = Math.abs(currentX - marquee.startX);
   marquee.height = Math.abs(currentY - marquee.startY);
 
-  // Compute intersections with seat elements
+  // Compute intersections with all grid slots (both seats and empty slots)
   const boxRect = {
     left: marquee.left + rect.left,
     top: marquee.top + rect.top,
@@ -841,8 +1008,12 @@ function handleCanvasMouseMove(e) {
     bottom: marquee.top + marquee.height + rect.top,
   };
 
-  const nextSet = new Set(selectedSeatKeys.value);
-  for (const [key, el] of seatElementMap.entries()) {
+  const nextSelected = new Set(e.shiftKey || e.ctrlKey ? selectedSeatKeys.value : []);
+  const nextHints = new Set();
+
+  const seatKeySet = new Set(draftSeats.value.map(s => `${s.row_label}-${s.seat_number}`));
+
+  for (const [key, el] of slotElementMap.entries()) {
     if (!el) continue;
     const elRect = el.getBoundingClientRect();
     const overlaps = !(
@@ -851,11 +1022,18 @@ function handleCanvasMouseMove(e) {
       elRect.bottom < boxRect.top ||
       elRect.top > boxRect.bottom
     );
+
     if (overlaps) {
-      nextSet.add(key);
+      if (seatKeySet.has(key)) {
+        nextSelected.add(key);
+      } else {
+        nextHints.add(key);
+      }
     }
   }
-  selectedSeatKeys.value = nextSet;
+
+  selectedSeatKeys.value = nextSelected;
+  hintSlotsToCreate.value = nextHints;
 }
 
 function handleCanvasMouseUp() {
@@ -864,23 +1042,27 @@ function handleCanvasMouseUp() {
 
   if (selectedSeatKeys.value.size > 0) {
     updateInferredRangeFromSelection();
-  } else if (marquee.width > 20 && marquee.height > 20) {
-    // Empty space drag: infer rows and seats from geometric dimensions
-    // Approximate row height ~ 44px (seat 32px + gap 12px), seat width ~ 36px (seat 32px + gap 4px)
-    const rowOffset = Math.max(0, Math.floor((marquee.top - 20) / 44));
-    const rowSpan = Math.max(1, Math.ceil(marquee.height / 44));
-    const startRowCode = 65 + Math.min(25, rowOffset);
-    const endRowCode = Math.min(90, startRowCode + rowSpan - 1);
-
-    const seatOffset = Math.max(1, Math.floor((marquee.left - 40) / 36) + 1);
-    const seatSpan = Math.max(1, Math.ceil(marquee.width / 36));
-
-    inferredRange.value = {
-      startRow: String.fromCharCode(startRowCode),
-      endRow: String.fromCharCode(endRowCode),
-      startSeat: Math.max(1, seatOffset),
-      endSeat: Math.max(1, seatOffset + seatSpan - 1),
-    };
+  } else if (hintSlotsToCreate.value.size > 0) {
+    // Infer range from hint slots
+    const rows = [];
+    const numbers = [];
+    for (const key of hintSlotsToCreate.value) {
+      const parts = key.split('-');
+      if (parts.length === 2) {
+        rows.push(parts[0]);
+        numbers.push(parseInt(parts[1], 10));
+      }
+    }
+    if (rows.length > 0) {
+      rows.sort();
+      numbers.sort((a, b) => a - b);
+      inferredRange.value = {
+        startRow: rows[0],
+        endRow: rows[rows.length - 1],
+        startSeat: numbers[0],
+        endSeat: numbers[numbers.length - 1],
+      };
+    }
   }
 }
 
@@ -916,7 +1098,7 @@ function bulkDeleteSelectedSeats() {
     s => !selectedSeatKeys.value.has(`${s.row_label}-${s.seat_number}`)
   );
   clearSelection();
-  showToast(`Deleted ${count} seat(s)`, 'info');
+  showToast(`Deleted ${count} seat(s) — grid walkways preserved`, 'info');
 }
 
 // Keyboard shortcuts (Delete / Backspace / Esc)
@@ -932,7 +1114,7 @@ function handleGlobalKeyDown(e) {
   if ((e.key === 'Delete' || e.key === 'Backspace') && selectedSeatKeys.value.size > 0) {
     e.preventDefault();
     bulkDeleteSelectedSeats();
-  } else if (e.key === 'Escape' && selectedSeatKeys.value.size > 0) {
+  } else if (e.key === 'Escape') {
     clearSelection();
   }
 }
@@ -1066,7 +1248,7 @@ async function fetchLayout() {
   if (!selectedTheaterId.value) return;
   loading.value = true;
   clearSelection();
-  seatElementMap.clear();
+  slotElementMap.clear();
 
   try {
     const res = await api.get(`/theaters/${selectedTheaterId.value}/layout`);
@@ -1214,9 +1396,23 @@ onUnmounted(() => {
   flex-wrap: nowrap;
 }
 
+.row-header-placeholder {
+  width: 28px;
+}
+
+.col-header-number {
+  width: 32px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
 .row-header-btn {
   width: 28px;
-  height: 28px;
+  height: 32px;
   border-radius: 6px;
   border: 1px solid #3b4256;
   background: #1e2330;
@@ -1240,6 +1436,11 @@ onUnmounted(() => {
   background: #f59e0b !important;
   color: #000 !important;
   border-color: #f59e0b !important;
+}
+
+.row-header-empty {
+  opacity: 0.5;
+  border-style: dashed;
 }
 
 .row-header-label-right {
@@ -1271,6 +1472,47 @@ onUnmounted(() => {
   border-width: 2px !important;
   box-shadow: 0 0 10px rgba(245, 158, 11, 0.6);
   z-index: 6;
+}
+
+.empty-grid-slot {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.empty-grid-slot:hover {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+}
+
+.empty-slot-number {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.15);
+  font-family: monospace;
+}
+
+.hint-slot-active {
+  border-color: #f59e0b !important;
+  border-style: solid !important;
+  background: rgba(245, 158, 11, 0.25) !important;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+  transform: scale(1.05);
+  z-index: 4;
+}
+
+.hint-label {
+  font-size: 9px;
+  font-weight: 800;
+  color: #f59e0b;
+  font-family: monospace;
 }
 
 .seat-number-label {
