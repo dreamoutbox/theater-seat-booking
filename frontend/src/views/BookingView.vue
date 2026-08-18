@@ -1,5 +1,5 @@
 <template>
-  <v-container class="py-6">
+  <v-container fluid class="py-6 px-6">
     <!-- Showtime Top Bar -->
     <v-card v-if="currentShowtime" class="pa-4 mb-6 rounded-xl border bg-surface" elevation="2">
       <div class="d-flex flex-wrap justify-space-between align-center gap-4">
@@ -46,8 +46,8 @@
 
     <!-- Main Grid: Left = SeatMap, Right = Reservation Summary & Checkout -->
     <v-row v-if="currentShowtime">
-      <!-- Left Column: Seat Map -->
-      <v-col cols="12" md="8" lg="8">
+      <!-- Left Column: Seat Map (Fills Width Screen) -->
+      <v-col cols="12" md="8" lg="9" xl="9">
         <SeatMap
           ref="seatMapRef"
           :theater-id="currentShowtime.theater_id"
@@ -57,7 +57,7 @@
       </v-col>
 
       <!-- Right Column: Order Summary & Selected Held Seats -->
-      <v-col cols="12" md="4" lg="4">
+      <v-col cols="12" md="4" lg="3" xl="3">
         <v-card theme="dark" class="rounded-xl pa-5 border bg-surface h-100 d-flex flex-column justify-space-between" elevation="4">
           <div>
             <div class="d-flex justify-space-between align-center mb-3">
