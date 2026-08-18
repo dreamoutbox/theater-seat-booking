@@ -9,7 +9,10 @@ use uuid::Uuid;
 
 use crate::{
     auth::{check_role, AuthenticatedUser, OptionalAuthenticatedUser},
-    models::{Event, SeatWithStatus, ShowtimeDetail, Theater, UserRole},
+    models::{
+        Event, SaveLayoutPayload, Seat, SeatWithStatus, ShowtimeDetail, Theater, TheaterLayout,
+        UserRole, Zone,
+    },
     routes::AppState,
 };
 
@@ -469,4 +472,288 @@ pub async fn get_theater_seats(
         })?;
 
     Ok(Json(seats))
+}
+
+pub async fn get_theater_layout(
+    Path(theater_id): Path<Uuid>,
+    State(state): State<AppState>,
+) -> Result<Json<TheaterLayout>, (StatusCode, Json<serde_json::Value>)> {
+    let theater: Theater = sqlx::query_as("SELECT id, name, address FROM theaters WHERE id = $1")
+        .bind(theater_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Theater not found" })),
+            )
+        })?;
+
+    let zones: Vec<Zone> = sqlx::query_as(
+        "SELECT id, theater_id, name, price_cents FROM zones WHERE theater_id = $1 ORDER BY price_cents DESC",
+    )
+    .bind(theater_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let seats: Vec<Seat> = sqlx::query_as(
+        "SELECT id, theater_id, zone_id, row_label, seat_number FROM seats WHERE theater_id = $1 ORDER BY row_label ASC, seat_number ASC",
+    )
+    .bind(theater_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    Ok(Json(TheaterLayout {
+        theater,
+        zones,
+        seats,
+    }))
+}
+
+pub async fn save_theater_layout(
+    Path(theater_id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+    Json(payload): Json<SaveLayoutPayload>,
+) -> Result<Json<TheaterLayout>, (StatusCode, Json<serde_json::Value>)> {
+    check_role(
+        &auth_user,
+        &[
+            UserRole::Admin,
+            UserRole::Staff,
+            UserRole::EventOrganizer,
+        ],
+    )
+    .map_err(|_e| {
+        (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Unauthorized" })),
+        )
+    })?;
+
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // 1. Sync zones
+    let mut valid_zone_ids = std::collections::HashSet::new();
+    for zone_item in &payload.zones {
+        let zone_name = zone_item.name.trim();
+        if zone_name.is_empty() {
+            continue;
+        }
+
+        let zone_id = match zone_item.id {
+            Some(existing_id) => {
+                let updated = sqlx::query(
+                    "UPDATE zones SET name = $1, price_cents = $2 WHERE id = $3 AND theater_id = $4",
+                )
+                .bind(zone_name)
+                .bind(zone_item.price_cents)
+                .bind(existing_id)
+                .bind(theater_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({ "error": e.to_string() })),
+                    )
+                })?;
+
+                if updated.rows_affected() > 0 {
+                    existing_id
+                } else {
+                    sqlx::query_scalar(
+                        "INSERT INTO zones (id, theater_id, name, price_cents) VALUES ($1, $2, $3, $4) RETURNING id",
+                    )
+                    .bind(existing_id)
+                    .bind(theater_id)
+                    .bind(zone_name)
+                    .bind(zone_item.price_cents)
+                    .fetch_one(&mut *tx)
+                    .await
+                    .map_err(|e| {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(serde_json::json!({ "error": e.to_string() })),
+                        )
+                    })?
+                }
+            }
+            None => {
+                sqlx::query_scalar(
+                    "INSERT INTO zones (theater_id, name, price_cents) VALUES ($1, $2, $3) RETURNING id",
+                )
+                .bind(theater_id)
+                .bind(zone_name)
+                .bind(zone_item.price_cents)
+                .fetch_one(&mut *tx)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({ "error": e.to_string() })),
+                    )
+                })?
+            }
+        };
+
+        valid_zone_ids.insert(zone_id);
+    }
+
+    // 2. Sync seats
+    let mut current_seat_keys = std::collections::HashSet::new();
+
+    for seat_item in &payload.seats {
+        let row_label = seat_item.row_label.trim().to_uppercase();
+        if row_label.is_empty() || seat_item.seat_number <= 0 {
+            continue;
+        }
+
+        // Validate zone_id is valid
+        if !valid_zone_ids.contains(&seat_item.zone_id) {
+            let zone_exists: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM zones WHERE id = $1 AND theater_id = $2)",
+            )
+            .bind(seat_item.zone_id)
+            .bind(theater_id)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap_or(false);
+
+            if !zone_exists {
+                tx.rollback().await.ok();
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({ "error": format!("Invalid zone id {} for seat {}{}", seat_item.zone_id, row_label, seat_item.seat_number) })),
+                ));
+            }
+        }
+
+        current_seat_keys.insert((row_label.clone(), seat_item.seat_number));
+
+        // Upsert seat on (theater_id, row_label, seat_number)
+        sqlx::query(
+            "INSERT INTO seats (theater_id, zone_id, row_label, seat_number)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (theater_id, row_label, seat_number)
+             DO UPDATE SET zone_id = EXCLUDED.zone_id",
+        )
+        .bind(theater_id)
+        .bind(seat_item.zone_id)
+        .bind(&row_label)
+        .bind(seat_item.seat_number)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+    }
+
+    // 3. Remove seats that are no longer in the payload
+    let existing_seats: Vec<(Uuid, String, i32)> = sqlx::query_as(
+        "SELECT id, row_label, seat_number FROM seats WHERE theater_id = $1",
+    )
+    .bind(theater_id)
+    .fetch_all(&mut *tx)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    for (seat_id, r_label, s_num) in existing_seats {
+        if !current_seat_keys.contains(&(r_label, s_num)) {
+            sqlx::query("DELETE FROM seats WHERE id = $1")
+                .bind(seat_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({ "error": e.to_string() })),
+                    )
+                })?;
+        }
+    }
+
+    tx.commit().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // 4. Return updated layout
+    let theater: Theater = sqlx::query_as("SELECT id, name, address FROM theaters WHERE id = $1")
+        .bind(theater_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let zones: Vec<Zone> = sqlx::query_as(
+        "SELECT id, theater_id, name, price_cents FROM zones WHERE theater_id = $1 ORDER BY price_cents DESC",
+    )
+    .bind(theater_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let seats: Vec<Seat> = sqlx::query_as(
+        "SELECT id, theater_id, zone_id, row_label, seat_number FROM seats WHERE theater_id = $1 ORDER BY row_label ASC, seat_number ASC",
+    )
+    .bind(theater_id)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    tracing::info!(theater_id = %theater_id, seats_count = seats.len(), zones_count = zones.len(), "Theater layout updated successfully");
+
+    Ok(Json(TheaterLayout {
+        theater,
+        zones,
+        seats,
+    }))
 }

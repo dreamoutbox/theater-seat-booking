@@ -75,6 +75,34 @@ pub struct Seat {
     pub seat_number: i32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TheaterLayout {
+    pub theater: Theater,
+    pub zones: Vec<Zone>,
+    pub seats: Vec<Seat>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveZoneItem {
+    pub id: Option<Uuid>,
+    pub name: String,
+    pub price_cents: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveSeatItem {
+    pub id: Option<Uuid>,
+    pub zone_id: Uuid,
+    pub row_label: String,
+    pub seat_number: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SaveLayoutPayload {
+    pub zones: Vec<SaveZoneItem>,
+    pub seats: Vec<SaveSeatItem>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SeatWithStatus {
     pub id: Uuid,

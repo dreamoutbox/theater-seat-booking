@@ -67,6 +67,10 @@ pub fn create_router(state: AppState) -> Router {
             axum::routing::put(theater::update_showtime).delete(theater::delete_showtime),
         )
         .route("/theaters/{id}/seats", get(theater::get_theater_seats))
+        .route(
+            "/theaters/{id}/layout",
+            get(theater::get_theater_layout).put(theater::save_theater_layout),
+        )
         // Booking Queue
         .route("/bookings", post(booking::enqueue_booking))
         .route("/bookings/{uuid}", get(booking::get_booking_status))
