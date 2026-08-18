@@ -43,29 +43,33 @@ This seeds theaters, VIP/Premium/Standard zones, seat grids, showtimes, and demo
 
 ---
 
-### 3. Run Backend API Server & Queue Worker
-```bash
-cargo run --bin theater-api
-```
-Server runs at `http://localhost:3000`.
+### 3. Development Workflow Scripts
 
----
+Three dedicated helper scripts are provided for local development:
 
-### 4. Run Frontend Development Server
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Access the SPA at `http://localhost:5173`.
+- **Run Backend API Server**:
+  ```bash
+  ./dev-backend.sh
+  ```
+  Runs the Axum API on `http://localhost:3000`.
 
-Alternatively, build the production bundle (`npm run build`), which is served directly by the Axum backend at `http://localhost:3000`.
+- **Run Dedicated Queue Worker**:
+  ```bash
+  ./dev-queue-worker.sh
+  ```
+  Runs the standalone booking queue worker (`src/bin/queue_worker.rs`) draining partition advisory locks.
+
+- **Run Vue 3 Frontend**:
+  ```bash
+  ./dev-frontend
+  ```
+  Runs Vite dev server with proxy to backend on `http://localhost:5173`.
 
 ---
 
 ## 🧪 Running Integration Tests
 
-To run the worker concurrency & isolation integration tests:
+To run the worker concurrency & isolation integration tests manually:
 ```bash
 cargo test
 ```

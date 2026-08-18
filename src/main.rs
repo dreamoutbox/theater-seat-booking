@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let config = AppConfig::from_env();
-    tracing::info!("Initializing Theater Seat Booking backend...");
+    tracing::info!("Initializing Theater Seat Booking backend API server...");
 
     let pool = create_pool(&config.database_url).await?;
     tracing::info!("Connected to PostgreSQL database at {}", config.database_url);
@@ -36,23 +36,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         stripe,
     };
 
-    // 1. Spawn the Booking Queue Worker loop
-    let worker_pool = pool.clone();
-    let worker_config = config.clone();
-    tokio::spawn(async move {
-        run_worker_loop(worker_pool, worker_config).await;
-    });
+    // Optionally spawn queue worker & sweeper (enabled by default unless explicitly disabled)
+    let spawn_embedded_worker = std::env::var("EMBEDDED_WORKER")
+        .map(|v| v != "0" && v.to_lowercase() != "false")
+        .unwrap_or(true);
 
-    // 2. Spawn the Expired Seat Holds Sweeper loop (every 30s)
-    let sweeper_pool = pool.clone();
-    tokio::spawn(async move {
-        run_sweeper_loop(sweeper_pool, 30).await;
-    });
+    if spawn_embedded_worker {
+        tracing::info!("Starting embedded queue worker and hold sweeper tasks...");
+        let worker_pool = pool.clone();
+        let worker_config = config.clone();
+        tokio::spawn(async move {
+            run_worker_loop(worker_pool, worker_config).await;
+        });
 
-    // 3. Start the Axum HTTP API server
+        let sweeper_pool = pool.clone();
+        tokio::spawn(async move {
+            run_sweeper_loop(sweeper_pool, 30).await;
+        });
+    }
+
+    // Start the Axum HTTP API server
     let app = create_router(state);
     let addr = std::net::SocketAddr::from(([0, 0, 0, 0], config.port));
-    tracing::info!("🚀 Server listening on http://0.0.0.0:{}", config.port);
+    tracing::info!("🚀 Backend API Server listening on http://0.0.0.0:{}", config.port);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
