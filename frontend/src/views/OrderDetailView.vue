@@ -1,0 +1,281 @@
+<template>
+  <v-container class="py-8 max-w-4xl">
+    <!-- Back Button -->
+    <div class="mb-4">
+      <v-btn
+        variant="text"
+        prepend-icon="mdi-arrow-left"
+        to="/orders"
+        class="text-none font-weight-bold"
+      >
+        Back to Orders
+      </v-btn>
+    </div>
+
+    <!-- Loading Skeleton -->
+    <v-skeleton-loader
+      v-if="loading"
+      type="article, table, actions"
+      theme="dark"
+      class="rounded-xl"
+    ></v-skeleton-loader>
+
+    <!-- Error State -->
+    <v-alert
+      v-else-if="error"
+      type="error"
+      variant="tonal"
+      class="rounded-xl mb-6"
+    >
+      {{ error }}
+    </v-alert>
+
+    <!-- Order Detail Card -->
+    <v-card v-else-if="order" theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="4">
+      <!-- Order Header -->
+      <div class="d-flex flex-wrap justify-space-between align-start gap-4 mb-6">
+        <div>
+          <div class="d-flex align-center gap-2 mb-1">
+            <span class="text-caption text-grey font-weight-mono text-uppercase">Order Reference</span>
+            <span class="text-caption font-weight-mono text-amber-darken-1">#{{ order.id }}</span>
+          </div>
+          <h1 class="text-h4 font-weight-bold text-white mb-1">
+            {{ order.event_title }}
+          </h1>
+          <div class="d-flex align-center text-body-2 text-grey">
+            <v-icon icon="mdi-map-marker" size="16" class="mr-1"></v-icon>
+            <span>{{ order.theater_name }}</span>
+            <span class="mx-2">•</span>
+            <v-icon icon="mdi-calendar-clock" size="16" class="mr-1"></v-icon>
+            <span>{{ formatDate(order.starts_at) }}</span>
+          </div>
+        </div>
+
+        <div class="d-flex flex-column align-end">
+          <v-chip
+            size="large"
+            :color="getStatusColor(order.status)"
+            variant="flat"
+            class="font-weight-bold text-uppercase mb-2"
+          >
+            {{ formatStatus(order.status) }}
+          </v-chip>
+          <span class="text-caption text-grey">Placed on {{ formatDate(order.created_at) }}</span>
+        </div>
+      </div>
+
+      <v-divider class="mb-6"></v-divider>
+
+      <!-- Customer / Buyer Info -->
+      <div class="row-info mb-6 pa-4 rounded-lg bg-surface-variant border">
+        <div class="d-flex flex-wrap justify-space-between align-center gap-4">
+          <div>
+            <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Account / Buyer</div>
+            <div class="text-body-1 font-weight-medium text-white">{{ order.user_email || 'You' }}</div>
+          </div>
+          <div>
+            <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Stripe Reference</div>
+            <div class="text-caption font-weight-mono text-grey-lighten-1">
+              {{ order.stripe_payment_intent_id || 'N/A' }}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seats List -->
+      <div class="mb-6">
+        <h2 class="text-h6 font-weight-bold text-white mb-3">Reserved Seats ({{ order.seats?.length || 0 }})</h2>
+        <v-table theme="dark" class="rounded-lg border">
+          <thead>
+            <tr>
+              <th class="text-left font-weight-bold">Seat</th>
+              <th class="text-left font-weight-bold">Zone Tier</th>
+              <th class="text-right font-weight-bold">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="s in order.seats" :key="s.seat_booking_id">
+              <td class="font-weight-bold text-white py-3">
+                <v-chip size="small" :color="getZoneColor(s.zone_name)" variant="flat" class="mr-2 font-weight-bold">
+                  {{ s.row_label }}{{ s.seat_number }}
+                </v-chip>
+                Row {{ s.row_label }}, Seat {{ s.seat_number }}
+              </td>
+              <td>
+                <span class="text-body-2 text-grey-lighten-1">{{ s.zone_name }}</span>
+              </td>
+              <td class="text-right font-weight-mono font-weight-bold text-white">
+                ${{ (s.price_cents / 100).toFixed(2) }}
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </div>
+
+      <v-divider class="mb-6"></v-divider>
+
+      <!-- Financial Summary -->
+      <div class="d-flex flex-column gap-2 max-w-sm ml-auto mb-6">
+        <div class="d-flex justify-space-between text-body-2 text-grey">
+          <span>Seats Subtotal:</span>
+          <span class="font-weight-mono text-white">${{ (order.total_amount_cents / 100).toFixed(2) }}</span>
+        </div>
+        <div class="d-flex justify-space-between text-body-2 text-grey">
+          <span>Booking & Processing Fee:</span>
+          <span class="text-success font-weight-bold">$0.00 (Free)</span>
+        </div>
+        <v-divider class="my-2"></v-divider>
+        <div class="d-flex justify-space-between align-center">
+          <span class="text-h6 font-weight-bold text-white">Total Amount:</span>
+          <span class="text-h4 font-weight-black text-amber-darken-1 font-weight-mono">
+            ${{ (order.total_amount_cents / 100).toFixed(2) }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Pending Payment Action -->
+      <div v-if="order.status === 'pending_payment'" class="pa-4 rounded-xl border bg-surface-variant d-flex justify-space-between align-center">
+        <div>
+          <div class="font-weight-bold text-white mb-1">Awaiting Payment</div>
+          <div class="text-caption text-grey">Complete checkout to permanently confirm your reserved seats.</div>
+        </div>
+        <v-btn
+          color="amber-darken-1"
+          variant="flat"
+          size="large"
+          prepend-icon="mdi-credit-card-check"
+          class="text-none font-weight-bold px-6"
+          :loading="paying"
+          @click="handlePayMock"
+        >
+          Pay Now (${{ (order.total_amount_cents / 100).toFixed(2) }})
+        </v-btn>
+      </div>
+    </v-card>
+
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3000">
+      {{ snackbar.text }}
+    </v-snackbar>
+  </v-container>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import api from '../api/client';
+
+const props = defineProps({
+  id: { type: String, required: true },
+});
+
+const route = useRoute();
+const order = ref(null);
+const loading = ref(true);
+const error = ref(null);
+const paying = ref(false);
+
+const snackbar = ref({
+  show: false,
+  text: '',
+  color: 'info',
+});
+
+function showToast(text, color = 'info') {
+  snackbar.value = { show: true, text, color };
+}
+
+function formatDate(isoStr) {
+  if (!isoStr) return '—';
+  const d = new Date(isoStr);
+  return d.toLocaleString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getStatusColor(status) {
+  switch (status) {
+    case 'paid': return 'success';
+    case 'pending_payment': return 'warning';
+    case 'cancelled': return 'grey';
+    case 'expired': return 'red-accent-3';
+    default: return 'info';
+  }
+}
+
+function formatStatus(status) {
+  if (!status) return '';
+  return status.replace('_', ' ');
+}
+
+function getZoneColor(zoneName) {
+  if (!zoneName) return 'grey';
+  if (zoneName.includes('VIP')) return 'amber-darken-2';
+  if (zoneName.includes('Premium')) return 'indigo-darken-1';
+  return 'teal-darken-1';
+}
+
+async function fetchOrderDetail() {
+  const orderId = props.id || route.params.id;
+  loading.value = true;
+  error.value = null;
+  try {
+    const res = await api.get(`/orders/${orderId}`);
+    order.value = res.data;
+  } catch (err) {
+    error.value = err.response?.data?.error || 'Failed to load order details';
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function handlePayMock() {
+  if (!order.value) return;
+  paying.value = true;
+  try {
+    await api.post(`/orders/${order.value.id}/confirm-mock`);
+    showToast('Payment successful! Seats confirmed.', 'success');
+    await fetchOrderDetail();
+  } catch (err) {
+    const errMsg = err.response?.data?.error || 'Payment failed';
+    showToast(errMsg, 'error');
+  } finally {
+    paying.value = false;
+  }
+}
+
+onMounted(() => {
+  fetchOrderDetail();
+});
+</script>
+
+<style scoped>
+.max-w-4xl {
+  max-width: 900px;
+}
+
+.max-w-sm {
+  max-width: 350px;
+}
+
+.bg-surface {
+  background: #181c27 !important;
+  border-color: #2a3142 !important;
+}
+
+.bg-surface-variant {
+  background: #1e2330 !important;
+  border-color: #2a3142 !important;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.gap-4 {
+  gap: 16px;
+}
+</style>

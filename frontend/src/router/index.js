@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router';
 import HomeView from '../views/HomeView.vue';
 import BookingView from '../views/BookingView.vue';
 import OrdersView from '../views/OrdersView.vue';
+import OrderDetailView from '../views/OrderDetailView.vue';
 import LoginView from '../views/LoginView.vue';
 import RegisterView from '../views/RegisterView.vue';
 import { useAuthStore } from '../stores/auth';
@@ -22,6 +23,13 @@ const routes = [
     path: '/orders',
     name: 'Orders',
     component: OrdersView,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/orders/:id',
+    name: 'OrderDetail',
+    component: OrderDetailView,
+    props: true,
     meta: { requiresAuth: true },
   },
   {
