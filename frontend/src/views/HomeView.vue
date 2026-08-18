@@ -16,8 +16,8 @@
     <!-- Showtimes Catalog -->
     <div class="d-flex justify-space-between align-center mb-6">
       <div>
-        <h2 class="text-h5 font-weight-bold text-white">Upcoming Showtimes</h2>
-        <span class="text-caption text-grey">All sessions currently open for reservation</span>
+        <h2 class="text-h5 font-weight-bold text-white">Upcoming Events & Showtimes</h2>
+        <span class="text-caption text-grey">Browse movies and concerts with available booking sessions</span>
       </div>
       <v-btn
         prepend-icon="mdi-refresh"
@@ -32,61 +32,98 @@
 
     <!-- Loading Skeletons -->
     <v-row v-if="loading">
-      <v-col v-for="n in 4" :key="n" cols="12" sm="6" md="6">
-        <v-skeleton-loader type="card" theme="dark" class="rounded-xl"></v-skeleton-loader>
+      <v-col v-for="n in 2" :key="n" cols="12" md="6">
+        <v-skeleton-loader type="card, list-item-two-line, actions" theme="dark" class="rounded-xl"></v-skeleton-loader>
       </v-col>
     </v-row>
 
-    <!-- Showtimes Grid -->
+    <!-- Grouped Events Grid -->
     <v-row v-else>
       <v-col
-        v-for="show in showtimes"
-        :key="show.id"
+        v-for="event in groupedEvents"
+        :key="event.event_id"
         cols="12"
-        sm="6"
         md="6"
       >
         <v-card
-          class="showtime-card rounded-xl pa-5 h-100 d-flex flex-column justify-space-between border"
+          class="event-card rounded-xl pa-6 h-100 d-flex flex-column justify-space-between border"
           elevation="4"
         >
           <div>
-            <div class="d-flex justify-space-between align-start mb-2">
+            <!-- Header Badges -->
+            <div class="d-flex justify-space-between align-center mb-3">
               <v-chip size="small" color="amber-darken-1" variant="tonal" class="font-weight-bold">
-                {{ show.theater_name }}
+                <v-icon start icon="mdi-theater" size="14"></v-icon>
+                {{ event.theater_name }}
               </v-chip>
-              <span class="text-caption text-grey font-weight-mono">
-                <v-icon icon="mdi-calendar-clock" size="14" class="mr-1"></v-icon>
-                {{ formatDate(show.starts_at) }}
+              <span class="text-caption text-grey font-weight-mono font-weight-bold">
+                {{ event.showtimes.length }} {{ event.showtimes.length === 1 ? 'Showtime' : 'Showtimes' }}
               </span>
             </div>
 
-            <h3 class="text-h6 font-weight-bold text-white mb-2">
-              {{ show.event_title }}
+            <!-- Event Title -->
+            <h3 class="text-h5 font-weight-bold text-white mb-2">
+              {{ event.event_title }}
             </h3>
 
+            <!-- Venue Description -->
             <div class="d-flex align-center text-caption text-grey mb-4">
               <v-icon icon="mdi-map-marker" size="14" class="mr-1 text-grey"></v-icon>
-              <span>Grand Horizon Hall • Dolby Atmos Surround</span>
+              <span>Main Hall • Dolby Atmos • Laser Projection</span>
             </div>
 
-            <div class="d-flex gap-2 mb-4">
-              <v-chip size="x-small" variant="outlined" color="amber-lighten-2">VIP $25</v-chip>
-              <v-chip size="x-small" variant="outlined" color="indigo-lighten-2">Premium $18</v-chip>
-              <v-chip size="x-small" variant="outlined" color="teal-lighten-2">Standard $12</v-chip>
+            <!-- Pricing Tiers -->
+            <div class="d-flex flex-wrap gap-2 mb-5">
+              <v-chip size="x-small" variant="outlined" color="amber-lighten-2" class="font-weight-bold">
+                VIP $25.00
+              </v-chip>
+              <v-chip size="x-small" variant="outlined" color="indigo-lighten-2" class="font-weight-bold">
+                Premium $18.00
+              </v-chip>
+              <v-chip size="x-small" variant="outlined" color="teal-lighten-2" class="font-weight-bold">
+                Standard $12.00
+              </v-chip>
+            </div>
+
+            <v-divider class="mb-4"></v-divider>
+
+            <!-- Showtimes in this Event -->
+            <div class="mb-2">
+              <div class="text-caption text-grey font-weight-bold text-uppercase mb-3">
+                SELECT A SHOWTIME SESSION
+              </div>
+              <div class="d-flex flex-column gap-2">
+                <div
+                  v-for="show in event.showtimes"
+                  :key="show.id"
+                  class="showtime-session-item d-flex justify-space-between align-center pa-3 rounded-lg bg-surface-variant border"
+                >
+                  <div class="d-flex align-center gap-2">
+                    <v-icon icon="mdi-calendar-clock" color="amber-darken-1" size="18"></v-icon>
+                    <div>
+                      <div class="text-body-2 font-weight-bold text-white">
+                        {{ formatDate(show.starts_at) }}
+                      </div>
+                      <div class="text-caption text-grey">
+                        {{ getTimeRelative(show.starts_at) }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <v-btn
+                    color="amber-darken-1"
+                    variant="flat"
+                    size="small"
+                    prepend-icon="mdi-seat"
+                    class="text-none font-weight-bold px-4"
+                    :to="`/booking/${show.id}`"
+                  >
+                    Select Seats
+                  </v-btn>
+                </div>
+              </div>
             </div>
           </div>
-
-          <v-btn
-            color="amber-darken-1"
-            variant="flat"
-            block
-            prepend-icon="mdi-seat"
-            class="text-none font-weight-bold mt-2"
-            :to="`/booking/${show.id}`"
-          >
-            Select Seats & Book
-          </v-btn>
         </v-card>
       </v-col>
     </v-row>
@@ -94,11 +131,34 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import api from '../api/client';
 
 const showtimes = ref([]);
 const loading = ref(false);
+
+const groupedEvents = computed(() => {
+  const map = new Map();
+  for (const s of showtimes.value) {
+    if (!map.has(s.event_id)) {
+      map.set(s.event_id, {
+        event_id: s.event_id,
+        event_title: s.event_title,
+        theater_name: s.theater_name,
+        theater_id: s.theater_id,
+        showtimes: [],
+      });
+    }
+    map.get(s.event_id).showtimes.push(s);
+  }
+
+  // Sort showtimes in each event by start date ASC
+  for (const event of map.values()) {
+    event.showtimes.sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
+  }
+
+  return Array.from(map.values());
+});
 
 function formatDate(isoStr) {
   if (!isoStr) return '—';
@@ -110,6 +170,17 @@ function formatDate(isoStr) {
     hour: '2-digit',
     minute: '2-digit',
   });
+}
+
+function getTimeRelative(isoStr) {
+  if (!isoStr) return '';
+  const d = new Date(isoStr);
+  const now = new Date();
+  const diffHours = Math.round((d.getTime() - now.getTime()) / (1000 * 60 * 60));
+  if (diffHours <= 0) return 'Starting soon';
+  if (diffHours < 24) return `In ~${diffHours} hours`;
+  const diffDays = Math.round(diffHours / 24);
+  return `In ${diffDays} day${diffDays > 1 ? 's' : ''}`;
 }
 
 async function fetchShowtimes() {
@@ -135,15 +206,27 @@ onMounted(() => {
   border: 1px solid #2a3142;
 }
 
-.showtime-card {
+.event-card {
   background: #181c27;
   border-color: #2a3142;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: border-color 0.2s ease;
 }
 
-.showtime-card:hover {
-  transform: translateY(-4px);
+.event-card:hover {
   border-color: #f59e0b;
+}
+
+.bg-surface-variant {
+  background: #1e2330 !important;
+  border-color: #2a3142 !important;
+}
+
+.showtime-session-item {
+  transition: background-color 0.15s ease;
+}
+
+.showtime-session-item:hover {
+  background: #252b3b !important;
 }
 
 .max-w-2xl {

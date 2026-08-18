@@ -8,7 +8,7 @@ echo "=========================================="
 echo "🎬 Starting Theater Seat Booking API..."
 echo "=========================================="
 
-export RUST_LOG="${RUST_LOG:-info,theater_seat_booking=debug,tower_http=debug}"
+export RUST_LOG="${RUST_LOG:-info,theater_seat_booking=debug}"
 export EMBEDDED_WORKER="${EMBEDDED_WORKER:-false}"
 
 if command -v cargo-watch &> /dev/null; then

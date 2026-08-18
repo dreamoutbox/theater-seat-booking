@@ -35,13 +35,23 @@
       <!-- Order Header -->
       <div class="d-flex flex-wrap justify-space-between align-start gap-4 mb-6">
         <div>
-          <div class="d-flex align-center gap-2 mb-1">
+          <div class="d-flex align-center gap-2 mb-2">
             <span class="text-caption text-grey font-weight-mono text-uppercase">Order Reference</span>
-            <span class="text-caption font-weight-mono text-amber-darken-1">#{{ order.id }}</span>
+            <span class="text-caption font-weight-mono text-amber-darken-1 font-weight-bold">#{{ order.id }}</span>
           </div>
-          <h1 class="text-h4 font-weight-bold text-white mb-1">
-            {{ order.event_title }}
-          </h1>
+          <div class="d-flex align-center gap-3 flex-wrap mb-2">
+            <h1 class="text-h4 font-weight-bold text-white mb-0">
+              {{ order.event_title }}
+            </h1>
+            <v-chip
+              size="small"
+              :color="getStatusColor(order.status)"
+              variant="flat"
+              class="font-weight-bold text-uppercase"
+            >
+              {{ formatStatus(order.status) }}
+            </v-chip>
+          </div>
           <div class="d-flex align-center text-body-2 text-grey">
             <v-icon icon="mdi-map-marker" size="16" class="mr-1"></v-icon>
             <span>{{ order.theater_name }}</span>
@@ -52,14 +62,6 @@
         </div>
 
         <div class="d-flex flex-column align-end">
-          <v-chip
-            size="large"
-            :color="getStatusColor(order.status)"
-            variant="flat"
-            class="font-weight-bold text-uppercase mb-2"
-          >
-            {{ formatStatus(order.status) }}
-          </v-chip>
           <span class="text-caption text-grey">Placed on {{ formatDate(order.created_at) }}</span>
         </div>
       </div>
