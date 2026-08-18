@@ -22,16 +22,6 @@
     </v-btn>
 
     <v-btn 
-      v-if="authStore.isElevated" 
-      variant="text" 
-      prepend-icon="mdi-seat-passenger" 
-      to="/manage/seat-map" 
-      class="text-none font-weight-medium text-amber-darken-1"
-    >
-      Seat Map Editor
-    </v-btn>
-
-    <v-btn 
       v-if="authStore.isAuthenticated" 
       variant="text" 
       prepend-icon="mdi-ticket-confirmation" 
