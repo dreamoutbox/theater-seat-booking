@@ -24,7 +24,7 @@
       </div>
       <div class="d-flex align-center mr-4">
         <span class="legend-box seat-held-mine mr-1"></span>
-        <span>Your Hold</span>
+        <span>Your Hold (Click to cancel)</span>
       </div>
       <div class="d-flex align-center mr-4">
         <span class="legend-box seat-processing mr-1"></span>
@@ -105,11 +105,18 @@
               icon="mdi-lock"
               size="12"
             ></v-icon>
-            <v-icon
-              v-else-if="seat.is_mine"
-              icon="mdi-check"
-              size="14"
-            ></v-icon>
+            <template v-else-if="seat.is_mine && seat.status === 'held'">
+              <v-icon
+                icon="mdi-check"
+                size="14"
+                class="seat-icon-check"
+              ></v-icon>
+              <v-icon
+                icon="mdi-close"
+                size="14"
+                class="seat-icon-cancel"
+              ></v-icon>
+            </template>
             <span v-else class="seat-num">{{ seat.seat_number }}</span>
           </button>
         </div>
@@ -219,7 +226,7 @@ function getSeatClasses(seat) {
 
 function getSeatTooltip(seat) {
   if (isSeatProcessing(seat.id)) return 'Enqueued in booking queue...';
-  if (seat.is_mine && seat.status === 'held') return `Held by you (${seat.row_label}${seat.seat_number}) - Click to checkout`;
+  if (seat.is_mine && seat.status === 'held') return `Held by you (${seat.row_label}${seat.seat_number}) - Click to cancel hold`;
   if (seat.status === 'confirmed') return `Seat ${seat.row_label}${seat.seat_number} is Sold Out`;
   if (seat.status === 'held') return `Seat ${seat.row_label}${seat.seat_number} is currently held by another customer`;
   return `${seat.zone_name}: Row ${seat.row_label}, Seat ${seat.seat_number} ($${(seat.price_cents / 100).toFixed(2)})`;
@@ -257,7 +264,25 @@ function updateCountdown() {
   countdownSeconds.value = diffSecs;
 }
 
-// Handle Seat Click: Enqueue Booking Request
+// Handle Cancel Hold
+async function handleCancelHold(seat) {
+  processingSeatIds.value.add(seat.id);
+  try {
+    await api.post('/bookings/release', {
+      showtime_id: props.showtimeId,
+      seat_id: seat.id,
+    });
+    showToast(`Hold for Seat ${seat.row_label}${seat.seat_number} cancelled`, 'info');
+    await fetchSeats();
+  } catch (err) {
+    const errMsg = err.response?.data?.error || 'Failed to cancel hold';
+    showToast(errMsg, 'error');
+  } finally {
+    processingSeatIds.value.delete(seat.id);
+  }
+}
+
+// Handle Seat Click: Enqueue Booking Request or Cancel existing Hold
 async function handleSeatClick(seat) {
   if (!authStore.isAuthenticated) {
     showToast('Please login to book seats', 'warning');
@@ -266,8 +291,8 @@ async function handleSeatClick(seat) {
   }
 
   if (seat.is_mine && seat.status === 'held') {
-    // Already held by me, emit checkout
-    emit('checkout', myHeldSeats.value);
+    // Click on held seat cancels hold
+    await handleCancelHold(seat);
     return;
   }
 
@@ -438,6 +463,28 @@ defineExpose({
   color: #fff !important;
   box-shadow: 0 0 12px #10b981;
   animation: pulse-border 2s infinite;
+}
+
+.seat-held-mine .seat-icon-check {
+  display: inline-flex;
+}
+
+.seat-held-mine .seat-icon-cancel {
+  display: none;
+}
+
+.seat-held-mine:hover {
+  background: #ef4444 !important;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.8) !important;
+  animation: none !important;
+}
+
+.seat-held-mine:hover .seat-icon-check {
+  display: none;
+}
+
+.seat-held-mine:hover .seat-icon-cancel {
+  display: inline-flex;
 }
 
 .seat-processing {

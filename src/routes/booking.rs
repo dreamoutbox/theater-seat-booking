@@ -18,6 +18,12 @@ pub struct EnqueueBookingRequest {
     pub seat_id: Uuid,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct ReleaseHoldRequest {
+    pub showtime_id: Uuid,
+    pub seat_id: Uuid,
+}
+
 #[derive(Debug, Serialize)]
 pub struct EnqueueBookingResponse {
     pub booking_uuid: Uuid,
@@ -178,6 +184,48 @@ pub async fn enqueue_booking(
             status: "pending".to_string(),
         }),
     ))
+}
+
+pub async fn release_hold(
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+    Json(payload): Json<ReleaseHoldRequest>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    let res = sqlx::query(
+        "UPDATE seat_bookings
+         SET status = 'released'
+         WHERE user_id = $1 AND showtime_id = $2 AND seat_id = $3 AND status = 'held'",
+    )
+    .bind(auth_user.id)
+    .bind(payload.showtime_id)
+    .bind(payload.seat_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    if res.rows_affected() == 0 {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Active seat hold not found for this user" })),
+        ));
+    }
+
+    tracing::info!(
+        user_id = %auth_user.id,
+        showtime_id = %payload.showtime_id,
+        seat_id = %payload.seat_id,
+        "Seat hold released by user"
+    );
+
+    Ok(Json(serde_json::json!({
+        "success": true,
+        "message": "Seat hold released successfully"
+    })))
 }
 
 pub async fn get_booking_status(
