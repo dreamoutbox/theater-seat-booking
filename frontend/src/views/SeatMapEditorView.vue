@@ -14,7 +14,7 @@
           </v-chip>
         </div>
         <span class="text-caption text-grey">
-          Configure physical hall geometry, bulk generate rows, drag-select seats, and adjust zone tiers
+          Configure physical hall geometry up to row ZZ and seat 100, bulk generate rows, drag-select seats, and adjust zone tiers
         </span>
       </div>
 
@@ -111,9 +111,41 @@
               </div>
             </div>
 
-            <!-- Quick Selection Helpers -->
-            <div class="d-flex align-center gap-2">
-              <span class="text-caption text-grey">Drag box to select / create • Press Delete to remove</span>
+            <!-- Grid Scale & Helpers Controls -->
+            <div class="d-flex align-center gap-3 flex-wrap">
+              <!-- Visible Columns Selector -->
+              <div class="d-flex align-center gap-1">
+                <span class="text-caption text-grey">Cols:</span>
+                <v-select
+                  v-model="gridColumnsCount"
+                  :items="[20, 30, 40, 50, 75, 100]"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  style="width: 85px;"
+                ></v-select>
+              </div>
+
+              <!-- Visible Rows Selector -->
+              <div class="d-flex align-center gap-1">
+                <span class="text-caption text-grey">Rows:</span>
+                <v-select
+                  v-model="gridRowsSpan"
+                  :items="[
+                    { title: 'A–Z (26)', value: 'Z' },
+                    { title: 'A–AZ (52)', value: 'AZ' },
+                    { title: 'A–BZ (78)', value: 'BZ' },
+                    { title: 'A–ZZ (702)', value: 'ZZ' },
+                  ]"
+                  item-title="title"
+                  item-value="value"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  style="width: 125px;"
+                ></v-select>
+              </div>
+
               <v-btn size="x-small" variant="text" color="amber-darken-1" @click="selectAllSeats">
                 Select All ({{ draftSeats.length }})
               </v-btn>
@@ -130,7 +162,7 @@
             </div>
           </div>
 
-          <!-- Interactive Drag-Select Canvas with Fixed Grid Structure -->
+          <!-- Interactive Drag-Select Canvas with Fixed Grid Structure (A..Z, AA..ZZ & 1..100) -->
           <div
             ref="canvasRef"
             class="seat-canvas-container"
@@ -151,8 +183,8 @@
               }"
             ></div>
 
-            <!-- Grid Header Column Numbers -->
-            <div class="d-flex align-center gap-2 mb-2 justify-center">
+            <!-- Grid Header Column Numbers (1 to gridMaxCols) -->
+            <div class="d-flex align-center gap-2 mb-2">
               <div class="row-header-placeholder"></div>
               <div class="d-flex align-center gap-1 seat-row-items">
                 <div
@@ -166,8 +198,8 @@
               <div class="row-header-placeholder"></div>
             </div>
 
-            <!-- Rows of Grid Slots (Seats + Walkway/Empty Placeholders) -->
-            <div class="d-flex flex-column gap-2 align-center">
+            <!-- Rows of Grid Slots (A..Z, AA..ZZ) -->
+            <div class="d-flex flex-column gap-2">
               <div
                 v-for="row in gridRows"
                 :key="row.label"
@@ -229,7 +261,7 @@
                       @click.stop="createSeatAtSlot(slot.rowLabel, slot.seatNumber)"
                     >
                       <template v-if="isSlotInHint(slot.rowLabel, slot.seatNumber)">
-                        <v-icon icon="mdi-plus" size="12" color="amber-darken-1"></v-icon>
+                        <v-icon icon="mdi-plus" size="10" color="amber-darken-1"></v-icon>
                         <span class="hint-label">{{ slot.rowLabel }}{{ slot.seatNumber }}</span>
                       </template>
                       <span v-else class="empty-slot-number">{{ slot.seatNumber }}</span>
@@ -347,11 +379,11 @@
             <div class="d-flex gap-2">
               <v-text-field
                 v-model="bulkRowLabel"
-                placeholder="e.g. C"
+                placeholder="e.g. AA"
                 variant="outlined"
                 density="compact"
                 hide-details
-                maxlength="3"
+                maxlength="4"
                 :disabled="selectedSeatKeys.size === 0"
                 class="text-uppercase"
               ></v-text-field>
@@ -415,23 +447,23 @@
       </v-col>
     </v-row>
 
-    <!-- Seat Generator Dialog -->
-    <v-dialog v-model="gridDialog.show" max-width="540">
+    <!-- Seat Generator Dialog (Supports A..Z, AA..ZZ and Seat Numbers to 100) -->
+    <v-dialog v-model="gridDialog.show" max-width="560">
       <v-card theme="dark" class="rounded-xl pa-5 border bg-surface">
         <v-card-title class="text-h6 font-weight-bold d-flex align-center gap-2">
           <v-icon icon="mdi-grid" color="amber-darken-1"></v-icon>
-          Bulk Seat Generator
+          Bulk Seat Generator (A–ZZ, 1–100)
         </v-card-title>
         <v-card-text>
           <div class="text-caption text-grey mb-4">
-            Generate rows and seats in a standardized auditorium matrix with custom zone assignment.
+            Generate rows (supports <strong>A..Z</strong> and <strong>AA..ZZ</strong>) and seat numbers up to <strong>100</strong>.
           </div>
 
           <v-row dense class="mb-2">
             <v-col cols="6">
               <v-text-field
                 v-model="gridDialog.startRow"
-                label="Start Row Label"
+                label="Start Row Label (e.g. A, AA)"
                 placeholder="A"
                 variant="outlined"
                 density="comfortable"
@@ -441,8 +473,8 @@
             <v-col cols="6">
               <v-text-field
                 v-model="gridDialog.endRow"
-                label="End Row Label"
-                placeholder="H"
+                label="End Row Label (e.g. Z, ZZ)"
+                placeholder="Z"
                 variant="outlined"
                 density="comfortable"
                 class="text-uppercase"
@@ -457,6 +489,7 @@
                 label="Start Seat Number"
                 type="number"
                 min="1"
+                max="100"
                 variant="outlined"
                 density="comfortable"
               ></v-text-field>
@@ -464,9 +497,10 @@
             <v-col cols="6">
               <v-text-field
                 v-model.number="gridDialog.endSeat"
-                label="End Seat Number"
+                label="End Seat Number (up to 100)"
                 type="number"
                 min="1"
+                max="100"
                 variant="outlined"
                 density="comfortable"
               ></v-text-field>
@@ -490,7 +524,7 @@
           </v-radio-group>
 
           <v-alert type="info" variant="tonal" density="compact" class="rounded-lg">
-            Will generate <strong>{{ calculatedGridCount }}</strong> seat(s) across rows <strong>{{ (gridDialog.startRow || 'A').toUpperCase() }}–{{ (gridDialog.endRow || 'A').toUpperCase() }}</strong>.
+            Will generate <strong>{{ calculatedGridCount }}</strong> seat(s) across rows <strong>{{ (gridDialog.startRow || 'A').toUpperCase() }}–{{ (gridDialog.endRow || 'Z').toUpperCase() }}</strong> (Seats {{ gridDialog.startSeat }}–{{ gridDialog.endSeat }}).
           </v-alert>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
@@ -516,17 +550,18 @@
         <v-card-text>
           <v-text-field
             v-model="singleSeatDialog.rowLabel"
-            label="Row Label"
-            placeholder="e.g. A"
+            label="Row Label (e.g. A, AA, ZZ)"
+            placeholder="e.g. AA"
             variant="outlined"
             density="comfortable"
             class="text-uppercase mb-2"
           ></v-text-field>
           <v-text-field
             v-model.number="singleSeatDialog.seatNumber"
-            label="Seat Number"
+            label="Seat Number (1–100)"
             type="number"
             min="1"
+            max="100"
             variant="outlined"
             density="comfortable"
             class="mb-2"
@@ -650,6 +685,9 @@ const slotElementMap = new Map(); // "ROW-SEATNUM" -> DOMElement (both seats and
 const bulkZoneId = ref(null);
 const bulkRowLabel = ref('');
 
+const gridColumnsCount = ref(30);
+const gridRowsSpan = ref('Z');
+
 const canvasRef = ref(null);
 
 const marquee = reactive({
@@ -665,17 +703,17 @@ const marquee = reactive({
 // Stores range computed from last drag or selection
 const inferredRange = ref({
   startRow: 'A',
-  endRow: 'H',
+  endRow: 'Z',
   startSeat: 1,
-  endSeat: 12,
+  endSeat: 30,
 });
 
 const gridDialog = ref({
   show: false,
   startRow: 'A',
-  endRow: 'H',
+  endRow: 'Z',
   startSeat: 1,
-  endSeat: 12,
+  endSeat: 30,
   zoneId: null,
   mode: 'append',
 });
@@ -701,34 +739,60 @@ function showToast(text, color = 'info') {
   snackbar.value = { show: true, text, color };
 }
 
+// Convert 0-based integer to row label: 0 -> A, 25 -> Z, 26 -> AA, 27 -> AB, 701 -> ZZ
+function indexToRowLabel(idx) {
+  let label = '';
+  idx = idx + 1; // 1-based
+  while (idx > 0) {
+    const rem = (idx - 1) % 26;
+    label = String.fromCharCode(65 + rem) + label;
+    idx = Math.floor((idx - 1) / 26);
+  }
+  return label;
+}
+
+// Convert row label to 0-based integer: A -> 0, Z -> 25, AA -> 26, AB -> 27, ZZ -> 701
+function rowLabelToIndex(label) {
+  if (!label) return 0;
+  label = label.toUpperCase().trim();
+  let index = 0;
+  for (let i = 0; i < label.length; i++) {
+    const code = label.charCodeAt(i);
+    if (code >= 65 && code <= 90) {
+      index = index * 26 + (code - 64);
+    }
+  }
+  return Math.max(0, index - 1);
+}
+
 function registerSlotElement(el, rowLabel, seatNumber) {
   if (el) {
     slotElementMap.set(`${rowLabel}-${seatNumber}`, el);
   }
 }
 
-// Compute maximum row and columns for the structured 2D grid matrix
-const gridMaxRowChar = computed(() => {
-  let maxCode = 'H'.charCodeAt(0);
+// Compute maximum row index (supports A..Z, and AA..ZZ)
+const gridMaxRowIndex = computed(() => {
+  let maxIdx = rowLabelToIndex(gridRowsSpan.value || 'Z');
   for (const s of draftSeats.value) {
-    const code = s.row_label.toUpperCase().charCodeAt(0);
-    if (code > maxCode) maxCode = code;
+    const idx = rowLabelToIndex(s.row_label);
+    if (idx > maxIdx) maxIdx = idx;
   }
-  return String.fromCharCode(maxCode);
+  return maxIdx;
 });
 
+// Compute maximum columns (supports 1 up to 100)
 const gridMaxCols = computed(() => {
-  let maxNum = 14;
+  let maxNum = gridColumnsCount.value || 30;
   for (const s of draftSeats.value) {
-    if (s.seat_number > maxNum) maxNum = s.seat_number;
+    if (s.seat_number > maxNum) maxNum = Math.min(100, s.seat_number);
   }
-  return maxNum;
+  return Math.min(100, Math.max(maxNum, 14));
 });
 
 // Build 2D matrix of rows and slots (maintains fixed grid geometry without shrinking)
 const gridRows = computed(() => {
-  const startCode = 'A'.charCodeAt(0);
-  const endCode = gridMaxRowChar.value.charCodeAt(0);
+  const maxIdx = gridMaxRowIndex.value;
   const rows = [];
 
   const seatMap = new Map();
@@ -736,8 +800,8 @@ const gridRows = computed(() => {
     seatMap.set(`${s.row_label}-${s.seat_number}`, s);
   }
 
-  for (let c = startCode; c <= endCode; c++) {
-    const rowLabel = String.fromCharCode(c);
+  for (let i = 0; i <= maxIdx; i++) {
+    const rowLabel = indexToRowLabel(i);
     const slots = [];
     for (let num = 1; num <= gridMaxCols.value; num++) {
       const seat = seatMap.get(`${rowLabel}-${num}`) || null;
@@ -773,9 +837,9 @@ const isModified = computed(() => {
 });
 
 const calculatedGridCount = computed(() => {
-  const startChar = (gridDialog.value.startRow || 'A').toUpperCase().charCodeAt(0);
-  const endChar = (gridDialog.value.endRow || 'A').toUpperCase().charCodeAt(0);
-  const rowCount = Math.max(0, endChar - startChar + 1);
+  const startIdx = rowLabelToIndex(gridDialog.value.startRow || 'A');
+  const endIdx = rowLabelToIndex(gridDialog.value.endRow || 'Z');
+  const rowCount = Math.max(0, endIdx - startIdx + 1);
   const seatCount = Math.max(0, (gridDialog.value.endSeat - gridDialog.value.startSeat + 1));
   return rowCount * seatCount;
 });
@@ -946,22 +1010,22 @@ function clearSelection() {
 function updateInferredRangeFromSelection() {
   if (selectedSeatKeys.value.size === 0) return;
 
-  const rows = [];
+  const rowIndices = [];
   const numbers = [];
   for (const key of selectedSeatKeys.value) {
     const parts = key.split('-');
     if (parts.length === 2) {
-      rows.push(parts[0]);
+      rowIndices.push(rowLabelToIndex(parts[0]));
       numbers.push(parseInt(parts[1], 10));
     }
   }
 
-  if (rows.length > 0) {
-    rows.sort();
+  if (rowIndices.length > 0) {
+    rowIndices.sort((a, b) => a - b);
     numbers.sort((a, b) => a - b);
     inferredRange.value = {
-      startRow: rows[0],
-      endRow: rows[rows.length - 1],
+      startRow: indexToRowLabel(rowIndices[0]),
+      endRow: indexToRowLabel(rowIndices[rowIndices.length - 1]),
       startSeat: numbers[0],
       endSeat: numbers[numbers.length - 1],
     };
@@ -975,8 +1039,8 @@ function handleCanvasMouseDown(e) {
 
   const rect = canvasRef.value.getBoundingClientRect();
   marquee.active = true;
-  marquee.startX = e.clientX - rect.left;
-  marquee.startY = e.clientY - rect.top;
+  marquee.startX = e.clientX - rect.left + canvasRef.value.scrollLeft;
+  marquee.startY = e.clientY - rect.top + canvasRef.value.scrollTop;
   marquee.left = marquee.startX;
   marquee.top = marquee.startY;
   marquee.width = 0;
@@ -992,8 +1056,8 @@ function handleCanvasMouseMove(e) {
   if (!marquee.active || !canvasRef.value) return;
 
   const rect = canvasRef.value.getBoundingClientRect();
-  const currentX = e.clientX - rect.left;
-  const currentY = e.clientY - rect.top;
+  const currentX = e.clientX - rect.left + canvasRef.value.scrollLeft;
+  const currentY = e.clientY - rect.top + canvasRef.value.scrollTop;
 
   marquee.left = Math.min(marquee.startX, currentX);
   marquee.top = Math.min(marquee.startY, currentY);
@@ -1002,10 +1066,10 @@ function handleCanvasMouseMove(e) {
 
   // Compute intersections with all grid slots (both seats and empty slots)
   const boxRect = {
-    left: marquee.left + rect.left,
-    top: marquee.top + rect.top,
-    right: marquee.left + marquee.width + rect.left,
-    bottom: marquee.top + marquee.height + rect.top,
+    left: marquee.left - canvasRef.value.scrollLeft + rect.left,
+    top: marquee.top - canvasRef.value.scrollTop + rect.top,
+    right: marquee.left + marquee.width - canvasRef.value.scrollLeft + rect.left,
+    bottom: marquee.top + marquee.height - canvasRef.value.scrollTop + rect.top,
   };
 
   const nextSelected = new Set(e.shiftKey || e.ctrlKey ? selectedSeatKeys.value : []);
@@ -1043,22 +1107,21 @@ function handleCanvasMouseUp() {
   if (selectedSeatKeys.value.size > 0) {
     updateInferredRangeFromSelection();
   } else if (hintSlotsToCreate.value.size > 0) {
-    // Infer range from hint slots
-    const rows = [];
+    const rowIndices = [];
     const numbers = [];
     for (const key of hintSlotsToCreate.value) {
       const parts = key.split('-');
       if (parts.length === 2) {
-        rows.push(parts[0]);
+        rowIndices.push(rowLabelToIndex(parts[0]));
         numbers.push(parseInt(parts[1], 10));
       }
     }
-    if (rows.length > 0) {
-      rows.sort();
+    if (rowIndices.length > 0) {
+      rowIndices.sort((a, b) => a - b);
       numbers.sort((a, b) => a - b);
       inferredRange.value = {
-        startRow: rows[0],
-        endRow: rows[rows.length - 1],
+        startRow: indexToRowLabel(rowIndices[0]),
+        endRow: indexToRowLabel(rowIndices[rowIndices.length - 1]),
         startSeat: numbers[0],
         endSeat: numbers[numbers.length - 1],
       };
@@ -1124,19 +1187,19 @@ function openGridGeneratorDialog() {
   gridDialog.value = {
     show: true,
     startRow: inferredRange.value.startRow || 'A',
-    endRow: inferredRange.value.endRow || 'H',
+    endRow: inferredRange.value.endRow || 'Z',
     startSeat: inferredRange.value.startSeat || 1,
-    endSeat: inferredRange.value.endSeat || 12,
+    endSeat: Math.min(100, inferredRange.value.endSeat || 30),
     zoneId: draftZones.value[0]?.id || null,
     mode: 'append',
   };
 }
 
 function executeGridGenerator() {
-  const startChar = (gridDialog.value.startRow || 'A').toUpperCase().charCodeAt(0);
-  const endChar = (gridDialog.value.endRow || 'A').toUpperCase().charCodeAt(0);
-  const startNum = gridDialog.value.startSeat || 1;
-  const endNum = gridDialog.value.endSeat || 1;
+  const startIdx = rowLabelToIndex(gridDialog.value.startRow || 'A');
+  const endIdx = rowLabelToIndex(gridDialog.value.endRow || 'Z');
+  const startNum = Math.max(1, gridDialog.value.startSeat || 1);
+  const endNum = Math.min(100, Math.max(startNum, gridDialog.value.endSeat || 30));
   const targetZoneId = gridDialog.value.zoneId;
 
   if (!targetZoneId) {
@@ -1145,8 +1208,8 @@ function executeGridGenerator() {
   }
 
   const newSeats = [];
-  for (let c = startChar; c <= endChar; c++) {
-    const rowLabel = String.fromCharCode(c);
+  for (let i = startIdx; i <= endIdx; i++) {
+    const rowLabel = indexToRowLabel(i);
     for (let num = startNum; num <= endNum; num++) {
       newSeats.push({
         id: null,
@@ -1177,14 +1240,14 @@ function openAddSeatDialog() {
   singleSeatDialog.value = {
     show: true,
     rowLabel: 'A',
-    seatNumber: draftSeats.value.length > 0 ? Math.max(...draftSeats.value.map(s => s.seat_number)) + 1 : 1,
+    seatNumber: draftSeats.value.length > 0 ? Math.min(100, Math.max(...draftSeats.value.map(s => s.seat_number)) + 1) : 1,
     zoneId: draftZones.value[0]?.id || null,
   };
 }
 
 function executeAddSingleSeat() {
   const row = singleSeatDialog.value.rowLabel.trim().toUpperCase();
-  const num = singleSeatDialog.value.seatNumber;
+  const num = Math.min(100, Math.max(1, singleSeatDialog.value.seatNumber));
   const zoneId = singleSeatDialog.value.zoneId;
 
   if (!row || num <= 0 || !zoneId) {
@@ -1329,7 +1392,7 @@ onUnmounted(() => {
 
 <style scoped>
 .editor-container {
-  max-width: 1440px;
+  max-width: 1600px;
 }
 
 .bg-surface {
@@ -1350,7 +1413,7 @@ onUnmounted(() => {
 .screen-wrapper {
   perspective: 400px;
   width: 100%;
-  max-width: 600px;
+  max-width: 700px;
   margin: 0 auto;
 }
 
@@ -1375,12 +1438,14 @@ onUnmounted(() => {
 
 .seat-canvas-container {
   position: relative;
-  min-height: 480px;
+  min-height: 520px;
+  max-height: 720px;
   padding: 30px;
   background: #131722;
   border-radius: 16px;
   border: 1px dashed #2a3142;
   overflow-x: auto;
+  overflow-y: auto;
 }
 
 .marquee-selection-box {
@@ -1394,13 +1459,15 @@ onUnmounted(() => {
 
 .seat-row {
   flex-wrap: nowrap;
+  min-width: max-content;
 }
 
 .row-header-placeholder {
-  width: 28px;
+  min-width: 36px;
 }
 
 .col-header-number {
+  min-width: 32px;
   width: 32px;
   height: 20px;
   display: flex;
@@ -1411,8 +1478,9 @@ onUnmounted(() => {
 }
 
 .row-header-btn {
-  width: 28px;
+  min-width: 36px;
   height: 32px;
+  padding: 0 4px;
   border-radius: 6px;
   border: 1px solid #3b4256;
   background: #1e2330;
@@ -1424,6 +1492,9 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   transition: all 0.15s ease;
+  position: sticky;
+  left: 0;
+  z-index: 2;
 }
 
 .row-header-btn:hover {
@@ -1439,17 +1510,18 @@ onUnmounted(() => {
 }
 
 .row-header-empty {
-  opacity: 0.5;
+  opacity: 0.45;
   border-style: dashed;
 }
 
 .row-header-label-right {
-  width: 28px;
+  min-width: 36px;
   text-align: center;
 }
 
 .seat-node {
   position: relative;
+  min-width: 32px;
   width: 32px;
   height: 32px;
   border-radius: 6px;
@@ -1459,6 +1531,7 @@ onUnmounted(() => {
   justify-content: center;
   cursor: pointer;
   transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+  flex-shrink: 0;
 }
 
 .seat-node:hover {
@@ -1476,16 +1549,18 @@ onUnmounted(() => {
 
 .empty-grid-slot {
   position: relative;
+  min-width: 32px;
   width: 32px;
   height: 32px;
   border-radius: 6px;
-  border: 1px dashed rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.015);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: all 0.15s ease;
+  flex-shrink: 0;
 }
 
 .empty-grid-slot:hover {
@@ -1494,8 +1569,8 @@ onUnmounted(() => {
 }
 
 .empty-slot-number {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.15);
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.12);
   font-family: monospace;
 }
 
@@ -1509,14 +1584,14 @@ onUnmounted(() => {
 }
 
 .hint-label {
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 800;
   color: #f59e0b;
   font-family: monospace;
 }
 
 .seat-number-label {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   color: #fff;
 }
