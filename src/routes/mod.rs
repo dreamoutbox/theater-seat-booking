@@ -51,10 +51,21 @@ pub fn create_router(state: AppState) -> Router {
         .route("/auth/login", post(auth::login))
         .route("/auth/logout", post(auth::logout))
         .route("/me", get(auth::me))
-        // Catalog
+        // Catalog & Management
         .route("/theaters", get(theater::list_theaters))
-        .route("/events", get(theater::list_events))
-        .route("/showtimes", get(theater::list_showtimes))
+        .route("/events", get(theater::list_events).post(theater::create_event))
+        .route(
+            "/events/{id}",
+            axum::routing::put(theater::update_event).delete(theater::delete_event),
+        )
+        .route(
+            "/showtimes",
+            get(theater::list_showtimes).post(theater::create_showtime),
+        )
+        .route(
+            "/showtimes/{id}",
+            axum::routing::put(theater::update_showtime).delete(theater::delete_showtime),
+        )
         .route("/theaters/{id}/seats", get(theater::get_theater_seats))
         // Booking Queue
         .route("/bookings", post(booking::enqueue_booking))

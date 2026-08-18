@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue';
 import BookingView from '../views/BookingView.vue';
 import OrdersView from '../views/OrdersView.vue';
 import OrderDetailView from '../views/OrderDetailView.vue';
+import ManageEventsView from '../views/ManageEventsView.vue';
 import LoginView from '../views/LoginView.vue';
 import RegisterView from '../views/RegisterView.vue';
 import { useAuthStore } from '../stores/auth';
@@ -31,6 +32,12 @@ const routes = [
     component: OrderDetailView,
     props: true,
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/manage/events',
+    name: 'ManageEvents',
+    component: ManageEventsView,
+    meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
   },
   {
     path: '/login',

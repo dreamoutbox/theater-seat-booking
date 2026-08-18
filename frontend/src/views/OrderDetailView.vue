@@ -2,31 +2,17 @@
   <v-container class="py-8 max-w-4xl">
     <!-- Back Button -->
     <div class="mb-4">
-      <v-btn
-        variant="text"
-        prepend-icon="mdi-arrow-left"
-        to="/orders"
-        class="text-none font-weight-bold"
-      >
+      <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/orders" class="text-none font-weight-bold">
         Back to Orders
       </v-btn>
     </div>
 
     <!-- Loading Skeleton -->
-    <v-skeleton-loader
-      v-if="loading"
-      type="article, table, actions"
-      theme="dark"
-      class="rounded-xl"
-    ></v-skeleton-loader>
+    <v-skeleton-loader v-if="loading" type="article, table, actions" theme="dark"
+      class="rounded-xl"></v-skeleton-loader>
 
     <!-- Error State -->
-    <v-alert
-      v-else-if="error"
-      type="error"
-      variant="tonal"
-      class="rounded-xl mb-6"
-    >
+    <v-alert v-else-if="error" type="error" variant="tonal" class="rounded-xl mb-6">
       {{ error }}
     </v-alert>
 
@@ -39,16 +25,12 @@
             <span class="text-caption text-grey font-weight-mono text-uppercase">Order Reference</span>
             <span class="text-caption font-weight-mono text-amber-darken-1 font-weight-bold">#{{ order.id }}</span>
           </div>
-          <div class="d-flex align-center gap-3 flex-wrap mb-2">
-            <h1 class="text-h4 font-weight-bold text-white mb-0">
+          <div class="d-flex align-center gap-5 flex-wrap mb-2">
+            <h1 class="text-h4 font-weight-bold text-white mb-0 mr-5">
               {{ order.event_title }}
             </h1>
-            <v-chip
-              size="small"
-              :color="getStatusColor(order.status)"
-              variant="flat"
-              class="font-weight-bold text-uppercase"
-            >
+            <v-chip size="small" :color="getStatusColor(order.status)" variant="flat"
+              class="font-weight-bold text-uppercase">
               {{ formatStatus(order.status) }}
             </v-chip>
           </div>
@@ -136,20 +118,14 @@
       </div>
 
       <!-- Pending Payment Action -->
-      <div v-if="order.status === 'pending_payment'" class="pa-4 rounded-xl border bg-surface-variant d-flex justify-space-between align-center">
+      <div v-if="order.status === 'pending_payment'"
+        class="pa-4 rounded-xl border bg-surface-variant d-flex justify-space-between align-center">
         <div>
           <div class="font-weight-bold text-white mb-1">Awaiting Payment</div>
           <div class="text-caption text-grey">Complete checkout to permanently confirm your reserved seats.</div>
         </div>
-        <v-btn
-          color="amber-darken-1"
-          variant="flat"
-          size="large"
-          prepend-icon="mdi-credit-card-check"
-          class="text-none font-weight-bold px-6"
-          :loading="paying"
-          @click="handlePayMock"
-        >
+        <v-btn color="amber-darken-1" variant="flat" size="large" prepend-icon="mdi-credit-card-check"
+          class="text-none font-weight-bold px-6" :loading="paying" @click="handlePayMock">
           Pay Now (${{ (order.total_amount_cents / 100).toFixed(2) }})
         </v-btn>
       </div>

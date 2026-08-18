@@ -12,6 +12,16 @@
     </v-btn>
 
     <v-btn 
+      v-if="authStore.isElevated" 
+      variant="text" 
+      prepend-icon="mdi-movie-edit" 
+      to="/manage/events" 
+      class="text-none font-weight-medium text-amber-darken-1"
+    >
+      Manage Events
+    </v-btn>
+
+    <v-btn 
       v-if="authStore.isAuthenticated" 
       variant="text" 
       prepend-icon="mdi-ticket-confirmation" 
