@@ -73,7 +73,6 @@
           size="small"
           class="text-none font-weight-bold"
           :loading="saving"
-          :disabled="!isModified"
           @click="saveLayout"
         >
           Save Layout
@@ -924,6 +923,15 @@ const isModified = computed(() => {
 
   const origZones = originalLayout.value.zones;
   if (origZones.length !== draftZones.value.length) return true;
+
+  const origZoneMap = new Map(origZones.map(z => [z.id, z]));
+  for (const z of draftZones.value) {
+    const orig = origZoneMap.get(z.id);
+    if (!orig) return true;
+    if (orig.name !== z.name) return true;
+    if (orig.price_cents !== z.price_cents) return true;
+    if ((orig.color || '#14b8a6') !== (z.color || '#14b8a6')) return true;
+  }
 
   const origMap = new Map(origSeats.map(s => [`${s.row_label}-${s.seat_number}`, s.zone_id]));
   for (const s of draftSeats.value) {

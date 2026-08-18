@@ -983,7 +983,7 @@ pub async fn save_theater_layout(
         })?;
 
     let zones: Vec<Zone> = sqlx::query_as(
-        "SELECT id, theater_id, name, price_cents FROM zones WHERE theater_id = $1 ORDER BY price_cents DESC",
+        "SELECT id, theater_id, name, price_cents, color FROM zones WHERE theater_id = $1 ORDER BY price_cents DESC",
     )
     .bind(theater_id)
     .fetch_all(&state.pool)

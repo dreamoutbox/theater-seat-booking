@@ -305,8 +305,11 @@ async function fetchSeats() {
     const res = await api.get(`/showtimes/${props.showtimeId}/seats`);
     seats.value = res.data;
     emit('seats-updated', seats.value);
-    emit('held-seats-changed', myHeldSeats.value);
     updateCountdown();
+    emit('held-seats-changed', {
+      heldSeats: myHeldSeats.value,
+      countdownSeconds: countdownSeconds.value,
+    });
   } catch (err) {
     showToast('Failed to load theater seat layout', 'error');
   }
@@ -396,6 +399,10 @@ function updateCountdown() {
   if (held.length === 0) {
     countdownSeconds.value = 0;
     if (countdownInterval) clearInterval(countdownInterval);
+    emit('held-seats-changed', {
+      heldSeats: [],
+      countdownSeconds: 0,
+    });
     return;
   }
 
@@ -410,10 +417,19 @@ function updateCountdown() {
   const diffSeconds = Math.max(0, Math.floor((earliestExpire - Date.now()) / 1000));
   countdownSeconds.value = diffSeconds;
 
+  emit('held-seats-changed', {
+    heldSeats: myHeldSeats.value,
+    countdownSeconds: countdownSeconds.value,
+  });
+
   if (countdownInterval) clearInterval(countdownInterval);
   countdownInterval = setInterval(() => {
     if (countdownSeconds.value > 0) {
       countdownSeconds.value--;
+      emit('held-seats-changed', {
+        heldSeats: myHeldSeats.value,
+        countdownSeconds: countdownSeconds.value,
+      });
     } else {
       clearInterval(countdownInterval);
       fetchSeats();

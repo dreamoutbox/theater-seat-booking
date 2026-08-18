@@ -263,8 +263,14 @@ function getZoneColor(zoneName) {
 }
 
 function onHeldSeatsChanged(payload) {
-  myHeldSeats.value = payload.heldSeats || [];
-  countdownSeconds.value = payload.countdownSeconds || 0;
+  if (Array.isArray(payload)) {
+    myHeldSeats.value = payload;
+  } else if (payload && Array.isArray(payload.heldSeats)) {
+    myHeldSeats.value = payload.heldSeats;
+    countdownSeconds.value = payload.countdownSeconds || 0;
+  } else {
+    myHeldSeats.value = [];
+  }
 }
 
 async function loadShowtimeData() {
