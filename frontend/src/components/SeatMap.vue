@@ -2,14 +2,19 @@
   <div class="seat-map-container pa-4">
 
 
-    <!-- Seating Legend (Dynamic from theater zones) -->
+    <!-- Seating Legend -->
     <div class="d-flex flex-wrap justify-center align-center gap-3 mb-5 text-caption mt-8">
-      <div v-for="zone in dynamicZones" :key="zone.id" class="d-flex align-center gap-1">
-        <div class="legend-box" :style="{
-          borderColor: zone.color,
-          background: hexToRgba(zone.color, 0.25),
-        }"></div>
-        <span class="text-grey-lighten-1">{{ zone.name }} (${{ (zone.price_cents / 100).toFixed(2) }})</span>
+      <div class="d-flex align-center gap-1">
+        <div class="legend-box zone-vip"></div>
+        <span class="text-grey-lighten-1">VIP</span>
+      </div>
+      <div class="d-flex align-center gap-1">
+        <div class="legend-box zone-premium"></div>
+        <span class="text-grey-lighten-1">Premium</span>
+      </div>
+      <div class="d-flex align-center gap-1">
+        <div class="legend-box zone-standard"></div>
+        <span class="text-grey-lighten-1">Standard</span>
       </div>
       <div class="d-flex align-center gap-1">
         <div class="legend-box seat-held-mine-legend"></div>
@@ -35,7 +40,7 @@
 
     <!-- In-flight Booking Queue Alert -->
     <v-alert v-if="inFlightBookings.length > 0" type="info" variant="tonal" density="compact"
-      class="mb-4 mx-auto max-w-xl rounded-lg">
+      class="mb-4 mx-auto max-w-xl rounded-lg mt-5">
       <div class="d-flex align-center">
         <v-progress-circular indeterminate size="16" width="2" color="info" class="mr-3"></v-progress-circular>
         <span class="text-caption">Processing seat reservation in queue...</span>
@@ -43,7 +48,7 @@
     </v-alert>
 
     <!-- Interactive Seating Grid Matrix (Matching Seat Map Editor layout) -->
-    <div class="seat-canvas-container">
+    <div class="seat-canvas-container mt-10">
       <!-- Grid Header Column Numbers -->
       <div class="d-flex align-center gap-1 mb-1 justify-center">
         <div class="row-header-placeholder"></div>
@@ -231,34 +236,6 @@ function isSeatDisabled(seat) {
   return false;
 }
 
-const dynamicZones = computed(() => {
-  const map = new Map();
-  for (const s of seats.value) {
-    if (s.zone_id && !map.has(s.zone_id)) {
-      map.set(s.zone_id, {
-        id: s.zone_id,
-        name: s.zone_name,
-        price_cents: s.price_cents,
-        color: s.zone_color || getZoneColorHex(s.zone_name),
-      });
-    }
-  }
-  return Array.from(map.values()).sort((a, b) => b.price_cents - a.price_cents);
-});
-
-function hexToRgba(hex, alpha = 0.2) {
-  if (!hex || typeof hex !== 'string') return `rgba(20, 184, 166, ${alpha})`;
-  let c = hex.replace('#', '').trim();
-  if (c.length === 3) c = c.split('').map(x => x + x).join('');
-  if (c.length !== 6) return `rgba(20, 184, 166, ${alpha})`;
-  const num = parseInt(c, 16);
-  if (isNaN(num)) return `rgba(20, 184, 166, ${alpha})`;
-  const r = (num >> 16) & 255;
-  const g = (num >> 8) & 255;
-  const b = num & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
 function getZoneColorHex(name) {
   if (!name) return '#94a3b8';
   if (name.toLowerCase().includes('vip')) return '#f59e0b';
@@ -266,8 +243,14 @@ function getZoneColorHex(name) {
   return '#14b8a6';
 }
 
+function getZoneBgColorHex(name) {
+  if (!name) return 'rgba(148, 163, 184, 0.15)';
+  if (name.toLowerCase().includes('vip')) return 'rgba(245, 158, 11, 0.18)';
+  if (name.toLowerCase().includes('premium')) return 'rgba(99, 102, 241, 0.18)';
+  return 'rgba(20, 184, 166, 0.18)';
+}
+
 function getSeatStyle(seat) {
-  const color = seat.zone_color || getZoneColorHex(seat.zone_name);
   if (seat.is_mine && seat.status === 'held') {
     return {
       borderColor: '#f59e0b',
@@ -281,8 +264,8 @@ function getSeatStyle(seat) {
     };
   }
   return {
-    borderColor: color,
-    background: hexToRgba(color, 0.18),
+    borderColor: getZoneColorHex(seat.zone_name),
+    background: getZoneBgColorHex(seat.zone_name),
   };
 }
 
@@ -339,7 +322,7 @@ async function handleSeatClick(seat) {
   if (seat.is_mine && seat.status === 'held') {
     try {
       processingSeatIds.value.add(seat.id);
-      await api.post('/release-hold', {
+      await api.post('/bookings/release', {
         showtime_id: props.showtimeId,
         seat_id: seat.id,
       });
@@ -357,7 +340,7 @@ async function handleSeatClick(seat) {
 
   try {
     processingSeatIds.value.add(seat.id);
-    const res = await api.post('/hold', {
+    const res = await api.post('/bookings', {
       showtime_id: props.showtimeId,
       seat_id: seat.id,
     });
@@ -378,7 +361,7 @@ async function pollBookingStatus(bookingUuid, seatId) {
   const interval = setInterval(async () => {
     attempts++;
     try {
-      const res = await api.get(`/booking/status/${bookingUuid}`);
+      const res = await api.get(`/bookings/${bookingUuid}`);
       const data = res.data;
 
       if (data.status === 'success') {

@@ -83,6 +83,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/bookings", post(booking::enqueue_booking))
         .route("/bookings/{uuid}", get(booking::get_booking_status))
         .route("/bookings/release", post(booking::release_hold))
+        .route("/hold", post(booking::enqueue_booking))
+        .route("/release-hold", post(booking::release_hold))
+        .route("/booking/status/{uuid}", get(booking::get_booking_status))
         // Orders
         .route("/orders", post(order::create_order).get(order::list_orders))
         .route("/orders/{id}", get(order::get_order))
