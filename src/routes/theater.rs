@@ -593,6 +593,7 @@ pub async fn get_theater_seats(
             s.theater_id,
             s.zone_id,
             z.name AS zone_name,
+            z.color AS zone_color,
             z.price_cents,
             s.row_label,
             s.seat_number,
@@ -644,6 +645,89 @@ pub async fn get_theater_seats(
     Ok(Json(seats))
 }
 
+pub async fn get_showtime_seats(
+    Path(showtime_id): Path<Uuid>,
+    opt_user: OptionalAuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<SeatWithStatus>>, (StatusCode, Json<serde_json::Value>)> {
+    let current_user_id = opt_user.0.map(|u| u.id);
+
+    let theater_id: Option<Uuid> = sqlx::query_scalar("SELECT theater_id FROM showtimes WHERE id = $1")
+        .bind(showtime_id)
+        .fetch_optional(&state.pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let Some(theater_id) = theater_id else {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Showtime not found" })),
+        ));
+    };
+
+    let query_str = "
+        SELECT
+            s.id,
+            s.theater_id,
+            s.zone_id,
+            z.name AS zone_name,
+            z.color AS zone_color,
+            z.price_cents,
+            s.row_label,
+            s.seat_number,
+            CASE
+                WHEN sb.status = 'confirmed' THEN 'confirmed'
+                WHEN sb.status = 'held' AND sb.expires_at > now() THEN 'held'
+                ELSE 'available'
+            END AS status,
+            CASE
+                WHEN sb.id IS NOT NULL 
+                     AND (sb.status = 'confirmed' OR (sb.status = 'held' AND sb.expires_at > now()))
+                     AND sb.user_id = $3 THEN true
+                ELSE false
+            END AS is_mine,
+            CASE
+                WHEN sb.status = 'held' AND sb.expires_at > now() THEN sb.expires_at
+                ELSE NULL
+            END AS held_expires_at,
+            CASE
+                WHEN sb.id IS NOT NULL 
+                     AND (sb.status = 'confirmed' OR (sb.status = 'held' AND sb.expires_at > now()))
+                     AND sb.user_id = $3 THEN sb.id
+                ELSE NULL
+            END AS seat_booking_id
+        FROM seats s
+        JOIN zones z ON z.id = s.zone_id
+        LEFT JOIN seat_bookings sb 
+            ON sb.seat_id = s.id 
+            AND sb.showtime_id = $2
+            AND sb.status IN ('held', 'confirmed')
+            AND (sb.status = 'confirmed' OR sb.expires_at > now())
+        WHERE s.theater_id = $1
+        ORDER BY s.row_label ASC, s.seat_number ASC
+    ";
+
+    let seats: Vec<SeatWithStatus> = sqlx::query_as(query_str)
+        .bind(theater_id)
+        .bind(showtime_id)
+        .bind(current_user_id)
+        .fetch_all(&state.pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    Ok(Json(seats))
+}
+
 pub async fn get_theater_layout(
     Path(theater_id): Path<Uuid>,
     State(state): State<AppState>,
@@ -666,7 +750,7 @@ pub async fn get_theater_layout(
         })?;
 
     let zones: Vec<Zone> = sqlx::query_as(
-        "SELECT id, theater_id, name, price_cents FROM zones WHERE theater_id = $1 ORDER BY price_cents DESC",
+        "SELECT id, theater_id, name, price_cents, color FROM zones WHERE theater_id = $1 ORDER BY price_cents DESC",
     )
     .bind(theater_id)
     .fetch_all(&state.pool)
@@ -734,13 +818,16 @@ pub async fn save_theater_layout(
             continue;
         }
 
+        let zone_color = zone_item.color.as_deref().unwrap_or("#14b8a6");
+
         let zone_id = match zone_item.id {
             Some(existing_id) => {
                 let updated = sqlx::query(
-                    "UPDATE zones SET name = $1, price_cents = $2 WHERE id = $3 AND theater_id = $4",
+                    "UPDATE zones SET name = $1, price_cents = $2, color = $3 WHERE id = $4 AND theater_id = $5",
                 )
                 .bind(zone_name)
                 .bind(zone_item.price_cents)
+                .bind(zone_color)
                 .bind(existing_id)
                 .bind(theater_id)
                 .execute(&mut *tx)
@@ -756,12 +843,13 @@ pub async fn save_theater_layout(
                     existing_id
                 } else {
                     sqlx::query_scalar(
-                        "INSERT INTO zones (id, theater_id, name, price_cents) VALUES ($1, $2, $3, $4) RETURNING id",
+                        "INSERT INTO zones (id, theater_id, name, price_cents, color) VALUES ($1, $2, $3, $4, $5) RETURNING id",
                     )
                     .bind(existing_id)
                     .bind(theater_id)
                     .bind(zone_name)
                     .bind(zone_item.price_cents)
+                    .bind(zone_color)
                     .fetch_one(&mut *tx)
                     .await
                     .map_err(|e| {
@@ -774,11 +862,12 @@ pub async fn save_theater_layout(
             }
             None => {
                 sqlx::query_scalar(
-                    "INSERT INTO zones (theater_id, name, price_cents) VALUES ($1, $2, $3) RETURNING id",
+                    "INSERT INTO zones (theater_id, name, price_cents, color) VALUES ($1, $2, $3, $4) RETURNING id",
                 )
                 .bind(theater_id)
                 .bind(zone_name)
                 .bind(zone_item.price_cents)
+                .bind(zone_color)
                 .fetch_one(&mut *tx)
                 .await
                 .map_err(|e| {

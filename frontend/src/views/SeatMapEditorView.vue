@@ -594,25 +594,29 @@
     </v-dialog>
 
     <!-- Zone Manager Dialog -->
-    <v-dialog v-model="zoneDialog.show" max-width="580">
+    <v-dialog v-model="zoneDialog.show" max-width="720">
       <v-card theme="dark" class="rounded-xl pa-4 border bg-surface">
         <v-card-title class="text-h6 font-weight-bold d-flex justify-space-between align-center">
-          <span>Manage Pricing Zones</span>
+          <div class="d-flex align-center gap-2">
+            <v-icon icon="mdi-palette" color="amber-darken-1" size="22"></v-icon>
+            <span>Manage Pricing Zones & Colors</span>
+          </div>
           <v-btn size="small" color="amber-darken-1" variant="flat" prepend-icon="mdi-plus" class="text-none font-weight-bold" @click="addNewDraftZone">
             New Zone
           </v-btn>
         </v-card-title>
         <v-card-text>
           <div class="text-caption text-grey mb-3">
-            Define seating categories, names, and ticket pricing in USD for this theater hall.
+            Define seating categories, pricing in USD, and custom zone colors for the seat map canvas.
           </div>
 
           <v-table theme="dark" class="rounded-lg border mb-3">
             <thead>
               <tr>
-                <th class="text-left font-weight-bold">Zone Name</th>
-                <th class="text-left font-weight-bold" style="width: 140px;">Price (USD)</th>
-                <th class="text-right font-weight-bold" style="width: 80px;">Action</th>
+                <th class="text-left font-weight-bold" style="width: 170px;">Zone Name</th>
+                <th class="text-left font-weight-bold" style="width: 120px;">Price (USD)</th>
+                <th class="text-left font-weight-bold" style="min-width: 240px;">Color (Picker & Presets)</th>
+                <th class="text-right font-weight-bold" style="width: 50px;">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -638,6 +642,75 @@
                     hide-details
                     @update:model-value="val => z.price_cents = Math.round(parseFloat(val || 0) * 100)"
                   ></v-text-field>
+                </td>
+                <td class="py-2">
+                  <div class="d-flex align-center gap-2">
+                    <!-- Native color picker wrapper -->
+                    <div
+                      class="color-picker-wrapper"
+                      :style="{ background: z.color || '#14b8a6' }"
+                      :title="`Pick color (${z.color || '#14b8a6'})`"
+                    >
+                      <input
+                        type="color"
+                        :value="z.color || '#14b8a6'"
+                        class="native-color-input"
+                        @input="e => z.color = e.target.value"
+                      />
+                    </div>
+
+                    <!-- Hex Code Input -->
+                    <v-text-field
+                      v-model="z.color"
+                      placeholder="#14b8a6"
+                      variant="outlined"
+                      density="compact"
+                      hide-details
+                      class="font-weight-mono text-caption"
+                      style="max-width: 95px;"
+                    ></v-text-field>
+
+                    <!-- Standard Color Preset Swatches -->
+                    <div class="d-flex align-center gap-1">
+                      <button
+                        v-for="preset in PRESET_ZONE_COLORS.slice(0, 5)"
+                        :key="preset.hex"
+                        type="button"
+                        class="preset-color-dot"
+                        :class="{ 'preset-selected': z.color?.toLowerCase() === preset.hex.toLowerCase() }"
+                        :style="{ background: preset.hex }"
+                        :title="`${preset.name} (${preset.hex})`"
+                        @click="z.color = preset.hex"
+                      ></button>
+                      <v-menu offset-y>
+                        <template #activator="{ props: menuProps }">
+                          <v-btn
+                            v-bind="menuProps"
+                            icon="mdi-dots-horizontal"
+                            size="x-small"
+                            variant="text"
+                            color="grey"
+                            title="More colors"
+                          ></v-btn>
+                        </template>
+                        <v-card theme="dark" class="pa-2 border rounded-lg bg-surface" style="width: 170px;">
+                          <div class="text-caption text-grey mb-1 font-weight-bold">Presets</div>
+                          <div class="d-flex flex-wrap gap-1">
+                            <button
+                              v-for="preset in PRESET_ZONE_COLORS"
+                              :key="preset.hex"
+                              type="button"
+                              class="preset-color-dot-lg"
+                              :class="{ 'preset-selected': z.color?.toLowerCase() === preset.hex.toLowerCase() }"
+                              :style="{ background: preset.hex }"
+                              :title="`${preset.name} (${preset.hex})`"
+                              @click="z.color = preset.hex"
+                            ></button>
+                          </div>
+                        </v-card>
+                      </v-menu>
+                    </div>
+                  </div>
                 </td>
                 <td class="text-right">
                   <v-btn
@@ -869,6 +942,32 @@ const calculatedGridCount = computed(() => {
   return rowCount * seatCount;
 });
 
+const PRESET_ZONE_COLORS = [
+  { name: 'Amber Gold', hex: '#f59e0b' },
+  { name: 'Indigo Purple', hex: '#6366f1' },
+  { name: 'Emerald Teal', hex: '#14b8a6' },
+  { name: 'Rose Red', hex: '#f43f5e' },
+  { name: 'Sky Cyan', hex: '#0ea5e9' },
+  { name: 'Orange Coral', hex: '#f97316' },
+  { name: 'Fuchsia Pink', hex: '#d946ef' },
+  { name: 'Lime Green', hex: '#84cc16' },
+  { name: 'Deep Violet', hex: '#8b5cf6' },
+  { name: 'Slate Gray', hex: '#94a3b8' },
+];
+
+function hexToRgba(hex, alpha = 0.2) {
+  if (!hex || typeof hex !== 'string') return `rgba(20, 184, 166, ${alpha})`;
+  let c = hex.replace('#', '').trim();
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  if (c.length !== 6) return `rgba(20, 184, 166, ${alpha})`;
+  const num = parseInt(c, 16);
+  if (isNaN(num)) return `rgba(20, 184, 166, ${alpha})`;
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function getZoneName(zoneId) {
   const z = draftZones.value.find(item => item.id === zoneId);
   return z ? z.name : 'Unknown';
@@ -879,18 +978,22 @@ function getZonePrice(zoneId) {
   return z ? z.price_cents : 0;
 }
 
-function getZoneColorHex(name) {
-  if (!name) return '#94a3b8';
-  if (name.toLowerCase().includes('vip')) return '#f59e0b';
-  if (name.toLowerCase().includes('premium')) return '#6366f1';
+function getZoneColorHex(zoneIdOrName) {
+  if (!zoneIdOrName) return '#14b8a6';
+  // 1. Check by zone id
+  const byId = draftZones.value.find(item => item.id === zoneIdOrName);
+  if (byId && byId.color) return byId.color;
+  // 2. Check by zone name
+  const byName = draftZones.value.find(item => item.name.toLowerCase() === zoneIdOrName.toLowerCase());
+  if (byName && byName.color) return byName.color;
+  if (zoneIdOrName.toLowerCase().includes('vip')) return '#f59e0b';
+  if (zoneIdOrName.toLowerCase().includes('premium')) return '#6366f1';
   return '#14b8a6';
 }
 
-function getZoneBgColorHex(name) {
-  if (!name) return 'rgba(148, 163, 184, 0.15)';
-  if (name.toLowerCase().includes('vip')) return 'rgba(245, 158, 11, 0.18)';
-  if (name.toLowerCase().includes('premium')) return 'rgba(99, 102, 241, 0.18)';
-  return 'rgba(20, 184, 166, 0.18)';
+function getZoneBgColorHex(zoneIdOrName) {
+  const hex = getZoneColorHex(zoneIdOrName);
+  return hexToRgba(hex, 0.18);
 }
 
 function isSeatSelected(rowLabel, seatNumber) {
@@ -1790,6 +1893,60 @@ onUnmounted(() => {
   width: 9px;
   height: 9px;
   border-radius: 50%;
+}
+
+.color-picker-wrapper {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  overflow: hidden;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  flex-shrink: 0;
+}
+
+.native-color-input {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  width: 50px;
+  height: 50px;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.preset-color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.preset-color-dot:hover {
+  transform: scale(1.25);
+  border-color: #ffffff !important;
+}
+
+.preset-color-dot-lg {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.preset-color-dot-lg:hover,
+.preset-selected {
+  border-color: #ffffff !important;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.8);
+  transform: scale(1.15);
 }
 
 .sticky-toolbar {

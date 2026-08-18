@@ -64,6 +64,7 @@ pub struct Zone {
     pub theater_id: Uuid,
     pub name: String,
     pub price_cents: i64,
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -87,6 +88,7 @@ pub struct SaveZoneItem {
     pub id: Option<Uuid>,
     pub name: String,
     pub price_cents: i64,
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -109,6 +111,7 @@ pub struct SeatWithStatus {
     pub theater_id: Uuid,
     pub zone_id: Uuid,
     pub zone_name: String,
+    pub zone_color: Option<String>,
     pub price_cents: i64,
     pub row_label: String,
     pub seat_number: i32,

@@ -1,25 +1,15 @@
 <template>
   <div class="seat-map-container pa-4">
-    <!-- Cinema Screen visual (Matches Editor) -->
-    <div class="screen-wrapper mb-6">
-      <div class="cinema-screen">
-        <div class="screen-text">CINEMA SCREEN</div>
-      </div>
-    </div>
 
-    <!-- Seating Legend -->
-    <div class="d-flex flex-wrap justify-center align-center gap-3 mb-6 text-caption">
-      <div class="d-flex align-center gap-1">
-        <div class="legend-box zone-vip"></div>
-        <span class="text-grey-lighten-1">VIP</span>
-      </div>
-      <div class="d-flex align-center gap-1">
-        <div class="legend-box zone-premium"></div>
-        <span class="text-grey-lighten-1">Premium</span>
-      </div>
-      <div class="d-flex align-center gap-1">
-        <div class="legend-box zone-standard"></div>
-        <span class="text-grey-lighten-1">Standard</span>
+
+    <!-- Seating Legend (Dynamic from theater zones) -->
+    <div class="d-flex flex-wrap justify-center align-center gap-3 mb-5 text-caption mt-8">
+      <div v-for="zone in dynamicZones" :key="zone.id" class="d-flex align-center gap-1">
+        <div class="legend-box" :style="{
+          borderColor: zone.color,
+          background: hexToRgba(zone.color, 0.25),
+        }"></div>
+        <span class="text-grey-lighten-1">{{ zone.name }} (${{ (zone.price_cents / 100).toFixed(2) }})</span>
       </div>
       <div class="d-flex align-center gap-1">
         <div class="legend-box seat-held-mine-legend"></div>
@@ -35,14 +25,17 @@
       </div>
     </div>
 
+    <!-- Cinema Screen visual (Matches Editor) -->
+    <div class="screen-wrapper mb-6">
+      <div class="cinema-screen">
+        <div class="screen-text">CINEMA SCREEN</div>
+      </div>
+    </div>
+
+
     <!-- In-flight Booking Queue Alert -->
-    <v-alert
-      v-if="inFlightBookings.length > 0"
-      type="info"
-      variant="tonal"
-      density="compact"
-      class="mb-4 mx-auto max-w-xl rounded-lg"
-    >
+    <v-alert v-if="inFlightBookings.length > 0" type="info" variant="tonal" density="compact"
+      class="mb-4 mx-auto max-w-xl rounded-lg">
       <div class="d-flex align-center">
         <v-progress-circular indeterminate size="16" width="2" color="info" class="mr-3"></v-progress-circular>
         <span class="text-caption">Processing seat reservation in queue...</span>
@@ -55,11 +48,8 @@
       <div class="d-flex align-center gap-1 mb-1 justify-center">
         <div class="row-header-placeholder"></div>
         <div class="d-flex align-center gap-1 seat-row-items">
-          <div
-            v-for="col in maxSeatCol"
-            :key="col"
-            class="col-header-number text-caption text-grey font-weight-bold font-weight-mono"
-          >
+          <div v-for="col in maxSeatCol" :key="col"
+            class="col-header-number text-caption text-grey font-weight-bold font-weight-mono">
             {{ col }}
           </div>
         </div>
@@ -68,11 +58,7 @@
 
       <!-- Rows of Grid Slots -->
       <div class="d-flex flex-column gap-1 align-center">
-        <div
-          v-for="row in groupedRows"
-          :key="row.label"
-          class="seat-row d-flex align-center gap-1"
-        >
+        <div v-for="row in groupedRows" :key="row.label" class="seat-row d-flex align-center gap-1">
           <!-- Row Left Header -->
           <div class="row-header-btn">
             {{ row.label }}
@@ -82,32 +68,17 @@
           <div class="d-flex align-center gap-1 seat-row-items">
             <template v-for="slot in row.slots" :key="`${row.label}-${slot.seatNumber}`">
               <!-- Active Seat -->
-              <button
-                v-if="slot.seat"
-                type="button"
-                class="seat-node"
-                :class="getSeatClasses(slot.seat)"
-                :disabled="isSeatDisabled(slot.seat)"
-                :style="getSeatStyle(slot.seat)"
-                @click="handleSeatClick(slot.seat)"
-                :title="getSeatTooltip(slot.seat)"
-              >
+              <button v-if="slot.seat" type="button" class="seat-node" :class="getSeatClasses(slot.seat)"
+                :disabled="isSeatDisabled(slot.seat)" :style="getSeatStyle(slot.seat)"
+                @click="handleSeatClick(slot.seat)" :title="getSeatTooltip(slot.seat)">
                 <!-- Loading Spinner -->
-                <v-progress-circular
-                  v-if="isSeatProcessing(slot.seat.id)"
-                  indeterminate
-                  size="14"
-                  width="2"
-                  color="white"
-                ></v-progress-circular>
+                <v-progress-circular v-if="isSeatProcessing(slot.seat.id)" indeterminate size="14" width="2"
+                  color="white"></v-progress-circular>
 
                 <!-- Sold / Locked Icon -->
                 <v-icon
                   v-else-if="slot.seat.status === 'confirmed' || (slot.seat.status === 'held' && !slot.seat.is_mine)"
-                  icon="mdi-lock"
-                  size="12"
-                  color="grey"
-                ></v-icon>
+                  icon="mdi-lock" size="12" color="grey"></v-icon>
 
                 <!-- My Held Seat: Checkmark or Cancel X on hover -->
                 <template v-else-if="slot.seat.is_mine && slot.seat.status === 'held'">
@@ -260,6 +231,34 @@ function isSeatDisabled(seat) {
   return false;
 }
 
+const dynamicZones = computed(() => {
+  const map = new Map();
+  for (const s of seats.value) {
+    if (s.zone_id && !map.has(s.zone_id)) {
+      map.set(s.zone_id, {
+        id: s.zone_id,
+        name: s.zone_name,
+        price_cents: s.price_cents,
+        color: s.zone_color || getZoneColorHex(s.zone_name),
+      });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.price_cents - a.price_cents);
+});
+
+function hexToRgba(hex, alpha = 0.2) {
+  if (!hex || typeof hex !== 'string') return `rgba(20, 184, 166, ${alpha})`;
+  let c = hex.replace('#', '').trim();
+  if (c.length === 3) c = c.split('').map(x => x + x).join('');
+  if (c.length !== 6) return `rgba(20, 184, 166, ${alpha})`;
+  const num = parseInt(c, 16);
+  if (isNaN(num)) return `rgba(20, 184, 166, ${alpha})`;
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function getZoneColorHex(name) {
   if (!name) return '#94a3b8';
   if (name.toLowerCase().includes('vip')) return '#f59e0b';
@@ -267,14 +266,8 @@ function getZoneColorHex(name) {
   return '#14b8a6';
 }
 
-function getZoneBgColorHex(name) {
-  if (!name) return 'rgba(148, 163, 184, 0.15)';
-  if (name.toLowerCase().includes('vip')) return 'rgba(245, 158, 11, 0.18)';
-  if (name.toLowerCase().includes('premium')) return 'rgba(99, 102, 241, 0.18)';
-  return 'rgba(20, 184, 166, 0.18)';
-}
-
 function getSeatStyle(seat) {
+  const color = seat.zone_color || getZoneColorHex(seat.zone_name);
   if (seat.is_mine && seat.status === 'held') {
     return {
       borderColor: '#f59e0b',
@@ -288,8 +281,8 @@ function getSeatStyle(seat) {
     };
   }
   return {
-    borderColor: getZoneColorHex(seat.zone_name),
-    background: getZoneBgColorHex(seat.zone_name),
+    borderColor: color,
+    background: hexToRgba(color, 0.18),
   };
 }
 
@@ -611,8 +604,15 @@ defineExpose({
 }
 
 @keyframes pulse-hold {
-  0%, 100% { box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
-  50% { box-shadow: 0 0 16px rgba(245, 158, 11, 0.9); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+  }
+
+  50% {
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.9);
+  }
 }
 
 .seat-held-mine .seat-icon-check {
@@ -647,8 +647,13 @@ defineExpose({
 }
 
 @keyframes pulse-opac {
-  from { opacity: 0.6; }
-  to { opacity: 1; }
+  from {
+    opacity: 0.6;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 .seat-held-other,
