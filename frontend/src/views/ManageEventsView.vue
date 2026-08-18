@@ -23,6 +23,15 @@
           Refresh
         </v-btn>
         <v-btn
+          color="indigo-darken-1"
+          variant="flat"
+          prepend-icon="mdi-seat-passenger"
+          class="text-none font-weight-bold"
+          to="/manage/seat-map"
+        >
+          Seat Map Editor
+        </v-btn>
+        <v-btn
           color="amber-darken-1"
           variant="flat"
           prepend-icon="mdi-plus"
@@ -163,6 +172,14 @@
                     >
                       Seat Map
                     </v-btn>
+                    <v-btn
+                      icon="mdi-seat-passenger"
+                      size="small"
+                      variant="text"
+                      color="indigo-lighten-2"
+                      title="Edit Theater Seat Layout"
+                      :to="`/manage/theaters/${show.theater_id}/seat-map`"
+                    ></v-btn>
                     <v-btn
                       icon="mdi-pencil"
                       size="small"
