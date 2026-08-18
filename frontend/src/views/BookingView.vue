@@ -44,82 +44,160 @@
       </div>
     </v-card>
 
-    <!-- Seat Map Component -->
-    <SeatMap
-      v-if="currentShowtime"
-      ref="seatMapRef"
-      :theater-id="currentShowtime.theater_id"
-      :showtime-id="props.showtimeId"
-      @checkout="handleOpenCheckout"
-    />
+    <!-- Main Grid: Left = SeatMap, Right = Reservation Summary & Checkout -->
+    <v-row v-if="currentShowtime">
+      <!-- Left Column: Seat Map -->
+      <v-col cols="12" md="8" lg="8">
+        <SeatMap
+          ref="seatMapRef"
+          :theater-id="currentShowtime.theater_id"
+          :showtime-id="props.showtimeId"
+          @held-seats-changed="onHeldSeatsChanged"
+        />
+      </v-col>
 
-    <!-- Checkout Modal Dialog -->
-    <v-dialog v-model="checkoutDialog" max-width="500" persistent>
-      <v-card theme="dark" class="rounded-xl pa-2">
-        <v-card-title class="d-flex justify-space-between align-center text-h6 font-weight-bold">
-          <span>Confirm Booking & Payment</span>
-          <v-btn icon="mdi-close" variant="text" size="small" @click="checkoutDialog = false"></v-btn>
-        </v-card-title>
-
-        <v-card-text>
-          <div class="mb-4">
-            <div class="text-caption text-grey mb-1">EVENT & SHOWTIME</div>
-            <div class="font-weight-bold text-body-1">{{ currentShowtime?.event_title }}</div>
-            <div class="text-caption text-grey">{{ currentShowtime?.theater_name }} • {{ formatDate(currentShowtime?.starts_at) }}</div>
-          </div>
-
-          <v-divider class="my-3"></v-divider>
-
-          <div class="mb-4">
-            <div class="text-caption text-grey mb-2">SELECTED HELD SEATS</div>
-            <div class="d-flex flex-column gap-2">
-              <div
-                v-for="seat in heldSeatsForCheckout"
-                :key="seat.id"
-                class="d-flex justify-space-between align-center pa-2 rounded bg-grey-darken-4"
+      <!-- Right Column: Order Summary & Selected Held Seats -->
+      <v-col cols="12" md="4" lg="4">
+        <v-card theme="dark" class="rounded-xl pa-5 border bg-surface h-100 d-flex flex-column justify-space-between" elevation="4">
+          <div>
+            <div class="d-flex justify-space-between align-center mb-3">
+              <h2 class="text-h6 font-weight-bold text-white mb-0">Your Reservation</h2>
+              <!-- Timer Badge -->
+              <v-chip
+                v-if="myHeldSeats.length > 0 && countdownSeconds > 0"
+                size="small"
+                color="warning"
+                variant="flat"
+                class="font-weight-bold font-weight-mono"
               >
-                <div>
-                  <span class="font-weight-bold mr-2">Seat {{ seat.row_label }}{{ seat.seat_number }}</span>
-                  <v-chip size="x-small" variant="tonal" color="amber-lighten-2">{{ seat.zone_name }}</v-chip>
+                <v-icon start icon="mdi-timer-outline" size="14"></v-icon>
+                {{ formattedCountdown }}
+              </v-chip>
+            </div>
+
+            <div class="text-caption text-grey mb-4">
+              {{ currentShowtime.event_title }} • {{ formatDate(currentShowtime.starts_at) }}
+            </div>
+
+            <v-divider class="mb-4"></v-divider>
+
+            <!-- SELECTED HELD SEATS -->
+            <div class="mb-4">
+              <div class="d-flex justify-space-between align-center mb-2">
+                <span class="text-caption text-grey font-weight-bold text-uppercase">
+                  SELECTED HELD SEATS ({{ myHeldSeats.length }})
+                </span>
+                <v-btn
+                  v-if="myHeldSeats.length > 1"
+                  variant="text"
+                  color="red-lighten-2"
+                  size="x-small"
+                  class="text-none px-1"
+                  :disabled="cancellingSeatId !== null"
+                  @click="handleCancelAllSeats"
+                >
+                  Cancel All
+                </v-btn>
+              </div>
+
+              <!-- Empty State -->
+              <div v-if="myHeldSeats.length === 0" class="text-center pa-6 rounded-lg bg-surface-variant border border-dashed">
+                <v-icon icon="mdi-seat-outline" size="36" color="grey" class="mb-2"></v-icon>
+                <div class="text-caption text-grey">No seats selected yet</div>
+                <div class="text-caption text-grey-darken-1 mt-1">Click on any available seat on the map to hold it.</div>
+              </div>
+
+              <!-- List of Selected Held Seats -->
+              <div v-else class="d-flex flex-column gap-2">
+                <div
+                  v-for="seat in myHeldSeats"
+                  :key="seat.id"
+                  class="d-flex justify-space-between align-center pa-3 rounded-lg bg-surface-variant border"
+                >
+                  <div class="d-flex align-center gap-2">
+                    <v-chip size="x-small" :color="getZoneColor(seat.zone_name)" variant="flat" class="font-weight-bold">
+                      {{ seat.row_label }}{{ seat.seat_number }}
+                    </v-chip>
+                    <div>
+                      <div class="text-caption font-weight-bold text-white">
+                        Row {{ seat.row_label }}, Seat {{ seat.seat_number }}
+                      </div>
+                      <div class="text-caption text-grey">{{ seat.zone_name }}</div>
+                    </div>
+                  </div>
+
+                  <div class="d-flex align-center gap-2">
+                    <span class="font-weight-mono font-weight-bold text-body-2 text-white">
+                      ${{ (seat.price_cents / 100).toFixed(2) }}
+                    </span>
+                    <!-- Cancel Booking Button for this seat -->
+                    <v-btn
+                      icon="mdi-close"
+                      size="x-small"
+                      color="red-lighten-2"
+                      variant="text"
+                      title="Cancel booking for this seat"
+                      :loading="cancellingSeatId === seat.id"
+                      @click="handleCancelSeat(seat)"
+                    ></v-btn>
+                  </div>
                 </div>
-                <span class="font-weight-mono font-weight-bold">${{ (seat.price_cents / 100).toFixed(2) }}</span>
               </div>
             </div>
+
+            <!-- Price Breakdown -->
+            <template v-if="myHeldSeats.length > 0">
+              <v-divider class="my-4"></v-divider>
+
+              <div class="d-flex justify-space-between align-center mb-2 text-caption text-grey">
+                <span>Seats Subtotal ({{ myHeldSeats.length }}):</span>
+                <span class="font-weight-mono">${{ (totalCheckoutCents / 100).toFixed(2) }}</span>
+              </div>
+              <div class="d-flex justify-space-between align-center mb-3 text-caption text-grey">
+                <span>Processing & Fees:</span>
+                <span class="text-success font-weight-bold">$0.00 (Included)</span>
+              </div>
+
+              <v-divider class="my-3"></v-divider>
+
+              <div class="d-flex justify-space-between align-center mb-4">
+                <span class="text-body-1 font-weight-bold text-white">Total Due:</span>
+                <span class="text-h5 font-weight-black text-amber-darken-1 font-weight-mono">
+                  ${{ (totalCheckoutCents / 100).toFixed(2) }}
+                </span>
+              </div>
+            </template>
           </div>
 
-          <v-divider class="my-3"></v-divider>
-
-          <div class="d-flex justify-space-between align-center mb-4">
-            <span class="text-h6 font-weight-bold">Total Due:</span>
-            <span class="text-h5 font-weight-black text-amber-darken-1 font-weight-mono">
-              ${{ (totalCheckoutCents / 100).toFixed(2) }}
-            </span>
+          <!-- Actions -->
+          <div class="mt-4">
+            <v-btn
+              color="amber-darken-1"
+              variant="flat"
+              block
+              size="large"
+              class="text-none font-weight-bold"
+              :disabled="myHeldSeats.length === 0"
+              :loading="processingOrder"
+              prepend-icon="mdi-credit-card-check"
+              @click="handleCreateAndPayOrder"
+            >
+              {{ myHeldSeats.length === 0 ? 'Select Seats to Book' : `Pay & Confirm ($${(totalCheckoutCents / 100).toFixed(2)})` }}
+            </v-btn>
+            <div class="text-caption text-grey text-center mt-2">
+              🔒 Instant lock reservation & transactional guarantee
+            </div>
           </div>
+        </v-card>
+      </v-col>
+    </v-row>
 
-          <v-alert type="info" variant="tonal" density="compact" class="text-caption mb-2">
-            Stripe payment processing will mark your held seats as confirmed.
-          </v-alert>
-        </v-card-text>
-
-        <v-card-actions class="pa-4 pt-0">
-          <v-btn variant="text" @click="checkoutDialog = false" :disabled="processingOrder">Cancel</v-btn>
-          <v-spacer></v-spacer>
-          <v-btn
-            color="amber-darken-1"
-            variant="flat"
-            class="text-none font-weight-bold px-6"
-            :loading="processingOrder"
-            prepend-icon="mdi-credit-card-check"
-            @click="handleCreateAndPayOrder"
-          >
-            Pay & Confirm Booking
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="4000">
+    <!-- Global Snackbar -->
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="4000" location="bottom right">
       {{ snackbar.text }}
+      <template #actions>
+        <v-btn variant="text" @click="snackbar.show = false">Close</v-btn>
+      </template>
     </v-snackbar>
   </v-container>
 </template>
@@ -139,8 +217,9 @@ const currentShowtime = ref(null);
 const allShowtimes = ref([]);
 const seatMapRef = ref(null);
 
-const checkoutDialog = ref(false);
-const heldSeatsForCheckout = ref([]);
+const myHeldSeats = ref([]);
+const countdownSeconds = ref(0);
+const cancellingSeatId = ref(null);
 const processingOrder = ref(false);
 
 const snackbar = ref({
@@ -154,7 +233,13 @@ function showToast(text, color = 'info') {
 }
 
 const totalCheckoutCents = computed(() => {
-  return heldSeatsForCheckout.value.reduce((sum, s) => sum + s.price_cents, 0);
+  return myHeldSeats.value.reduce((sum, s) => sum + s.price_cents, 0);
+});
+
+const formattedCountdown = computed(() => {
+  const m = Math.floor(countdownSeconds.value / 60);
+  const s = countdownSeconds.value % 60;
+  return `${m}:${s < 10 ? '0' : ''}${s}`;
 });
 
 function formatDate(isoStr) {
@@ -169,6 +254,18 @@ function formatDate(isoStr) {
   });
 }
 
+function getZoneColor(zoneName) {
+  if (!zoneName) return 'grey';
+  if (zoneName.includes('VIP')) return 'amber-darken-2';
+  if (zoneName.includes('Premium')) return 'indigo-darken-1';
+  return 'teal-darken-1';
+}
+
+function onHeldSeatsChanged(payload) {
+  myHeldSeats.value = payload.heldSeats || [];
+  countdownSeconds.value = payload.countdownSeconds || 0;
+}
+
 async function loadShowtimeData() {
   try {
     const res = await api.get('/showtimes');
@@ -179,44 +276,71 @@ async function loadShowtimeData() {
   }
 }
 
-function handleOpenCheckout(myHeldSeats) {
-  if (!myHeldSeats || myHeldSeats.length === 0) return;
-  heldSeatsForCheckout.value = myHeldSeats;
-  checkoutDialog.value = true;
+// Cancel individual held seat
+async function handleCancelSeat(seat) {
+  cancellingSeatId.value = seat.id;
+  try {
+    await api.post('/bookings/release', {
+      showtime_id: props.showtimeId,
+      seat_id: seat.id,
+    });
+    showToast(`Cancelled hold for Seat ${seat.row_label}${seat.seat_number}`, 'info');
+    if (seatMapRef.value) {
+      await seatMapRef.value.fetchSeats();
+    }
+  } catch (err) {
+    const errMsg = err.response?.data?.error || 'Failed to cancel hold';
+    showToast(errMsg, 'error');
+  } finally {
+    cancellingSeatId.value = null;
+  }
+}
+
+// Cancel all held seats
+async function handleCancelAllSeats() {
+  const seatsToCancel = [...myHeldSeats.value];
+  cancellingSeatId.value = 'all';
+  try {
+    for (const s of seatsToCancel) {
+      await api.post('/bookings/release', {
+        showtime_id: props.showtimeId,
+        seat_id: s.id,
+      });
+    }
+    showToast('All seat holds cancelled', 'info');
+    if (seatMapRef.value) {
+      await seatMapRef.value.fetchSeats();
+    }
+  } catch (err) {
+    showToast('Failed to cancel all seat holds', 'error');
+  } finally {
+    cancellingSeatId.value = null;
+  }
 }
 
 async function handleCreateAndPayOrder() {
+  if (myHeldSeats.value.length === 0) return;
   processingOrder.value = true;
   try {
-    // 1. Fetch the seat_booking ids corresponding to these held seats
-    // We get them from the active holds query
-    const resSeats = await api.get(`/theaters/${currentShowtime.value.theater_id}/seats?showtime_id=${props.showtimeId}`);
-    const myHeld = resSeats.data.filter((s) => s.is_mine && s.status === 'held');
-    
-    if (myHeld.length === 0) {
-      showToast('Holds expired. Please select seats again.', 'error');
-      checkoutDialog.value = false;
-      if (seatMapRef.value) seatMapRef.value.fetchSeats();
-      return;
-    }
-
-    // 2. Create order: POST /api/orders
+    // 1. Create order: POST /api/orders
     const orderRes = await api.post('/orders', {
-      seat_booking_ids: myHeld.map((s) => s.id),
+      seat_booking_ids: myHeldSeats.value.map((s) => s.id),
     });
 
     const orderId = orderRes.data.order_id;
-    showToast('Order created! Processing payment...', 'info');
+    showToast('Order created! Confirming payment...', 'info');
 
-    // 3. Confirm payment via mock endpoint / webhook simulation
+    // 2. Confirm payment via mock endpoint / webhook simulation
     await api.post(`/orders/${orderId}/confirm-mock`);
 
     showToast('Payment successful! Your seats are confirmed.', 'success');
-    checkoutDialog.value = false;
     router.push('/orders');
   } catch (err) {
     const errMsg = err.response?.data?.error || 'Order processing failed';
     showToast(errMsg, 'error');
+    if (seatMapRef.value) {
+      await seatMapRef.value.fetchSeats();
+    }
   } finally {
     processingOrder.value = false;
   }
@@ -234,6 +358,11 @@ watch(() => props.showtimeId, () => {
 <style scoped>
 .bg-surface {
   background: #181c27 !important;
+  border-color: #2a3142 !important;
+}
+
+.bg-surface-variant {
+  background: #1e2330 !important;
   border-color: #2a3142 !important;
 }
 

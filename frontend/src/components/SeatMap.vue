@@ -36,32 +36,6 @@
       </div>
     </div>
 
-    <!-- Active Hold Banner / Timer -->
-    <v-alert
-      v-if="myHeldSeats.length > 0"
-      type="success"
-      variant="tonal"
-      density="compact"
-      class="mb-6 mx-auto max-w-xl"
-      icon="mdi-clock-outline"
-    >
-      <div class="d-flex justify-space-between align-center">
-        <div>
-          <strong>{{ myHeldSeats.length }} seat(s) held for you!</strong>
-          <span class="ml-2 text-caption">Hold expires in: <strong>{{ formattedCountdown }}</strong></span>
-        </div>
-        <v-btn
-          color="success"
-          size="small"
-          variant="flat"
-          class="text-none font-weight-bold"
-          @click="$emit('checkout', myHeldSeats)"
-        >
-          Checkout (${{ (myHeldTotalCents / 100).toFixed(2) }})
-        </v-btn>
-      </div>
-    </v-alert>
-
     <!-- In-flight Booking Queue Alert -->
     <v-alert
       v-if="inFlightBookings.length > 0"
@@ -146,7 +120,7 @@ const props = defineProps({
   showtimeId: { type: String, required: true },
 });
 
-const emit = defineEmits(['checkout', 'seats-updated']);
+const emit = defineEmits(['seats-updated', 'held-seats-changed']);
 
 const authStore = useAuthStore();
 const router = useRouter();
@@ -182,16 +156,6 @@ const groupedRows = computed(() => {
 
 const myHeldSeats = computed(() => {
   return seats.value.filter((s) => s.is_mine && s.status === 'held');
-});
-
-const myHeldTotalCents = computed(() => {
-  return myHeldSeats.value.reduce((sum, s) => sum + s.price_cents, 0);
-});
-
-const formattedCountdown = computed(() => {
-  const m = Math.floor(countdownSeconds.value / 60);
-  const s = countdownSeconds.value % 60;
-  return `${m}:${s < 10 ? '0' : ''}${s}`;
 });
 
 function isSeatProcessing(seatId) {
@@ -240,6 +204,10 @@ async function fetchSeats() {
     const res = await api.get(`/theaters/${props.theaterId}/seats?showtime_id=${props.showtimeId}`);
     seats.value = res.data;
     emit('seats-updated', seats.value);
+    emit('held-seats-changed', {
+      heldSeats: myHeldSeats.value,
+      countdownSeconds: countdownSeconds.value,
+    });
 
     // Calculate nearest expiry for countdown
     updateCountdown();
@@ -254,6 +222,10 @@ function updateCountdown() {
   const heldWithExpiry = seats.value.filter((s) => s.is_mine && s.held_expires_at);
   if (heldWithExpiry.length === 0) {
     countdownSeconds.value = 0;
+    emit('held-seats-changed', {
+      heldSeats: myHeldSeats.value,
+      countdownSeconds: 0,
+    });
     return;
   }
 
@@ -262,6 +234,10 @@ function updateCountdown() {
   const now = Date.now();
   const diffSecs = Math.max(0, Math.floor((earliestExpiry - now) / 1000));
   countdownSeconds.value = diffSecs;
+  emit('held-seats-changed', {
+    heldSeats: myHeldSeats.value,
+    countdownSeconds: diffSecs,
+  });
 }
 
 // Handle Cancel Hold
@@ -366,6 +342,10 @@ onMounted(() => {
   countdownInterval = setInterval(() => {
     if (countdownSeconds.value > 0) {
       countdownSeconds.value--;
+      emit('held-seats-changed', {
+        heldSeats: myHeldSeats.value,
+        countdownSeconds: countdownSeconds.value,
+      });
       if (countdownSeconds.value === 0) {
         // Expiry reached, refresh seats
         fetchSeats();
@@ -384,6 +364,7 @@ watch(() => [props.theaterId, props.showtimeId], () => {
 
 defineExpose({
   fetchSeats,
+  handleCancelHold,
 });
 </script>
 
