@@ -41,7 +41,7 @@
           class="text-none font-weight-bold"
           @click="openGridGeneratorDialog"
         >
-          Grid Generator
+          Seat Generator
         </v-btn>
 
         <v-btn
@@ -90,10 +90,10 @@
       </div>
     </div>
 
-    <!-- Main Workspace Layout (Canvas + Sticky Sidebar) -->
+    <!-- Main Workspace Layout (Canvas + Persistent Sidebar) -->
     <v-row>
-      <!-- Canvas Area -->
-      <v-col cols="12" :md="selectedSeatKeys.size > 0 ? 9 : 12">
+      <!-- Canvas Area (9 Columns) -->
+      <v-col cols="12" md="9">
         <v-card theme="dark" class="canvas-card rounded-xl pa-6 border bg-surface" elevation="3">
           <!-- Canvas Top Toolbar -->
           <div class="d-flex justify-space-between align-center mb-6 flex-wrap gap-4">
@@ -102,7 +102,7 @@
               <span class="text-caption text-grey font-weight-bold text-uppercase">Zones:</span>
               <div
                 v-for="zone in draftZones"
-                :key="zone.id || zone.tempId"
+                :key="zone.id"
                 class="d-flex align-center gap-1 zone-legend-badge"
               >
                 <div class="zone-color-dot" :style="{ background: getZoneColorHex(zone.name) }"></div>
@@ -113,7 +113,7 @@
 
             <!-- Quick Selection Helpers -->
             <div class="d-flex align-center gap-2">
-              <span class="text-caption text-grey">Drag box to select multiple</span>
+              <span class="text-caption text-grey">Drag box to select • Press Delete to remove</span>
               <v-btn size="x-small" variant="text" color="amber-darken-1" @click="selectAllSeats">
                 Select All ({{ draftSeats.length }})
               </v-btn>
@@ -155,9 +155,11 @@
             <div v-if="draftSeats.length === 0" class="text-center pa-12">
               <v-icon icon="mdi-seat-outline" size="56" color="grey" class="mb-3"></v-icon>
               <div class="text-h6 text-grey font-weight-medium">No seats in this theater yet</div>
-              <div class="text-caption text-grey-darken-1 mt-1">Use the Grid Generator to create a complete auditorium layout in seconds.</div>
+              <div class="text-caption text-grey-darken-1 mt-1">
+                Drag on the canvas or click Seat Generator to create auditorium rows in seconds.
+              </div>
               <v-btn color="indigo-darken-1" variant="flat" prepend-icon="mdi-grid" class="mt-4 text-none font-weight-bold" @click="openGridGeneratorDialog">
-                Open Grid Generator
+                Open Seat Generator
               </v-btn>
             </div>
 
@@ -219,21 +221,31 @@
         </v-card>
       </v-col>
 
-      <!-- Selection & Bulk Actions Sidebar (Sticky when seats selected) -->
-      <v-col v-if="selectedSeatKeys.size > 0" cols="12" md="3">
+      <!-- Selection & Bulk Actions Sidebar (Persistent in right column) -->
+      <v-col cols="12" md="3">
         <v-card theme="dark" class="rounded-xl pa-5 border bg-surface sticky-toolbar" elevation="4">
+          <!-- Sidebar Header -->
           <div class="d-flex justify-space-between align-center mb-4">
             <div class="d-flex align-center gap-2">
-              <v-icon icon="mdi-checkbox-multiple-marked" color="amber-darken-1" size="20"></v-icon>
-              <h3 class="text-h6 font-weight-bold text-white mb-0">Selected Seats</h3>
+              <v-icon icon="mdi-checkbox-multiple-marked" :color="selectedSeatKeys.size > 0 ? 'amber-darken-1' : 'grey'" size="20"></v-icon>
+              <h3 class="text-h6 font-weight-bold text-white mb-0">Selection Actions</h3>
             </div>
-            <v-chip size="small" color="amber-darken-1" variant="flat" class="font-weight-bold">
-              {{ selectedSeatKeys.size }}
+            <v-chip size="small" :color="selectedSeatKeys.size > 0 ? 'amber-darken-1' : 'grey'" variant="flat" class="font-weight-bold">
+              {{ selectedSeatKeys.size }} selected
             </v-chip>
           </div>
 
-          <div class="text-caption text-grey mb-4">
-            Perform bulk actions on all <strong>{{ selectedSeatKeys.size }}</strong> selected seat(s).
+          <!-- Empty selection helper or selection info -->
+          <div v-if="selectedSeatKeys.size === 0" class="pa-3 rounded-lg bg-surface-variant border border-dashed mb-4 text-center">
+            <v-icon icon="mdi-cursor-default-click" size="24" color="grey" class="mb-1"></v-icon>
+            <div class="text-caption text-grey font-weight-medium">No seats selected</div>
+            <div class="text-caption text-grey-darken-1 mt-1">
+              Click seats or drag a box on the canvas to bulk reassign zones, rename rows, or delete.
+            </div>
+          </div>
+
+          <div v-else class="text-caption text-grey mb-4">
+            Editing <strong>{{ selectedSeatKeys.size }}</strong> selected seat(s). Press <kbd class="kbd-key">Delete</kbd> to remove.
           </div>
 
           <v-divider class="mb-4"></v-divider>
@@ -252,6 +264,7 @@
               density="compact"
               hide-details
               placeholder="Select Zone..."
+              :disabled="selectedSeatKeys.size === 0"
               class="mb-2"
             ></v-select>
             <v-btn
@@ -260,7 +273,7 @@
               block
               size="small"
               class="text-none font-weight-bold"
-              :disabled="!bulkZoneId"
+              :disabled="selectedSeatKeys.size === 0 || !bulkZoneId"
               @click="applyBulkZone"
             >
               Apply Zone to {{ selectedSeatKeys.size }} Seats
@@ -282,13 +295,14 @@
                 density="compact"
                 hide-details
                 maxlength="3"
+                :disabled="selectedSeatKeys.size === 0"
                 class="text-uppercase"
               ></v-text-field>
               <v-btn
                 variant="outlined"
                 size="small"
                 class="text-none font-weight-bold"
-                :disabled="!bulkRowLabel.trim()"
+                :disabled="selectedSeatKeys.size === 0 || !bulkRowLabel.trim()"
                 @click="applyBulkRowLabel"
               >
                 Apply Row
@@ -298,7 +312,24 @@
 
           <v-divider class="mb-4"></v-divider>
 
-          <!-- Action 3: Bulk Delete -->
+          <!-- Action 3: Quick Generator from Selection -->
+          <div class="mb-4">
+            <v-btn
+              color="indigo-darken-1"
+              variant="outlined"
+              block
+              size="small"
+              prepend-icon="mdi-grid"
+              class="text-none font-weight-bold"
+              @click="openGridGeneratorDialog"
+            >
+              Seat Generator Wizard
+            </v-btn>
+          </div>
+
+          <v-divider class="mb-4"></v-divider>
+
+          <!-- Action 4: Bulk Delete & Clear -->
           <div class="d-flex flex-column gap-2">
             <v-btn
               color="red-darken-1"
@@ -306,12 +337,14 @@
               block
               prepend-icon="mdi-trash-can-outline"
               class="text-none font-weight-bold"
+              :disabled="selectedSeatKeys.size === 0"
               @click="bulkDeleteSelectedSeats"
             >
               Delete {{ selectedSeatKeys.size }} Seats
             </v-btn>
 
             <v-btn
+              v-if="selectedSeatKeys.size > 0"
               variant="outlined"
               block
               size="small"
@@ -325,16 +358,16 @@
       </v-col>
     </v-row>
 
-    <!-- Grid Generator Dialog -->
+    <!-- Seat Generator Dialog -->
     <v-dialog v-model="gridDialog.show" max-width="540">
       <v-card theme="dark" class="rounded-xl pa-5 border bg-surface">
         <v-card-title class="text-h6 font-weight-bold d-flex align-center gap-2">
           <v-icon icon="mdi-grid" color="amber-darken-1"></v-icon>
-          Bulk Seat Grid Generator
+          Bulk Seat Generator
         </v-card-title>
         <v-card-text>
           <div class="text-caption text-grey mb-4">
-            Quickly generate rows and seats in a standardized auditorium matrix.
+            Generate rows and seats in a standardized auditorium matrix with custom zone assignment.
           </div>
 
           <v-row dense class="mb-2">
@@ -400,7 +433,7 @@
           </v-radio-group>
 
           <v-alert type="info" variant="tonal" density="compact" class="rounded-lg">
-            Will generate <strong>{{ calculatedGridCount }}</strong> seats.
+            Will generate <strong>{{ calculatedGridCount }}</strong> seat(s) across rows <strong>{{ (gridDialog.startRow || 'A').toUpperCase() }}–{{ (gridDialog.endRow || 'A').toUpperCase() }}</strong>.
           </v-alert>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
@@ -484,7 +517,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(z, idx) in draftZones" :key="z.id || z.tempId">
+              <tr v-for="(z, idx) in draftZones" :key="z.id">
                 <td class="py-2">
                   <v-text-field
                     v-model="z.name"
@@ -538,7 +571,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, reactive } from 'vue';
+import { ref, computed, onMounted, onUnmounted, reactive } from 'vue';
 import { useRoute } from 'vue-router';
 import api from '../api/client';
 
@@ -569,6 +602,14 @@ const marquee = reactive({
   top: 0,
   width: 0,
   height: 0,
+});
+
+// Stores range computed from last drag or selection
+const inferredRange = ref({
+  startRow: 'A',
+  endRow: 'H',
+  startSeat: 1,
+  endSeat: 12,
 });
 
 const gridDialog = ref({
@@ -651,12 +692,12 @@ const calculatedGridCount = computed(() => {
 });
 
 function getZoneName(zoneId) {
-  const z = draftZones.value.find(item => item.id === zoneId || item.tempId === zoneId);
+  const z = draftZones.value.find(item => item.id === zoneId);
   return z ? z.name : 'Unknown';
 }
 
 function getZonePrice(zoneId) {
-  const z = draftZones.value.find(item => item.id === zoneId || item.tempId === zoneId);
+  const z = draftZones.value.find(item => item.id === zoneId);
   return z ? z.price_cents : 0;
 }
 
@@ -698,6 +739,7 @@ function toggleRowSelection(rowLabel) {
     }
   }
   selectedSeatKeys.value = nextSet;
+  updateInferredRangeFromSelection();
 }
 
 function handleSeatClick(seat, event) {
@@ -719,6 +761,7 @@ function handleSeatClick(seat, event) {
     }
   }
   selectedSeatKeys.value = nextSet;
+  updateInferredRangeFromSelection();
 }
 
 function selectAllSeats() {
@@ -727,10 +770,36 @@ function selectAllSeats() {
     nextSet.add(`${s.row_label}-${s.seat_number}`);
   }
   selectedSeatKeys.value = nextSet;
+  updateInferredRangeFromSelection();
 }
 
 function clearSelection() {
   selectedSeatKeys.value = new Set();
+}
+
+function updateInferredRangeFromSelection() {
+  if (selectedSeatKeys.value.size === 0) return;
+
+  const rows = [];
+  const numbers = [];
+  for (const key of selectedSeatKeys.value) {
+    const parts = key.split('-');
+    if (parts.length === 2) {
+      rows.push(parts[0]);
+      numbers.push(parseInt(parts[1], 10));
+    }
+  }
+
+  if (rows.length > 0) {
+    rows.sort();
+    numbers.sort((a, b) => a - b);
+    inferredRange.value = {
+      startRow: rows[0],
+      endRow: rows[rows.length - 1],
+      startSeat: numbers[0],
+      endSeat: numbers[numbers.length - 1],
+    };
+  }
 }
 
 // Marquee Box Drag Selection Handlers
@@ -790,7 +859,29 @@ function handleCanvasMouseMove(e) {
 }
 
 function handleCanvasMouseUp() {
+  if (!marquee.active) return;
   marquee.active = false;
+
+  if (selectedSeatKeys.value.size > 0) {
+    updateInferredRangeFromSelection();
+  } else if (marquee.width > 20 && marquee.height > 20) {
+    // Empty space drag: infer rows and seats from geometric dimensions
+    // Approximate row height ~ 44px (seat 32px + gap 12px), seat width ~ 36px (seat 32px + gap 4px)
+    const rowOffset = Math.max(0, Math.floor((marquee.top - 20) / 44));
+    const rowSpan = Math.max(1, Math.ceil(marquee.height / 44));
+    const startRowCode = 65 + Math.min(25, rowOffset);
+    const endRowCode = Math.min(90, startRowCode + rowSpan - 1);
+
+    const seatOffset = Math.max(1, Math.floor((marquee.left - 40) / 36) + 1);
+    const seatSpan = Math.max(1, Math.ceil(marquee.width / 36));
+
+    inferredRange.value = {
+      startRow: String.fromCharCode(startRowCode),
+      endRow: String.fromCharCode(endRowCode),
+      startSeat: Math.max(1, seatOffset),
+      endSeat: Math.max(1, seatOffset + seatSpan - 1),
+    };
+  }
 }
 
 // Bulk Actions
@@ -820,6 +911,7 @@ function applyBulkRowLabel() {
 
 function bulkDeleteSelectedSeats() {
   const count = selectedSeatKeys.value.size;
+  if (count === 0) return;
   draftSeats.value = draftSeats.value.filter(
     s => !selectedSeatKeys.value.has(`${s.row_label}-${s.seat_number}`)
   );
@@ -827,25 +919,48 @@ function bulkDeleteSelectedSeats() {
   showToast(`Deleted ${count} seat(s)`, 'info');
 }
 
+// Keyboard shortcuts (Delete / Backspace / Esc)
+function handleGlobalKeyDown(e) {
+  const activeEl = document.activeElement;
+  if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.isContentEditable)) {
+    return;
+  }
+  if (gridDialog.value.show || singleSeatDialog.value.show || zoneDialog.value.show) {
+    return;
+  }
+
+  if ((e.key === 'Delete' || e.key === 'Backspace') && selectedSeatKeys.value.size > 0) {
+    e.preventDefault();
+    bulkDeleteSelectedSeats();
+  } else if (e.key === 'Escape' && selectedSeatKeys.value.size > 0) {
+    clearSelection();
+  }
+}
+
 // Dialogs & Generators
 function openGridGeneratorDialog() {
   gridDialog.value = {
     show: true,
-    startRow: 'A',
-    endRow: 'H',
-    startSeat: 1,
-    endSeat: 12,
-    zoneId: draftZones.value[0]?.id || draftZones.value[0]?.tempId || null,
+    startRow: inferredRange.value.startRow || 'A',
+    endRow: inferredRange.value.endRow || 'H',
+    startSeat: inferredRange.value.startSeat || 1,
+    endSeat: inferredRange.value.endSeat || 12,
+    zoneId: draftZones.value[0]?.id || null,
     mode: 'append',
   };
 }
 
 function executeGridGenerator() {
-  const startChar = gridDialog.value.startRow.toUpperCase().charCodeAt(0);
-  const endChar = gridDialog.value.endRow.toUpperCase().charCodeAt(0);
-  const startNum = gridDialog.value.startSeat;
-  const endNum = gridDialog.value.endSeat;
+  const startChar = (gridDialog.value.startRow || 'A').toUpperCase().charCodeAt(0);
+  const endChar = (gridDialog.value.endRow || 'A').toUpperCase().charCodeAt(0);
+  const startNum = gridDialog.value.startSeat || 1;
+  const endNum = gridDialog.value.endSeat || 1;
   const targetZoneId = gridDialog.value.zoneId;
+
+  if (!targetZoneId) {
+    showToast('Please select a zone tier', 'warning');
+    return;
+  }
 
   const newSeats = [];
   for (let c = startChar; c <= endChar; c++) {
@@ -881,7 +996,7 @@ function openAddSeatDialog() {
     show: true,
     rowLabel: 'A',
     seatNumber: draftSeats.value.length > 0 ? Math.max(...draftSeats.value.map(s => s.seat_number)) + 1 : 1,
-    zoneId: draftZones.value[0]?.id || draftZones.value[0]?.tempId || null,
+    zoneId: draftZones.value[0]?.id || null,
   };
 }
 
@@ -916,10 +1031,12 @@ function openZoneManagerDialog() {
 }
 
 function addNewDraftZone() {
-  const tempId = `temp_zone_${Date.now()}`;
+  const newId = (typeof crypto !== 'undefined' && crypto.randomUUID)
+    ? crypto.randomUUID()
+    : `zone_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+
   draftZones.value.push({
-    id: null,
-    tempId,
+    id: newId,
     name: `Zone ${draftZones.value.length + 1}`,
     price_cents: 1500,
   });
@@ -928,11 +1045,11 @@ function addNewDraftZone() {
 function removeDraftZone(index) {
   if (draftZones.value.length <= 1) return;
   const removed = draftZones.value.splice(index, 1)[0];
-  const fallbackZoneId = draftZones.value[0]?.id || draftZones.value[0]?.tempId;
+  const fallbackZoneId = draftZones.value[0]?.id;
 
   // Reassign any seats in the removed zone to fallback zone
   for (const s of draftSeats.value) {
-    if (s.zone_id === removed.id || s.zone_id === removed.tempId) {
+    if (s.zone_id === removed.id) {
       s.zone_id = fallbackZoneId;
     }
   }
@@ -956,6 +1073,11 @@ async function fetchLayout() {
     originalLayout.value = res.data;
     draftZones.value = JSON.parse(JSON.stringify(res.data.zones || []));
     draftSeats.value = JSON.parse(JSON.stringify(res.data.seats || []));
+
+    // Ensure bulkZoneId has a valid default
+    if (draftZones.value.length > 0) {
+      bulkZoneId.value = draftZones.value[0].id;
+    }
   } catch (err) {
     showToast('Failed to load theater seat layout', 'error');
   } finally {
@@ -997,6 +1119,8 @@ async function saveLayout() {
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleGlobalKeyDown);
+
   try {
     const theatersRes = await api.get('/theaters');
     theaters.value = theatersRes.data;
@@ -1015,6 +1139,10 @@ onMounted(async () => {
     showToast('Failed to initialize editor', 'error');
   }
 });
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleGlobalKeyDown);
+});
 </script>
 
 <style scoped>
@@ -1024,6 +1152,11 @@ onMounted(async () => {
 
 .bg-surface {
   background: #181c27 !important;
+  border-color: #2a3142 !important;
+}
+
+.bg-surface-variant {
+  background: #1e2330 !important;
   border-color: #2a3142 !important;
 }
 
@@ -1163,6 +1296,16 @@ onMounted(async () => {
 .sticky-toolbar {
   position: sticky;
   top: 80px;
+}
+
+.kbd-key {
+  padding: 1px 5px;
+  background: #2a3142;
+  border: 1px solid #4b5563;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 10px;
+  color: #fff;
 }
 
 .gap-1 {
