@@ -426,6 +426,7 @@ function formatDate(isoStr) {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 }
 

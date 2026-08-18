@@ -1,7 +1,7 @@
 <template>
   <v-container class="py-8">
     <!-- Hero Banner -->
-    <div class="hero-section text-center mb-10 pa-8 rounded-xl">
+    <!-- <div class="hero-section text-center mb-10 pa-8 rounded-xl">
       <v-chip color="amber-darken-1" size="small" variant="flat" class="mb-3 font-weight-bold">
         EXPERIENCE PREMIUM CINEMA
       </v-chip>
@@ -9,9 +9,10 @@
         Live Symphony & Cinematic Masterpieces
       </h1>
       <p class="text-body-1 text-grey max-w-2xl mx-auto mb-6">
-        Select a showtime below to reserve your seats with real-time zone pricing, instant hold guarantees, and seamless checkout.
+        Select a showtime below to reserve your seats with real-time zone pricing, instant hold guarantees, and seamless
+        checkout.
       </p>
-    </div>
+    </div> -->
 
     <!-- Showtimes Catalog -->
     <div class="d-flex justify-space-between align-center mb-6">
@@ -19,13 +20,7 @@
         <h2 class="text-h5 font-weight-bold text-white">Upcoming Events & Showtimes</h2>
         <span class="text-caption text-grey">Browse movies and concerts with available booking sessions</span>
       </div>
-      <v-btn
-        prepend-icon="mdi-refresh"
-        variant="text"
-        size="small"
-        :loading="loading"
-        @click="fetchShowtimes"
-      >
+      <v-btn prepend-icon="mdi-refresh" variant="text" size="small" :loading="loading" @click="fetchShowtimes">
         Refresh
       </v-btn>
     </div>
@@ -39,16 +34,8 @@
 
     <!-- Grouped Events Grid -->
     <v-row v-else>
-      <v-col
-        v-for="event in groupedEvents"
-        :key="event.event_id"
-        cols="12"
-        md="6"
-      >
-        <v-card
-          class="event-card rounded-xl pa-6 h-100 d-flex flex-column justify-space-between border"
-          elevation="4"
-        >
+      <v-col v-for="event in groupedEvents" :key="event.event_id" cols="12" md="6">
+        <v-card class="event-card rounded-xl pa-6 h-100 d-flex flex-column justify-space-between border" elevation="4">
           <div>
             <!-- Header Badges -->
             <div class="d-flex justify-space-between align-center mb-3">
@@ -93,11 +80,8 @@
                 SELECT A SHOWTIME SESSION
               </div>
               <div class="d-flex flex-column gap-2">
-                <div
-                  v-for="show in event.showtimes"
-                  :key="show.id"
-                  class="showtime-session-item d-flex justify-space-between align-center pa-3 rounded-lg bg-surface-variant border"
-                >
+                <div v-for="show in event.showtimes" :key="show.id"
+                  class="showtime-session-item d-flex justify-space-between align-center pa-3 rounded-lg bg-surface-variant border">
                   <div class="d-flex align-center gap-2">
                     <v-icon icon="mdi-calendar-clock" color="amber-darken-1" size="18"></v-icon>
                     <div>
@@ -110,14 +94,8 @@
                     </div>
                   </div>
 
-                  <v-btn
-                    color="amber-darken-1"
-                    variant="flat"
-                    size="small"
-                    prepend-icon="mdi-seat"
-                    class="text-none font-weight-bold px-4"
-                    :to="`/booking/${show.id}`"
-                  >
+                  <v-btn color="amber-darken-1" variant="flat" size="small" prepend-icon="mdi-seat"
+                    class="text-none font-weight-bold px-4" :to="`/booking/${show.id}`">
                     Select Seats
                   </v-btn>
                 </div>
@@ -169,6 +147,7 @@ function formatDate(isoStr) {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    hour12: false,
   });
 }
 

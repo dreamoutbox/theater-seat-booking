@@ -52,7 +52,14 @@ pub fn create_router(state: AppState) -> Router {
         .route("/auth/logout", post(auth::logout))
         .route("/me", get(auth::me))
         // Catalog & Management
-        .route("/theaters", get(theater::list_theaters))
+        .route(
+            "/theaters",
+            get(theater::list_theaters).post(theater::create_theater),
+        )
+        .route(
+            "/theaters/{id}",
+            axum::routing::put(theater::update_theater).delete(theater::delete_theater),
+        )
         .route("/events", get(theater::list_events).post(theater::create_event))
         .route(
             "/events/{id}",

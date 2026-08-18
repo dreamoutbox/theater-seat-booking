@@ -12,6 +12,16 @@
     </v-btn>
 
     <v-btn 
+      v-if="authStore.isStaff" 
+      variant="text" 
+      prepend-icon="mdi-theater" 
+      to="/manage/theaters" 
+      class="text-none font-weight-medium text-amber-darken-1"
+    >
+      Theaters
+    </v-btn>
+
+    <v-btn 
       v-if="authStore.isElevated" 
       variant="text" 
       prepend-icon="mdi-movie-edit" 

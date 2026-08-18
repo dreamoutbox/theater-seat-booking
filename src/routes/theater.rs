@@ -22,6 +22,12 @@ pub struct SeatsQuery {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct CreateTheaterPayload {
+    pub name: String,
+    pub address: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct CreateEventPayload {
     pub title: String,
 }
@@ -54,6 +60,151 @@ pub async fn list_theaters(
             })?;
 
     Ok(Json(theaters))
+}
+
+pub async fn create_theater(
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+    Json(payload): Json<CreateTheaterPayload>,
+) -> Result<(StatusCode, Json<Theater>), (StatusCode, Json<serde_json::Value>)> {
+    check_role(
+        &auth_user,
+        &[UserRole::Admin, UserRole::Staff],
+    )
+    .map_err(|_e| {
+        (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Unauthorized" })),
+        )
+    })?;
+
+    let name = payload.name.trim();
+    if name.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Theater name is required" })),
+        ));
+    }
+
+    let theater_id = Uuid::new_v4();
+    let theater: Theater = sqlx::query_as(
+        "INSERT INTO theaters (id, name, address) VALUES ($1, $2, $3) RETURNING id, name, address",
+    )
+    .bind(theater_id)
+    .bind(name)
+    .bind(payload.address.as_deref())
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // Create default zone for the new theater
+    sqlx::query(
+        "INSERT INTO zones (theater_id, name, price_cents) VALUES ($1, 'Standard', 1200)",
+    )
+    .bind(theater_id)
+    .execute(&state.pool)
+    .await
+    .ok();
+
+    tracing::info!(theater_id = %theater.id, name = %theater.name, user_id = %auth_user.id, "Created new theater");
+
+    Ok((StatusCode::CREATED, Json(theater)))
+}
+
+pub async fn update_theater(
+    Path(id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+    Json(payload): Json<CreateTheaterPayload>,
+) -> Result<Json<Theater>, (StatusCode, Json<serde_json::Value>)> {
+    check_role(
+        &auth_user,
+        &[UserRole::Admin, UserRole::Staff],
+    )
+    .map_err(|_e| {
+        (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Unauthorized" })),
+        )
+    })?;
+
+    let name = payload.name.trim();
+    if name.is_empty() {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "Theater name is required" })),
+        ));
+    }
+
+    let theater: Option<Theater> = sqlx::query_as(
+        "UPDATE theaters SET name = $1, address = $2 WHERE id = $3 RETURNING id, name, address",
+    )
+    .bind(name)
+    .bind(payload.address.as_deref())
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    match theater {
+        Some(t) => {
+            tracing::info!(theater_id = %id, name = %t.name, "Updated theater");
+            Ok(Json(t))
+        }
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Theater not found" })),
+        )),
+    }
+}
+
+pub async fn delete_theater(
+    Path(id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    check_role(
+        &auth_user,
+        &[UserRole::Admin, UserRole::Staff],
+    )
+    .map_err(|_e| {
+        (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Unauthorized" })),
+        )
+    })?;
+
+    let res = sqlx::query("DELETE FROM theaters WHERE id = $1")
+        .bind(id)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    if res.rows_affected() == 0 {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": "Theater not found" })),
+        ));
+    }
+
+    tracing::info!(theater_id = %id, user_id = %auth_user.id, "Deleted theater");
+
+    Ok(Json(serde_json::json!({ "success": true, "message": "Theater deleted successfully" })))
 }
 
 pub async fn list_events(

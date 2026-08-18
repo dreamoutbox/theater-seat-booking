@@ -137,22 +137,6 @@
                 >
                   Manage
                 </v-btn>
-                <v-btn
-                  icon="mdi-pencil"
-                  size="small"
-                  variant="text"
-                  color="grey"
-                  title="Edit Title"
-                  @click.stop="openEditEventDialog(event)"
-                ></v-btn>
-                <v-btn
-                  icon="mdi-delete-outline"
-                  size="small"
-                  variant="text"
-                  color="red-lighten-2"
-                  title="Delete Event"
-                  @click.stop="openDeleteEventDialog(event)"
-                ></v-btn>
               </div>
             </td>
           </tr>

@@ -5,6 +5,7 @@ import OrdersView from '../views/OrdersView.vue';
 import OrderDetailView from '../views/OrderDetailView.vue';
 import ManageEventsView from '../views/ManageEventsView.vue';
 import ManageEventDetailView from '../views/ManageEventDetailView.vue';
+import ManageTheatersView from '../views/ManageTheatersView.vue';
 import SeatMapEditorView from '../views/SeatMapEditorView.vue';
 import LoginView from '../views/LoginView.vue';
 import RegisterView from '../views/RegisterView.vue';
@@ -34,6 +35,12 @@ const routes = [
     component: OrderDetailView,
     props: true,
     meta: { requiresAuth: true },
+  },
+  {
+    path: '/manage/theaters',
+    name: 'ManageTheaters',
+    component: ManageTheatersView,
+    meta: { requiresAuth: true, roles: ['admin', 'staff'] },
   },
   {
     path: '/manage/events',
