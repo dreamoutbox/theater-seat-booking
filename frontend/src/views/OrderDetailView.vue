@@ -1,9 +1,22 @@
 <template>
   <v-container class="py-8 max-w-4xl">
-    <!-- Back Button -->
-    <div class="mb-4">
+    <!-- Back Button & Actions -->
+    <div class="d-flex justify-space-between align-center mb-4">
       <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/orders" class="text-none font-weight-bold">
         Back to Orders
+      </v-btn>
+
+      <!-- Elevated Refund Action -->
+      <v-btn
+        v-if="canRefundOrder"
+        color="red-accent-2"
+        variant="tonal"
+        size="small"
+        prepend-icon="mdi-cash-refund"
+        class="text-none font-weight-bold"
+        @click="openRefundDialog()"
+      >
+        Refund Tickets ({{ activeTickets.length }})
       </v-btn>
     </div>
 
@@ -68,13 +81,18 @@
 
       <!-- Seats List -->
       <div class="mb-6">
-        <h2 class="text-h6 font-weight-bold text-white mb-3">Order Items ({{ order.seats?.length || 0 }})</h2>
+        <div class="d-flex justify-space-between align-center mb-3">
+          <h2 class="text-h6 font-weight-bold text-white">Order Items ({{ order.seats?.length || 0 }})</h2>
+          <div v-if="order.refunded_amount_cents > 0" class="text-caption text-red-accent-2 font-weight-bold">
+            Refunded: ${{ (order.refunded_amount_cents / 100).toFixed(2) }}
+          </div>
+        </div>
         <v-table theme="dark" class="rounded-lg border">
           <thead>
             <tr>
               <th class="text-left font-weight-bold">Seat</th>
               <th class="text-left font-weight-bold">Zone Tier</th>
-              <th v-if="order.status === 'paid'" class="text-left font-weight-bold" style="min-width: 220px;">
+              <th v-if="hasTickets" class="text-left font-weight-bold" style="min-width: 240px;">
                 Ticket & QR Pass
               </th>
               <th class="text-right font-weight-bold">Price</th>
@@ -91,32 +109,55 @@
               <td class="align-middle">
                 <span class="text-body-2 text-grey-lighten-1">{{ s.zone_name }}</span>
               </td>
-              <td v-if="order.status === 'paid'" class="py-3 align-middle">
+              <td v-if="hasTickets" class="py-3 align-middle">
                 <div v-if="getTicket(s.seat_booking_id)" class="d-flex align-center gap-3">
-                  <div class="qr-cell-wrapper pa-1 rounded bg-white elevation-2 d-flex align-center justify-center">
+                  <!-- QR wrapper -->
+                  <div
+                    class="qr-cell-wrapper pa-1 rounded bg-white elevation-2 d-flex align-center justify-center"
+                    :class="{ 'opacity-40': getTicket(s.seat_booking_id).status === 'refunded' }"
+                  >
                     <qrcode-vue :value="getTicket(s.seat_booking_id).code" :size="64" level="H" />
                   </div>
-                  <div class="d-flex flex-column">
+                  <div class="d-flex flex-column flex-grow-1">
                     <div class="d-flex align-center gap-2 mb-1">
                       <span class="text-caption text-grey text-uppercase font-weight-bold">Code</span>
-                      <span class="text-subtitle-2 font-weight-black font-weight-mono text-amber-darken-1 letter-spacing-code">
+                      <span
+                        class="text-subtitle-2 font-weight-black font-weight-mono letter-spacing-code"
+                        :class="getTicket(s.seat_booking_id).status === 'refunded' ? 'text-grey text-decoration-line-through' : 'text-amber-darken-1'"
+                      >
                         {{ getTicket(s.seat_booking_id).code }}
                       </span>
                     </div>
-                    <div class="d-flex align-center gap-2">
+                    <div class="d-flex align-center gap-2 flex-wrap">
                       <v-chip size="x-small" :color="getTicketStatusColor(getTicket(s.seat_booking_id).status)" variant="flat" class="font-weight-bold text-uppercase">
                         {{ getTicket(s.seat_booking_id).status }}
                       </v-chip>
                       <span v-if="getTicket(s.seat_booking_id).status === 'used'" class="text-caption text-grey text-truncate">
                         Scanned {{ formatDate(getTicket(s.seat_booking_id).used_at) }}
                       </span>
+                      <span v-else-if="getTicket(s.seat_booking_id).status === 'refunded'" class="text-caption text-red-accent-2 text-truncate">
+                        Refunded {{ formatDate(getTicket(s.seat_booking_id).refunded_at) }}
+                      </span>
+                      <!-- Individual ticket refund button for staff/organizers -->
+                      <v-btn
+                        v-else-if="canRefundOrder && getTicket(s.seat_booking_id).status === 'active'"
+                        size="x-small"
+                        color="red-accent-2"
+                        variant="text"
+                        class="text-none font-weight-bold px-1"
+                        @click="openRefundDialog(getTicket(s.seat_booking_id).id)"
+                      >
+                        Refund
+                      </v-btn>
                     </div>
                   </div>
                 </div>
                 <span v-else class="text-caption text-grey">Generating ticket...</span>
               </td>
               <td class="text-right font-weight-mono font-weight-bold text-white align-middle">
-                ${{ (s.price_cents / 100).toFixed(2) }}
+                <span :class="{ 'text-decoration-line-through text-grey': getTicket(s.seat_booking_id)?.status === 'refunded' }">
+                  ${{ (s.price_cents / 100).toFixed(2) }}
+                </span>
               </td>
             </tr>
           </tbody>
@@ -131,15 +172,19 @@
           <span>Seats Subtotal:</span>
           <span class="font-weight-mono text-white">${{ (order.total_amount_cents / 100).toFixed(2) }}</span>
         </div>
+        <div v-if="order.refunded_amount_cents > 0" class="d-flex justify-space-between text-body-2 text-red-accent-2 font-weight-bold">
+          <span>Total Refunded:</span>
+          <span class="font-weight-mono">-${{ (order.refunded_amount_cents / 100).toFixed(2) }}</span>
+        </div>
         <div class="d-flex justify-space-between text-body-2 text-grey">
           <span>Booking & Processing Fee:</span>
           <span class="text-success font-weight-bold">$0.00 (Free)</span>
         </div>
         <v-divider class="my-2"></v-divider>
         <div class="d-flex justify-space-between align-center">
-          <span class="text-h6 font-weight-bold text-white">Total Amount:</span>
+          <span class="text-h6 font-weight-bold text-white">Net Total:</span>
           <span class="text-h4 font-weight-black text-amber-darken-1 font-weight-mono">
-            ${{ (order.total_amount_cents / 100).toFixed(2) }}
+            ${{ ((order.total_amount_cents - (order.refunded_amount_cents || 0)) / 100).toFixed(2) }}
           </span>
         </div>
       </div>
@@ -158,6 +203,95 @@
       </div>
     </v-card>
 
+    <!-- Refund Dialog -->
+    <v-dialog v-model="refundDialog.show" max-width="520" theme="dark">
+      <v-card theme="dark" class="rounded-xl pa-6 border bg-surface">
+        <div class="d-flex align-center gap-3 mb-4">
+          <v-avatar color="red-accent-2" variant="tonal" size="44">
+            <v-icon icon="mdi-cash-refund" size="24"></v-icon>
+          </v-avatar>
+          <div>
+            <h3 class="text-h6 font-weight-bold text-white">Refund Tickets</h3>
+            <span class="text-caption text-grey">Select the active tickets to refund and release back to inventory.</span>
+          </div>
+        </div>
+
+        <v-divider class="mb-4"></v-divider>
+
+        <!-- Ticket Selection Checkboxes -->
+        <div class="mb-4">
+          <div class="text-caption text-grey font-weight-bold text-uppercase mb-2">Select Tickets to Refund</div>
+          <div class="d-flex flex-column gap-2 max-h-60 overflow-y-auto">
+            <v-card
+              v-for="t in activeTickets"
+              :key="t.id"
+              variant="outlined"
+              class="pa-3 rounded-lg border bg-surface-variant cursor-pointer"
+              @click="toggleTicketSelection(t.id)"
+            >
+              <div class="d-flex justify-space-between align-center">
+                <div class="d-flex align-center gap-3">
+                  <v-checkbox-btn
+                    :model-value="refundDialog.selectedTicketIds.includes(t.id)"
+                    color="red-accent-2"
+                    hide-details
+                    density="compact"
+                    @click.stop="toggleTicketSelection(t.id)"
+                  ></v-checkbox-btn>
+                  <div>
+                    <div class="font-weight-bold text-white text-body-2">
+                      Row {{ t.row_label }}, Seat {{ t.seat_number }}
+                    </div>
+                    <div class="text-caption text-grey">
+                      Code: <strong class="font-weight-mono text-amber-darken-1">{{ t.code }}</strong> • {{ t.zone_name }}
+                    </div>
+                  </div>
+                </div>
+                <div class="font-weight-mono font-weight-bold text-white">
+                  ${{ (t.price_cents / 100).toFixed(2) }}
+                </div>
+              </div>
+            </v-card>
+          </div>
+        </div>
+
+        <!-- Refund Reason -->
+        <v-text-field
+          v-model="refundDialog.reason"
+          label="Refund Reason (Optional)"
+          placeholder="e.g., Customer requested cancellation"
+          variant="outlined"
+          density="compact"
+          class="mb-4"
+          hide-details
+        ></v-text-field>
+
+        <!-- Calculated Refund Total -->
+        <div class="pa-4 rounded-lg bg-surface-variant border mb-6 d-flex justify-space-between align-center">
+          <span class="text-body-2 text-grey">Total Refund Amount:</span>
+          <span class="text-h6 font-weight-bold text-red-accent-2 font-weight-mono">
+            ${{ (calculatedRefundAmount / 100).toFixed(2) }}
+          </span>
+        </div>
+
+        <div class="d-flex justify-end gap-3">
+          <v-btn variant="text" class="text-none font-weight-bold" :disabled="refundDialog.submitting" @click="refundDialog.show = false">
+            Cancel
+          </v-btn>
+          <v-btn
+            color="red-accent-2"
+            variant="flat"
+            class="text-none font-weight-bold px-6"
+            :loading="refundDialog.submitting"
+            :disabled="refundDialog.selectedTicketIds.length === 0"
+            @click="handleRefundSubmit"
+          >
+            Confirm Refund ({{ refundDialog.selectedTicketIds.length }})
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3000">
       {{ snackbar.text }}
     </v-snackbar>
@@ -169,17 +303,31 @@ import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 import QrcodeVue from 'qrcode.vue';
 import api from '../api/client';
+import { useAuthStore } from '../stores/auth';
 
 const props = defineProps({
   id: { type: String, required: true },
 });
 
 const route = useRoute();
+const authStore = useAuthStore();
 const order = ref(null);
 const tickets = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const paying = ref(false);
+
+const refundDialog = ref({
+  show: false,
+  selectedTicketIds: [],
+  reason: '',
+  submitting: false,
+});
+
+const hasTickets = computed(() => {
+  if (!order.value) return false;
+  return ['paid', 'partially_refunded', 'refunded'].includes(order.value.status);
+});
 
 const ticketMap = computed(() => {
   const map = new Map();
@@ -191,6 +339,62 @@ const ticketMap = computed(() => {
 
 function getTicket(seatBookingId) {
   return ticketMap.value.get(seatBookingId);
+}
+
+const activeTickets = computed(() => {
+  return tickets.value.filter((t) => t.status === 'active');
+});
+
+const canRefundOrder = computed(() => {
+  if (!order.value || !authStore.isElevated) return false;
+  return (
+    (order.value.status === 'paid' || order.value.status === 'partially_refunded') &&
+    activeTickets.value.length > 0
+  );
+});
+
+const calculatedRefundAmount = computed(() => {
+  return tickets.value
+    .filter((t) => refundDialog.value.selectedTicketIds.includes(t.id))
+    .reduce((sum, t) => sum + (t.price_cents || 0), 0);
+});
+
+function toggleTicketSelection(ticketId) {
+  const idx = refundDialog.value.selectedTicketIds.indexOf(ticketId);
+  if (idx > -1) {
+    refundDialog.value.selectedTicketIds.splice(idx, 1);
+  } else {
+    refundDialog.value.selectedTicketIds.push(ticketId);
+  }
+}
+
+function openRefundDialog(specificTicketId = null) {
+  if (specificTicketId) {
+    refundDialog.value.selectedTicketIds = [specificTicketId];
+  } else {
+    refundDialog.value.selectedTicketIds = activeTickets.value.map((t) => t.id);
+  }
+  refundDialog.value.reason = '';
+  refundDialog.value.show = true;
+}
+
+async function handleRefundSubmit() {
+  if (refundDialog.value.selectedTicketIds.length === 0 || !order.value) return;
+  refundDialog.value.submitting = true;
+  try {
+    const res = await api.post(`/orders/${order.value.id}/refund`, {
+      ticket_ids: refundDialog.value.selectedTicketIds,
+      reason: refundDialog.value.reason || undefined,
+    });
+    showToast(`Refund processed successfully ($${(res.data.amount_cents / 100).toFixed(2)})`, 'success');
+    refundDialog.value.show = false;
+    await fetchOrderDetail();
+  } catch (err) {
+    const errMsg = err.response?.data?.error || 'Failed to process refund';
+    showToast(errMsg, 'error');
+  } finally {
+    refundDialog.value.submitting = false;
+  }
 }
 
 const snackbar = ref({
@@ -219,6 +423,8 @@ function formatDate(isoStr) {
 function getStatusColor(status) {
   switch (status) {
     case 'paid': return 'success';
+    case 'partially_refunded': return 'deep-purple-accent-2';
+    case 'refunded': return 'grey-darken-1';
     case 'pending_payment': return 'warning';
     case 'cancelled': return 'grey';
     case 'expired': return 'red-accent-3';
@@ -230,6 +436,7 @@ function getTicketStatusColor(status) {
   switch (status) {
     case 'active': return 'success';
     case 'used': return 'grey-darken-1';
+    case 'refunded': return 'deep-purple-accent-2';
     case 'cancelled': return 'red';
     case 'expired': return 'amber-darken-2';
     default: return 'info';
@@ -261,7 +468,7 @@ async function fetchOrderDetail() {
     const res = await api.get(`/orders/${orderId}`);
     order.value = res.data;
 
-    if (order.value.status === 'paid') {
+    if (['paid', 'partially_refunded', 'refunded'].includes(order.value.status)) {
       await fetchTickets(orderId);
     }
   } catch (err) {
@@ -332,6 +539,11 @@ onMounted(() => {
 
 .align-middle {
   vertical-align: middle !important;
+}
+
+.opacity-40 {
+  opacity: 0.4;
+  filter: grayscale(1);
 }
 
 .gap-2 {

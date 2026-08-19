@@ -69,6 +69,24 @@
           </v-chip>
           <v-chip
             size="small"
+            :variant="selectedStatus === 'partially_refunded' ? 'flat' : 'outlined'"
+            color="deep-purple-accent-2"
+            class="font-weight-bold cursor-pointer"
+            @click="selectedStatus = 'partially_refunded'"
+          >
+            Partially Refunded
+          </v-chip>
+          <v-chip
+            size="small"
+            :variant="selectedStatus === 'refunded' ? 'flat' : 'outlined'"
+            color="grey-darken-1"
+            class="font-weight-bold cursor-pointer"
+            @click="selectedStatus = 'refunded'"
+          >
+            Refunded
+          </v-chip>
+          <v-chip
+            size="small"
             :variant="selectedStatus === 'expired' ? 'flat' : 'outlined'"
             color="red-accent-3"
             class="font-weight-bold cursor-pointer"
@@ -162,7 +180,16 @@
 
             <!-- Total Amount -->
             <td>
-              <span class="font-weight-bold font-weight-mono text-white">
+              <div v-if="order.refunded_amount_cents > 0">
+                <span class="font-weight-bold font-weight-mono text-white">
+                  ${{ ((order.total_amount_cents - order.refunded_amount_cents) / 100).toFixed(2) }}
+                </span>
+                <div class="text-caption text-grey">
+                  <span class="text-decoration-line-through">${{ (order.total_amount_cents / 100).toFixed(2) }}</span>
+                  <span class="text-red-accent-2 ml-1">(-${{ (order.refunded_amount_cents / 100).toFixed(2) }})</span>
+                </div>
+              </div>
+              <span v-else class="font-weight-bold font-weight-mono text-white">
                 ${{ (order.total_amount_cents / 100).toFixed(2) }}
               </span>
             </td>
@@ -309,6 +336,8 @@ function formatDate(isoStr) {
 function getStatusColor(status) {
   switch (status) {
     case 'paid': return 'success';
+    case 'partially_refunded': return 'deep-purple-accent-2';
+    case 'refunded': return 'grey-darken-1';
     case 'pending_payment': return 'warning';
     case 'cancelled': return 'grey';
     case 'expired': return 'red-accent-3';
