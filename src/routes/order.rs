@@ -97,6 +97,7 @@ pub async fn create_order(
     // 5. Insert order
     OrderRepository::save(
         &mut *tx,
+        order_id,
         auth_user.id,
         first_showtime_id,
         total_amount_cents,

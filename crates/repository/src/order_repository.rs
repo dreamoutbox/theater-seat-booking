@@ -8,16 +8,18 @@ pub struct OrderRepository;
 impl OrderRepository {
     pub async fn save<'e, E: PgExecutor<'e>>(
         executor: E,
+        id: Uuid,
         user_id: Uuid,
         showtime_id: Uuid,
         total_amount_cents: i64,
         stripe_payment_intent_id: Option<&str>,
     ) -> Result<Uuid, sqlx::Error> {
         sqlx::query_scalar(
-            "INSERT INTO orders (user_id, showtime_id, total_amount_cents, status, stripe_payment_intent_id)
-             VALUES ($1, $2, $3, 'pending_payment', $4)
+            "INSERT INTO orders (id, user_id, showtime_id, total_amount_cents, status, stripe_payment_intent_id)
+             VALUES ($1, $2, $3, $4, 'pending_payment', $5)
              RETURNING id",
         )
+        .bind(id)
         .bind(user_id)
         .bind(showtime_id)
         .bind(total_amount_cents)
