@@ -6,6 +6,7 @@ import OrderDetailView from '../views/OrderDetailView.vue';
 import ManageEventsView from '../views/ManageEventsView.vue';
 import ManageEventDetailView from '../views/ManageEventDetailView.vue';
 import ManageEventGatekeepersView from '../views/ManageEventGatekeepersView.vue';
+import EventFinancialReportView from '../views/EventFinancialReportView.vue';
 import ManageTheatersView from '../views/ManageTheatersView.vue';
 import SeatMapEditorView from '../views/SeatMapEditorView.vue';
 import ScanTicketView from '../views/ScanTicketView.vue';
@@ -74,6 +75,13 @@ const routes = [
     path: '/manage/events/:id/gatekeepers',
     name: 'ManageEventGatekeepers',
     component: ManageEventGatekeepersView,
+    props: true,
+    meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
+  },
+  {
+    path: '/manage/events/:id/financial-report',
+    name: 'EventFinancialReport',
+    component: EventFinancialReportView,
     props: true,
     meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
   },

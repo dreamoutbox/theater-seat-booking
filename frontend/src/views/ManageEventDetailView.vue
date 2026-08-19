@@ -88,6 +88,18 @@
               Gatekeepers (Scanner Staff)
             </v-btn>
 
+            <!-- Financial Report (A4 Print / Tax Statement) -->
+            <v-btn
+              variant="outlined"
+              color="amber-darken-1"
+              size="small"
+              prepend-icon="mdi-file-document-outline"
+              class="text-none font-weight-bold"
+              :to="`/manage/events/${event.id}/financial-report`"
+            >
+              Financial & Tax Report
+            </v-btn>
+
             <!-- Edit Event -->
             <v-btn
               variant="outlined"
