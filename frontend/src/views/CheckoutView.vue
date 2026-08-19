@@ -327,7 +327,7 @@ async function loadCheckoutData() {
     showtime.value = foundSt || null;
 
     const myHolds = (seatsRes.data || []).filter(
-      (s) => s.status === 'held' && s.my_hold === true
+      (s) => s.status === 'held' && (s.is_mine === true || s.my_hold === true)
     );
     heldSeats.value = myHolds;
 
@@ -337,8 +337,8 @@ async function loadCheckoutData() {
     const map = {};
     for (const seat of myHolds) {
       map[seat.id] = {
-        name: map[seat.id]?.name || defaultName,
-        phone: map[seat.id]?.phone || '',
+        name: attendees.value[seat.id]?.name || defaultName,
+        phone: attendees.value[seat.id]?.phone || '',
       };
     }
     attendees.value = map;
@@ -378,7 +378,7 @@ async function handleCompletePayment() {
   try {
     // 1. Build seats payload with attendee details
     const seatItems = heldSeats.value.map((seat) => ({
-      seat_booking_id: seat.booking_id,
+      seat_booking_id: seat.seat_booking_id || seat.booking_id || seat.id,
       attendee_name: attendees.value[seat.id]?.name?.trim() || null,
       attendee_phone: attendees.value[seat.id]?.phone?.trim() || null,
     }));
