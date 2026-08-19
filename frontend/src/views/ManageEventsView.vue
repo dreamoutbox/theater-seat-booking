@@ -128,17 +128,6 @@
             <td class="text-right">
               <div class="d-flex align-center justify-end gap-1" @click.stop>
                 <v-btn
-                  variant="outlined"
-                  size="small"
-                  color="amber-lighten-2"
-                  prepend-icon="mdi-chart-box-outline"
-                  class="text-none font-weight-bold"
-                  title="View Event Analytics"
-                  @click.stop="$router.push(`/manage/dashboard?event_id=${event.id}`)"
-                >
-                  Analytics
-                </v-btn>
-                <v-btn
                   variant="tonal"
                   size="small"
                   color="amber-darken-1"

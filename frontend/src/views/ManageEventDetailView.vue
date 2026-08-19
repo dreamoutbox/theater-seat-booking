@@ -1,5 +1,5 @@
 <template>
-  <v-container class="py-8 max-w-5xl">
+  <v-container class="py-8 max-w-6xl">
     <!-- Back Navigation -->
     <div class="mb-4">
       <v-btn
@@ -64,16 +64,31 @@
 
           <!-- Header Action Buttons -->
           <div class="d-flex align-center gap-2 flex-wrap">
+            <!-- Manage Orders -->
             <v-btn
               variant="outlined"
               color="amber-lighten-2"
               size="small"
-              prepend-icon="mdi-chart-box-outline"
+              prepend-icon="mdi-ticket-confirmation"
               class="text-none font-weight-bold"
-              :to="`/manage/dashboard?event_id=${event.id}`"
+              to="/orders"
             >
-              View Analytics
+              Manage Orders
             </v-btn>
+
+            <!-- Gatekeepers Staff Page Button -->
+            <v-btn
+              variant="outlined"
+              color="teal-accent-3"
+              size="small"
+              prepend-icon="mdi-shield-account"
+              class="text-none font-weight-bold"
+              :to="`/manage/events/${event.id}/gatekeepers`"
+            >
+              Gatekeepers (Scanner Staff)
+            </v-btn>
+
+            <!-- Edit Event -->
             <v-btn
               variant="outlined"
               size="small"
@@ -83,6 +98,8 @@
             >
               Edit Event & Limits
             </v-btn>
+
+            <!-- Delete Event -->
             <v-btn
               variant="outlined"
               color="red-lighten-2"
@@ -93,6 +110,8 @@
             >
               Delete Event
             </v-btn>
+
+            <!-- Seat Map Editor -->
             <v-btn
               color="indigo-darken-1"
               variant="flat"
@@ -103,6 +122,8 @@
             >
               Seat Map Editor
             </v-btn>
+
+            <!-- Add Showtime -->
             <v-btn
               color="amber-darken-1"
               variant="flat"
@@ -116,6 +137,137 @@
           </div>
         </div>
       </v-card>
+
+      <!-- Embedded Event Analytics Dashboard Section -->
+      <div>
+        <div class="d-flex justify-space-between align-center mb-3">
+          <h2 class="text-h6 font-weight-bold text-white d-flex align-center gap-2">
+            <v-icon icon="mdi-chart-box-outline" color="amber-darken-1" size="24"></v-icon>
+            Event Analytics & Financial Performance
+          </h2>
+          <v-btn
+            prepend-icon="mdi-refresh"
+            variant="text"
+            size="small"
+            color="grey-lighten-1"
+            :loading="loadingMetrics"
+            @click="fetchEventMetrics"
+          >
+            Refresh Metrics
+          </v-btn>
+        </div>
+
+        <!-- Metric KPI Cards Grid -->
+        <v-row dense class="mb-2">
+          <!-- 1. Gross Revenue -->
+          <v-col cols="12" sm="6" md="4" class="pa-2">
+            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+              <div class="d-flex justify-space-between align-center mb-2">
+                <span class="text-caption text-grey font-weight-bold text-uppercase">Gross Revenue</span>
+                <v-avatar color="indigo-darken-2" variant="tonal" size="32">
+                  <v-icon icon="mdi-cash-multiple" size="18"></v-icon>
+                </v-avatar>
+              </div>
+              <div class="text-h5 font-weight-black text-white font-weight-mono">
+                ${{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}
+              </div>
+              <div class="text-caption text-grey mt-1">Total ticket sales revenue</div>
+            </v-card>
+          </v-col>
+
+          <!-- 2. Total Refunds -->
+          <v-col cols="12" sm="6" md="4" class="pa-2">
+            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+              <div class="d-flex justify-space-between align-center mb-2">
+                <span class="text-caption text-grey font-weight-bold text-uppercase">Total Refunded</span>
+                <v-avatar color="red-darken-3" variant="tonal" size="32">
+                  <v-icon icon="mdi-cash-refund" size="18"></v-icon>
+                </v-avatar>
+              </div>
+              <div class="text-h5 font-weight-black text-red-accent-2 font-weight-mono">
+                ${{ ((metrics.total_refunds_cents || 0) / 100).toFixed(2) }}
+              </div>
+              <div class="text-caption text-grey mt-1">
+                {{ metrics.refunded_tickets || 0 }} {{ (metrics.refunded_tickets === 1) ? 'ticket' : 'tickets' }} refunded
+              </div>
+            </v-card>
+          </v-col>
+
+          <!-- 3. Net Profit -->
+          <v-col cols="12" sm="6" md="4" class="pa-2">
+            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100 highlight-card">
+              <div class="d-flex justify-space-between align-center mb-2">
+                <span class="text-caption text-amber-lighten-2 font-weight-bold text-uppercase">Net Profit</span>
+                <v-avatar color="amber-darken-1" variant="tonal" size="32">
+                  <v-icon icon="mdi-trending-up" size="18"></v-icon>
+                </v-avatar>
+              </div>
+              <div class="text-h5 font-weight-black text-amber-darken-1 font-weight-mono">
+                ${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}
+              </div>
+              <div class="text-caption text-grey mt-1">Gross sales minus refunds</div>
+            </v-card>
+          </v-col>
+
+          <!-- 4. Total Tickets Created -->
+          <v-col cols="12" sm="6" md="4" class="pa-2">
+            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+              <div class="d-flex justify-space-between align-center mb-2">
+                <span class="text-caption text-grey font-weight-bold text-uppercase">Tickets Issued</span>
+                <v-avatar color="teal-darken-2" variant="tonal" size="32">
+                  <v-icon icon="mdi-ticket-confirmation" size="18"></v-icon>
+                </v-avatar>
+              </div>
+              <div class="text-h5 font-weight-black text-white font-weight-mono">
+                {{ metrics.total_tickets_created || 0 }}
+              </div>
+              <div class="text-caption text-grey mt-1">
+                <span class="text-success font-weight-bold">{{ metrics.active_tickets || 0 }} active</span> •
+                <span class="text-grey">{{ metrics.used_tickets || 0 }} scanned</span>
+              </div>
+            </v-card>
+          </v-col>
+
+          <!-- 5. Checked-In Passes -->
+          <v-col cols="12" sm="6" md="4" class="pa-2">
+            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+              <div class="d-flex justify-space-between align-center mb-2">
+                <span class="text-caption text-grey font-weight-bold text-uppercase">Checked-In</span>
+                <v-avatar color="blue-darken-2" variant="tonal" size="32">
+                  <v-icon icon="mdi-qrcode-scan" size="18"></v-icon>
+                </v-avatar>
+              </div>
+              <div class="text-h5 font-weight-black text-white font-weight-mono">
+                {{ metrics.used_tickets || 0 }}
+              </div>
+              <div class="text-caption text-grey mt-1">Scanned at gate entrance</div>
+            </v-card>
+          </v-col>
+
+          <!-- 6. Attendance Rate -->
+          <v-col cols="12" sm="6" md="4" class="pa-2">
+            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+              <div class="d-flex justify-space-between align-center mb-2">
+                <span class="text-caption text-grey font-weight-bold text-uppercase">Attendance Rate</span>
+                <v-avatar color="purple-darken-2" variant="tonal" size="32">
+                  <v-icon icon="mdi-account-check-outline" size="18"></v-icon>
+                </v-avatar>
+              </div>
+              <div class="text-h5 font-weight-black text-white font-weight-mono">
+                {{ metrics.attendance_rate_percent || 0 }}%
+              </div>
+              <v-progress-linear
+                :model-value="metrics.attendance_rate_percent || 0"
+                color="amber-darken-1"
+                bg-color="grey-darken-3"
+                height="6"
+                rounded
+                class="mt-2"
+              ></v-progress-linear>
+            </v-card>
+          </v-col>
+        </v-row>
+      </div>
 
       <!-- Scheduled Showtimes Card -->
       <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
@@ -224,68 +376,6 @@
                     @click="openDeleteShowtimeDialog(show)"
                   ></v-btn>
                 </div>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-      </v-card>
-
-      <!-- Gatekeepers Management Card -->
-      <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
-        <div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-2">
-          <div>
-            <h2 class="text-h6 font-weight-bold text-white mb-1 d-flex align-center gap-2">
-              <v-icon icon="mdi-shield-account-outline" color="teal-accent-3" size="24"></v-icon>
-              Event Gatekeepers (Check-in Scanner Staff)
-            </h2>
-            <span class="text-caption text-grey">Staff authorized to scan QR tickets and verify admission for this event</span>
-          </div>
-          <v-btn
-            prepend-icon="mdi-account-plus"
-            color="teal-accent-3"
-            variant="tonal"
-            size="small"
-            class="text-none font-weight-bold"
-            @click="openAddGatekeeperDialog"
-          >
-            Add Gatekeeper
-          </v-btn>
-        </div>
-
-        <!-- Empty State -->
-        <div v-if="gatekeepers.length === 0" class="text-center pa-6 rounded-lg bg-surface-variant border border-dashed">
-          <v-icon icon="mdi-shield-account" size="40" color="grey" class="mb-2"></v-icon>
-          <div class="text-body-2 text-grey font-weight-medium">No gatekeepers assigned to this event yet.</div>
-          <div class="text-caption text-grey-darken-1 mt-1">Add scanner staff accounts to allow QR scanning at entrance.</div>
-        </div>
-
-        <!-- Gatekeepers Table -->
-        <v-table v-else class="showtimes-table rounded-lg border">
-          <thead>
-            <tr>
-              <th class="text-left font-weight-bold">Gatekeeper Email</th>
-              <th class="text-left font-weight-bold">Assigned At</th>
-              <th class="text-right font-weight-bold">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="g in gatekeepers" :key="g.user_id">
-              <td class="font-weight-bold text-white py-3">
-                <v-icon icon="mdi-account-circle" color="teal-accent-3" size="18" class="mr-2"></v-icon>
-                {{ g.email }}
-              </td>
-              <td class="text-caption text-grey">
-                {{ formatDate(g.assigned_at) }}
-              </td>
-              <td class="text-right">
-                <v-btn
-                  icon="mdi-account-remove-outline"
-                  size="small"
-                  variant="text"
-                  color="red-lighten-2"
-                  title="Remove Gatekeeper from Event"
-                  @click="openRemoveGatekeeperDialog(g)"
-                ></v-btn>
               </td>
             </tr>
           </tbody>
@@ -432,54 +522,6 @@
       </v-card>
     </v-dialog>
 
-    <!-- Add Gatekeeper Dialog -->
-    <v-dialog v-model="gatekeeperDialog.show" max-width="480">
-      <v-card theme="dark" class="rounded-xl pa-4">
-        <v-card-title class="text-h6 font-weight-bold d-flex align-center gap-2">
-          <v-icon icon="mdi-shield-account" color="teal-accent-3"></v-icon>
-          Add Gatekeeper Scanner
-        </v-card-title>
-        <v-card-text>
-          <div class="text-caption text-grey mb-3">
-            Create or assign a gatekeeper account for admission QR scanning at this event.
-          </div>
-          <v-text-field
-            v-model="gatekeeperDialog.email"
-            label="Gatekeeper Email"
-            type="email"
-            variant="outlined"
-            density="comfortable"
-            placeholder="e.g. staff.scanner@theater.local"
-            class="mb-3"
-            autofocus
-          ></v-text-field>
-          <v-text-field
-            v-model="gatekeeperDialog.password"
-            label="Temporary Password"
-            type="password"
-            variant="outlined"
-            density="comfortable"
-            placeholder="Min 6 characters"
-            hint="Scanner staff can use this to login and access /scan"
-            persistent-hint
-          ></v-text-field>
-        </v-card-text>
-        <v-card-actions class="pa-4 pt-0">
-          <v-btn variant="text" @click="gatekeeperDialog.show = false">Cancel</v-btn>
-          <v-spacer></v-spacer>
-          <v-btn
-            color="teal-accent-3"
-            variant="flat"
-            class="font-weight-bold text-none text-black"
-            :loading="gatekeeperDialog.saving"
-            @click="saveGatekeeper"
-          >
-            Assign Gatekeeper
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <!-- Delete Confirmation Dialog -->
     <v-dialog v-model="deleteDialog.show" max-width="420">
       <v-card theme="dark" class="rounded-xl pa-4">
@@ -526,9 +568,20 @@ const router = useRouter();
 const event = ref(null);
 const allShowtimes = ref([]);
 const theaters = ref([]);
-const gatekeepers = ref([]);
 const loading = ref(true);
 const error = ref(null);
+
+const loadingMetrics = ref(false);
+const metrics = ref({
+  gross_sales_cents: 0,
+  total_refunds_cents: 0,
+  net_profit_cents: 0,
+  total_tickets_created: 0,
+  active_tickets: 0,
+  used_tickets: 0,
+  refunded_tickets: 0,
+  attendance_rate_percent: 0,
+});
 
 const snackbar = ref({
   show: false,
@@ -550,13 +603,8 @@ const eventShowtimes = computed(() => {
 const editEventDialog = ref({
   show: false,
   title: '',
-  saving: false,
-});
-
-const gatekeeperDialog = ref({
-  show: false,
-  email: '',
-  password: '',
+  max_seats_per_booking: 6,
+  max_seats_per_user: 10,
   saving: false,
 });
 
@@ -576,7 +624,7 @@ const theaterSelectorDialog = ref({
 
 const deleteDialog = ref({
   show: false,
-  type: '', // 'event' | 'showtime' | 'gatekeeper'
+  type: '', // 'event' | 'showtime'
   itemId: null,
   itemName: '',
   deleting: false,
@@ -617,7 +665,7 @@ async function loadData() {
     allShowtimes.value = showtimesRes.data;
     theaters.value = theatersRes.data;
 
-    await fetchGatekeepers(eventId);
+    await fetchEventMetrics();
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load event details';
   } finally {
@@ -625,62 +673,20 @@ async function loadData() {
   }
 }
 
-async function fetchGatekeepers(eventId) {
+async function fetchEventMetrics() {
+  const eventId = props.id || route.params.id;
+  loadingMetrics.value = true;
   try {
-    const res = await api.get(`/events/${eventId}/gatekeepers`);
-    gatekeepers.value = res.data || [];
+    const res = await api.get('/analytics/dashboard', { params: { event_id: eventId } });
+    metrics.value = res.data.metrics || {};
   } catch (err) {
-    console.error('Failed to load event gatekeepers', err);
-  }
-}
-
-function openAddGatekeeperDialog() {
-  gatekeeperDialog.value = {
-    show: true,
-    email: '',
-    password: '',
-    saving: false,
-  };
-}
-
-async function saveGatekeeper() {
-  if (!gatekeeperDialog.value.email || !gatekeeperDialog.value.email.includes('@')) {
-    showToast('Please enter a valid email', 'warning');
-    return;
-  }
-  if (!gatekeeperDialog.value.password || gatekeeperDialog.value.password.length < 6) {
-    showToast('Password must be at least 6 characters', 'warning');
-    return;
-  }
-
-  gatekeeperDialog.value.saving = true;
-  try {
-    await api.post(`/events/${event.value.id}/gatekeepers`, {
-      email: gatekeeperDialog.value.email.trim(),
-      password: gatekeeperDialog.value.password,
-    });
-    showToast('Gatekeeper added successfully', 'success');
-    gatekeeperDialog.value.show = false;
-    await fetchGatekeepers(event.value.id);
-  } catch (err) {
-    showToast(err.response?.data?.error || 'Failed to add gatekeeper', 'error');
+    console.error('Failed to load event metrics', err);
   } finally {
-    gatekeeperDialog.value.saving = false;
+    loadingMetrics.value = false;
   }
-}
-
-function openRemoveGatekeeperDialog(g) {
-  deleteDialog.value = {
-    show: true,
-    type: 'gatekeeper',
-    itemId: g.user_id,
-    itemName: `Gatekeeper (${g.email})`,
-    deleting: false,
-  };
 }
 
 function openEditEventDialog() {
-  if (!event.value) return;
   editEventDialog.value = {
     show: true,
     title: event.value.title,
@@ -692,19 +698,19 @@ function openEditEventDialog() {
 
 async function saveEventTitle() {
   if (!editEventDialog.value.title.trim()) {
-    showToast('Please enter an event title', 'warning');
+    showToast('Event title cannot be empty', 'warning');
     return;
   }
   editEventDialog.value.saving = true;
   try {
     const res = await api.put(`/events/${event.value.id}`, {
       title: editEventDialog.value.title.trim(),
-      max_seats_per_booking: editEventDialog.value.max_seats_per_booking,
-      max_seats_per_user: editEventDialog.value.max_seats_per_user,
+      max_seats_per_booking: editEventDialog.value.max_seats_per_booking || 6,
+      max_seats_per_user: editEventDialog.value.max_seats_per_user || 10,
     });
     event.value = res.data;
     editEventDialog.value.show = false;
-    showToast('Event settings & limits updated', 'success');
+    showToast('Event settings saved', 'success');
   } catch (err) {
     showToast(err.response?.data?.error || 'Failed to update event', 'error');
   } finally {
@@ -713,7 +719,6 @@ async function saveEventTitle() {
 }
 
 function openDeleteEventDialog() {
-  if (!event.value) return;
   deleteDialog.value = {
     show: true,
     type: 'event',
@@ -725,14 +730,10 @@ function openDeleteEventDialog() {
 
 function openTheaterSeatMapSelector() {
   const defaultTheaterId = eventShowtimes.value[0]?.theater_id || theaters.value[0]?.id || null;
-  if (defaultTheaterId) {
-    router.push(`/manage/theaters/${defaultTheaterId}/seat-map`);
-  } else {
-    theaterSelectorDialog.value = {
-      show: true,
-      theaterId: defaultTheaterId,
-    };
-  }
+  theaterSelectorDialog.value = {
+    show: true,
+    theaterId: defaultTheaterId,
+  };
 }
 
 function goToSeatMapEditor() {
@@ -743,9 +744,9 @@ function goToSeatMapEditor() {
 }
 
 function openAddShowtimeDialog() {
-  const defaultTheaterId = eventShowtimes.value[0]?.theater_id || theaters.value[0]?.id || null;
-  const defaultDate = new Date();
-  defaultDate.setDate(defaultDate.getDate() + 1);
+  const defaultTheaterId = eventShowtimes.value[0]?.theater_id || theaters.value[0]?.id || '';
+  const now = new Date();
+  const defaultDate = new Date(now.getTime() + 86400000);
   defaultDate.setHours(19, 0, 0, 0);
   const localIso = new Date(defaultDate.getTime() - defaultDate.getTimezoneOffset() * 60000)
     .toISOString()
@@ -808,6 +809,7 @@ async function saveShowtime() {
     showtimeDialog.value.show = false;
     const showtimesRes = await api.get('/showtimes');
     allShowtimes.value = showtimesRes.data;
+    await fetchEventMetrics();
   } catch (err) {
     showToast(err.response?.data?.error || 'Failed to save showtime', 'error');
   } finally {
@@ -839,11 +841,7 @@ async function confirmDelete() {
       deleteDialog.value.show = false;
       const showtimesRes = await api.get('/showtimes');
       allShowtimes.value = showtimesRes.data;
-    } else if (deleteDialog.value.type === 'gatekeeper') {
-      await api.delete(`/events/${event.value.id}/gatekeepers/${deleteDialog.value.itemId}`);
-      showToast('Gatekeeper removed successfully', 'success');
-      deleteDialog.value.show = false;
-      await fetchGatekeepers(event.value.id);
+      await fetchEventMetrics();
     }
   } catch (err) {
     showToast(err.response?.data?.error || 'Failed to delete item', 'error');
@@ -858,8 +856,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.max-w-5xl {
-  max-width: 1050px;
+.max-w-6xl {
+  max-width: 1150px;
 }
 
 .bg-surface {
@@ -870,6 +868,20 @@ onMounted(() => {
 .bg-surface-variant {
   background: #1e2330 !important;
   border-color: #2a3142 !important;
+}
+
+.kpi-card {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+
+.highlight-card {
+  border: 1px solid rgba(245, 158, 11, 0.3) !important;
+  background: linear-gradient(180deg, #1e2330 0%, #181c27 100%) !important;
 }
 
 .showtimes-table {

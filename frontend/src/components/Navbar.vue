@@ -11,11 +11,6 @@
       Showtimes
     </v-btn>
 
-    <v-btn v-if="authStore.isElevated" variant="text" prepend-icon="mdi-chart-box-outline" to="/manage/dashboard"
-      class="text-none font-weight-medium text-amber-darken-1">
-      Dashboard
-    </v-btn>
-
     <v-btn v-if="authStore.isStaff" variant="text" prepend-icon="mdi-theater" to="/manage/theaters"
       class="text-none font-weight-medium text-amber-darken-1">
       Manage Theaters
@@ -31,9 +26,9 @@
       Scan Passes
     </v-btn>
 
-    <v-btn v-if="authStore.isAuthenticated && !authStore.isGatekeeper" variant="text" prepend-icon="mdi-ticket-confirmation" to="/orders"
+    <v-btn v-if="authStore.isAuthenticated && !authStore.isElevated && !authStore.isGatekeeper" variant="text" prepend-icon="mdi-ticket-confirmation" to="/orders"
       class="text-none font-weight-medium">
-      {{ authStore.isElevated ? 'Manage Orders' : 'My Orders' }}
+      My Orders
     </v-btn>
 
     <v-divider vertical class="mx-3 my-2" v-if="authStore.isAuthenticated"></v-divider>
