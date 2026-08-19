@@ -11,6 +11,11 @@
       Showtimes
     </v-btn>
 
+    <v-btn v-if="authStore.isElevated" variant="text" prepend-icon="mdi-chart-box-outline" to="/manage/dashboard"
+      class="text-none font-weight-medium text-amber-darken-1">
+      Dashboard
+    </v-btn>
+
     <v-btn v-if="authStore.isStaff" variant="text" prepend-icon="mdi-theater" to="/manage/theaters"
       class="text-none font-weight-medium text-amber-darken-1">
       Manage Theaters

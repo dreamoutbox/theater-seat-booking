@@ -8,6 +8,7 @@ import ManageEventDetailView from '../views/ManageEventDetailView.vue';
 import ManageTheatersView from '../views/ManageTheatersView.vue';
 import SeatMapEditorView from '../views/SeatMapEditorView.vue';
 import ScanTicketView from '../views/ScanTicketView.vue';
+import DashboardView from '../views/DashboardView.vue';
 import LoginView from '../views/LoginView.vue';
 import RegisterView from '../views/RegisterView.vue';
 import { useAuthStore } from '../stores/auth';
@@ -42,6 +43,12 @@ const routes = [
     name: 'ScanTickets',
     component: ScanTicketView,
     meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer', 'gatekeeper'] },
+  },
+  {
+    path: '/manage/dashboard',
+    name: 'Dashboard',
+    component: DashboardView,
+    meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
   },
   {
     path: '/manage/theaters',

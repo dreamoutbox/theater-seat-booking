@@ -66,6 +66,16 @@
           <div class="d-flex align-center gap-2 flex-wrap">
             <v-btn
               variant="outlined"
+              color="amber-lighten-2"
+              size="small"
+              prepend-icon="mdi-chart-box-outline"
+              class="text-none font-weight-bold"
+              :to="`/manage/dashboard?event_id=${event.id}`"
+            >
+              View Analytics
+            </v-btn>
+            <v-btn
+              variant="outlined"
               size="small"
               prepend-icon="mdi-pencil"
               class="text-none font-weight-bold"
