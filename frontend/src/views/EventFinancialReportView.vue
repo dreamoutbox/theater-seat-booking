@@ -73,39 +73,29 @@
           </div>
         </div>
 
-        <!-- Event & Organizer Metadata Grid -->
-        <div class="meta-section pa-3 rounded mb-5 bg-light-gray border">
-          <div class="grid-2col">
-            <div>
-              <div class="meta-row">
-                <span class="meta-label">Event Title:</span>
-                <span class="meta-val font-bold">{{ event?.title }}</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Event ID:</span>
-                <span class="meta-val font-mono text-small">#{{ event?.id }}</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Organizer Account:</span>
-                <span class="meta-val">{{ organizerEmail || 'Primary Cinema Administration' }}</span>
-              </div>
-            </div>
-            <div>
-              <div class="meta-row">
-                <span class="meta-label">Accounting Currency:</span>
-                <span class="meta-val font-bold">USD ($)</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Total Sessions:</span>
-                <span class="meta-val">{{ showtimes.length }} Scheduled Showtime(s)</span>
-              </div>
-              <div class="meta-row">
-                <span class="meta-label">Period Coverage:</span>
-                <span class="meta-val">{{ eventDateRange }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <!-- Event & Accounting Specification Table -->
+        <table class="report-table mb-5">
+          <tbody>
+            <tr>
+              <th class="text-left bg-light-gray" style="width: 18%;">Event Title:</th>
+              <td style="width: 32%;" class="font-bold">{{ event?.title }}</td>
+              <th class="text-left bg-light-gray" style="width: 22%;">Accounting Currency:</th>
+              <td style="width: 28%;" class="font-bold font-mono">USD ($)</td>
+            </tr>
+            <tr>
+              <th class="text-left bg-light-gray">Event ID:</th>
+              <td class="font-mono text-small">#{{ event?.id }}</td>
+              <th class="text-left bg-light-gray">Total Sessions:</th>
+              <td>{{ showtimes.length }} Scheduled Showtime(s)</td>
+            </tr>
+            <tr>
+              <th class="text-left bg-light-gray">Organizer Account:</th>
+              <td>{{ organizerEmail || 'Primary Cinema Administration' }}</td>
+              <th class="text-left bg-light-gray">Period Coverage:</th>
+              <td>{{ eventDateRange }}</td>
+            </tr>
+          </tbody>
+        </table>
 
         <!-- Executive Financial Summary Table for Tax Filing -->
         <div class="section-title mb-2">1. EXECUTIVE FINANCIAL & TAX SUMMARY</div>
