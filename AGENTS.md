@@ -346,6 +346,8 @@ This is the largest file (~65KB). It is a fully custom canvas-like seat editor:
 | `payment_events` | Stripe webhook idempotency log |
 | `tickets` | Digital tickets (one per seat booking, generated on payment) |
 | `event_gatekeepers` | Assigns gatekeeper users to specific events |
+| `refunds` | Audit trail of ticket refund transactions |
+| `refund_tickets` | Join table: refund ↔ tickets refunded |
 
 ### Key Constraints
 
@@ -354,6 +356,7 @@ This is the largest file (~65KB). It is a fully custom canvas-like seat editor:
 - `tickets.code` is `CHAR(6) UNIQUE` — 6 alphanumeric chars, no ambiguous characters (no 0, O, 1, I)
 - `tickets` has a `UNIQUE INDEX` on `seat_booking_id` — one ticket per seat booking
 - `event_gatekeepers` has a composite `PRIMARY KEY (event_id, user_id)`
+- `refund_tickets` has a composite `PRIMARY KEY (refund_id, ticket_id)`
 
 ### Migration Ordering
 
@@ -400,12 +403,13 @@ All routes are prefixed with `/api`.
 | POST | `/release-hold` | Customer | Release held seat |
 | GET | `/booking/status/:uuid` | Customer | Poll queue item status |
 
-### Orders
+### Orders & Refunds
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST/GET | `/orders` | Auth | Create order or list orders |
 | GET | `/orders/:id` | Auth | Get order detail |
 | POST | `/orders/:id/confirm-mock` | Auth | Mock payment confirmation |
+| POST | `/orders/:id/refund` | Elevated | Refund specific tickets in an order & release seats |
 | GET | `/orders/:id/tickets` | Auth | List tickets for an order |
 
 ### Tickets
@@ -413,6 +417,11 @@ All routes are prefixed with `/api`.
 |---|---|---|---|
 | POST | `/tickets/scan` | Gatekeeper/Staff/Admin | Scan ticket code, mark as used |
 | GET | `/tickets/:code` | Auth | Get ticket detail by 6-digit code |
+
+### Analytics
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/analytics/dashboard` | Elevated | Real-time KPI metrics & showtime performance breakdown |
 
 ### Gatekeepers
 | Method | Path | Auth | Description |
@@ -450,13 +459,15 @@ All routes are prefixed with `/api`.
 13. **Tickets table** — Created on payment (both mock + Stripe webhook); 1 ticket per seat booking; unique 6-char alphanumeric code (charset excludes 0, O, 1, I)
 14. **Gatekeeper role** — New `user_role` enum value `gatekeeper`; `event_gatekeepers` join table; POST `/events/:id/gatekeepers` creates user + assigns; scoped scan authorization
 15. **Ticket scan endpoint** — `POST /tickets/scan {code}` marks ticket as `used` with timestamp and `used_by`; scoped to gatekeeper's assigned events
+16. **Ticket refund endpoint & inventory release** — `POST /orders/:id/refund` refunds single/multiple active tickets, calls Stripe refund, updates `orders.status` to `partially_refunded`/`refunded`, logs to `refunds` & `refund_tickets`, and releases seat bookings back to inventory
+17. **Analytics API** — `GET /analytics/dashboard` returns gross revenue, refunds, net profit, tickets scanned, attendance rate %, and showtimes breakdown with role scoping
 
 ### Frontend
 
 1. **Home page** — Showtimes grouped by event, book buttons
 2. **Booking view** — Customer seat map (read-only mode of seat editor), hold + release
 3. **Order detail** — Order info, seat table, mock pay button
-4. **QR ticket pass cards** — Shown on order detail when status is `paid`; each ticket shows: seat info, 6-digit code (monospace badge), QR code (client-side `qrcode.vue`), status chip
+4. **QR ticket pass cards** — Monospace code badge, client-side QR code, scan status chip
 5. **Auth pages** — Login, Register
 6. **Manage Events** — Searchable/paginated event table
 7. **Event Detail** — Showtimes management + Add/Remove Gatekeepers section
@@ -464,6 +475,9 @@ All routes are prefixed with `/api`.
 9. **Seat Map Editor** — Full interactive editor: drag to create, drag to move, marquee select, zone manager with color picker (presets + hex), save layout, grid from A–Z/AA–ZZ rows × 1–100 seats
 10. **Scan Ticket View** (`/scan`) — Gatekeeper scanner page: code input, scan result (green/red card), session scan history
 11. **Navbar** — Role-aware links, Demo Switcher with Gatekeeper account, Scan Passes button for gatekeepers/elevated roles
+12. **Order items QR column** — Embedded QR code and ticket code inside the Order Items table
+13. **Ticket refund flow** — Modal dialog with ticket selection checkboxes + per-row refund trigger + refunded badges & financial summary
+14. **Event Analytics Dashboard** (`/manage/dashboard`) — Full KPI summary cards, event selector dropdown, and showtime-by-showtime attendance and financial performance table
 
 ---
 
