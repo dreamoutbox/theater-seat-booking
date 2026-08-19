@@ -191,7 +191,19 @@ async fn get_or_create_event(
     if let Some(event) = EventRepository::find_by_title(pool, title).await? {
         Ok(event.id)
     } else {
-        let event = EventRepository::save(pool, title, 6, 10, owner_id).await?;
+        let event = EventRepository::save(
+            pool,
+            title,
+            6,
+            10,
+            owner_id,
+            Some("DreamCinema Live Productions Ltd."),
+            Some("TAX-8842-TSB-2026"),
+            Some("100 Theater Way, Suite 400, Los Angeles, CA 90028"),
+            Some("billing@dreamcinema.com"),
+            Some("+1 (555) 019-2834"),
+        )
+        .await?;
         Ok(event.id)
     }
 }

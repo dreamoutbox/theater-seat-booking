@@ -100,15 +100,16 @@
               Financial & Tax Report
             </v-btn>
 
-            <!-- Edit Event -->
+            <!-- Event Settings & Tax Info Page -->
             <v-btn
               variant="outlined"
+              color="blue-grey-lighten-2"
               size="small"
-              prepend-icon="mdi-pencil"
+              prepend-icon="mdi-cog-outline"
               class="text-none font-weight-bold"
-              @click="openEditEventDialog"
+              :to="`/manage/events/${event.id}/settings`"
             >
-              Edit Event & Limits
+              Settings & Tax Info
             </v-btn>
 
             <!-- Delete Event -->
@@ -395,65 +396,6 @@
       </v-card>
     </div>
 
-    <!-- Edit Event Dialog -->
-    <v-dialog v-model="editEventDialog.show" max-width="480">
-      <v-card theme="dark" class="rounded-xl pa-4">
-        <v-card-title class="text-h6 font-weight-bold">Edit Event Title</v-card-title>
-        <v-card-text>
-          <v-text-field
-            v-model="editEventDialog.title"
-            label="Event Title"
-            variant="outlined"
-            density="comfortable"
-            autofocus
-            class="mb-3"
-          ></v-text-field>
-
-          <v-row dense>
-            <v-col cols="6">
-              <v-text-field
-                v-model.number="editEventDialog.max_seats_per_booking"
-                label="Max Seats / Order"
-                type="number"
-                min="1"
-                max="50"
-                variant="outlined"
-                density="comfortable"
-                hint="Max held seats per checkout"
-                persistent-hint
-              ></v-text-field>
-            </v-col>
-            <v-col cols="6">
-              <v-text-field
-                v-model.number="editEventDialog.max_seats_per_user"
-                label="Max Seats / Customer"
-                type="number"
-                min="1"
-                max="100"
-                variant="outlined"
-                density="comfortable"
-                hint="Total cumulative per person"
-                persistent-hint
-              ></v-text-field>
-            </v-col>
-          </v-row>
-        </v-card-text>
-        <v-card-actions class="pa-4 pt-0">
-          <v-btn variant="text" @click="editEventDialog.show = false">Cancel</v-btn>
-          <v-spacer></v-spacer>
-          <v-btn
-            color="amber-darken-1"
-            variant="flat"
-            class="font-weight-bold text-none"
-            :loading="editEventDialog.saving"
-            @click="saveEventTitle"
-          >
-            Save Changes
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
     <!-- Showtime Dialog (Add / Edit) -->
     <v-dialog v-model="showtimeDialog.show" max-width="500">
       <v-card theme="dark" class="rounded-xl pa-4">
@@ -612,14 +554,6 @@ const eventShowtimes = computed(() => {
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 });
 
-const editEventDialog = ref({
-  show: false,
-  title: '',
-  max_seats_per_booking: 6,
-  max_seats_per_user: 10,
-  saving: false,
-});
-
 const showtimeDialog = ref({
   show: false,
   isEdit: false,
@@ -695,38 +629,6 @@ async function fetchEventMetrics() {
     console.error('Failed to load event metrics', err);
   } finally {
     loadingMetrics.value = false;
-  }
-}
-
-function openEditEventDialog() {
-  editEventDialog.value = {
-    show: true,
-    title: event.value.title,
-    max_seats_per_booking: event.value.max_seats_per_booking || 6,
-    max_seats_per_user: event.value.max_seats_per_user || 10,
-    saving: false,
-  };
-}
-
-async function saveEventTitle() {
-  if (!editEventDialog.value.title.trim()) {
-    showToast('Event title cannot be empty', 'warning');
-    return;
-  }
-  editEventDialog.value.saving = true;
-  try {
-    const res = await api.put(`/events/${event.value.id}`, {
-      title: editEventDialog.value.title.trim(),
-      max_seats_per_booking: editEventDialog.value.max_seats_per_booking || 6,
-      max_seats_per_user: editEventDialog.value.max_seats_per_user || 10,
-    });
-    event.value = res.data;
-    editEventDialog.value.show = false;
-    showToast('Event settings saved', 'success');
-  } catch (err) {
-    showToast(err.response?.data?.error || 'Failed to update event', 'error');
-  } finally {
-    editEventDialog.value.saving = false;
   }
 }
 

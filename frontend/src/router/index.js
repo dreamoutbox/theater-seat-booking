@@ -7,6 +7,8 @@ import ManageEventsView from '../views/ManageEventsView.vue';
 import ManageEventDetailView from '../views/ManageEventDetailView.vue';
 import ManageEventGatekeepersView from '../views/ManageEventGatekeepersView.vue';
 import EventFinancialReportView from '../views/EventFinancialReportView.vue';
+import ManageEventSettingsView from '../views/ManageEventSettingsView.vue';
+import CheckoutView from '../views/CheckoutView.vue';
 import ManageTheatersView from '../views/ManageTheatersView.vue';
 import SeatMapEditorView from '../views/SeatMapEditorView.vue';
 import ScanTicketView from '../views/ScanTicketView.vue';
@@ -23,9 +25,17 @@ const routes = [
   },
   {
     path: '/booking/:showtimeId',
+    alias: '/showtimes/:showtimeId/booking',
     name: 'Booking',
     component: BookingView,
     props: true,
+  },
+  {
+    path: '/checkout/:showtimeId',
+    name: 'Checkout',
+    component: CheckoutView,
+    props: true,
+    meta: { requiresAuth: true },
   },
   {
     path: '/orders',
@@ -82,6 +92,13 @@ const routes = [
     path: '/manage/events/:id/financial-report',
     name: 'EventFinancialReport',
     component: EventFinancialReportView,
+    props: true,
+    meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
+  },
+  {
+    path: '/manage/events/:id/settings',
+    name: 'ManageEventSettings',
+    component: ManageEventSettingsView,
     props: true,
     meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
   },

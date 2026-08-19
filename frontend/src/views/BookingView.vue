@@ -178,11 +178,10 @@
               size="large"
               class="text-none font-weight-bold"
               :disabled="myHeldSeats.length === 0"
-              :loading="processingOrder"
-              prepend-icon="mdi-credit-card-check"
-              @click="handleCreateAndPayOrder"
+              prepend-icon="mdi-cart-arrow-right"
+              @click="goToCheckout"
             >
-              {{ myHeldSeats.length === 0 ? 'Select Seats to Book' : `Pay & Confirm ($${(totalCheckoutCents / 100).toFixed(2)})` }}
+              {{ myHeldSeats.length === 0 ? 'Select Seats to Book' : `Proceed to Checkout ($${(totalCheckoutCents / 100).toFixed(2)})` }}
             </v-btn>
             <div class="text-caption text-grey text-center mt-2">
               🔒 Instant lock reservation & transactional guarantee
@@ -330,32 +329,9 @@ async function handleCancelAllSeats() {
   }
 }
 
-async function handleCreateAndPayOrder() {
+function goToCheckout() {
   if (myHeldSeats.value.length === 0) return;
-  processingOrder.value = true;
-  try {
-    // 1. Create order: POST /api/orders
-    const orderRes = await api.post('/orders', {
-      seat_booking_ids: myHeldSeats.value.map((s) => s.seat_booking_id || s.id),
-    });
-
-    const orderId = orderRes.data.order_id;
-    showToast('Order created! Confirming payment...', 'info');
-
-    // 2. Confirm payment via mock endpoint / webhook simulation
-    await api.post(`/orders/${orderId}/confirm-mock`);
-
-    showToast('Payment successful! Your seats are confirmed.', 'success');
-    router.push('/orders');
-  } catch (err) {
-    const errMsg = err.response?.data?.error || 'Order processing failed';
-    showToast(errMsg, 'error');
-    if (seatMapRef.value) {
-      await seatMapRef.value.fetchSeats();
-    }
-  } finally {
-    processingOrder.value = false;
-  }
+  router.push(`/checkout/${props.showtimeId}`);
 }
 
 onMounted(() => {

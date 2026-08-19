@@ -6,18 +6,33 @@
         Back to Orders
       </v-btn>
 
-      <!-- Elevated Refund Action -->
-      <v-btn
-        v-if="canRefundOrder"
-        color="red-accent-2"
-        variant="tonal"
-        size="small"
-        prepend-icon="mdi-cash-refund"
-        class="text-none font-weight-bold"
-        @click="openRefundDialog()"
-      >
-        Refund Tickets ({{ activeTickets.length }})
-      </v-btn>
+      <div class="d-flex align-center gap-2">
+        <!-- Print Tax Receipt Action -->
+        <v-btn
+          v-if="hasTickets"
+          variant="outlined"
+          color="teal-accent-3"
+          size="small"
+          prepend-icon="mdi-printer"
+          class="text-none font-weight-bold"
+          @click="printReceipt"
+        >
+          Print Tax Receipt
+        </v-btn>
+
+        <!-- Elevated Refund Action -->
+        <v-btn
+          v-if="canRefundOrder"
+          color="red-accent-2"
+          variant="tonal"
+          size="small"
+          prepend-icon="mdi-cash-refund"
+          class="text-none font-weight-bold"
+          @click="openRefundDialog()"
+        >
+          Refund Tickets ({{ activeTickets.length }})
+        </v-btn>
+      </div>
     </div>
 
     <!-- Loading Skeleton -->
@@ -63,20 +78,38 @@
 
       <v-divider class="mb-6"></v-divider>
 
-      <!-- Customer / Buyer Info -->
+      <!-- Customer & Organizer Info Grid -->
       <div class="row-info mb-6 pa-4 rounded-lg bg-surface-variant border">
-        <div class="d-flex flex-wrap justify-space-between align-center gap-4">
-          <div>
-            <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Account / Buyer</div>
+        <v-row dense>
+          <v-col cols="12" sm="6">
+            <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Customer / Buyer</div>
             <div class="text-body-1 font-weight-medium text-white">{{ order.user_email || 'You' }}</div>
-          </div>
-          <div>
-            <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Stripe Reference</div>
-            <div class="text-caption font-weight-mono text-grey-lighten-1">
-              {{ order.stripe_payment_intent_id || 'N/A' }}
+            <div v-if="order.billing_name" class="text-caption text-grey-lighten-1 mt-1 font-weight-bold">
+              Tax Name: {{ order.billing_name }}
             </div>
-          </div>
-        </div>
+            <div v-if="order.tax_id" class="text-caption font-weight-mono text-teal-accent-3">
+              Tax ID: {{ order.tax_id }}
+            </div>
+            <div v-if="order.billing_address" class="text-caption text-grey">
+              {{ order.billing_address }}
+            </div>
+          </v-col>
+          <v-col cols="12" sm="6">
+            <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Event Organizer & Tax Identity</div>
+            <div class="text-body-2 font-weight-bold text-white">
+              {{ order.organizer_tax_business_name || 'DreamCinema Live Productions Ltd.' }}
+            </div>
+            <div class="text-caption font-weight-mono text-grey-lighten-1">
+              Tax ID: {{ order.organizer_tax_id || 'TAX-8842-TSB-2026' }}
+            </div>
+            <div v-if="order.organizer_tax_address" class="text-caption text-grey">
+              {{ order.organizer_tax_address }}
+            </div>
+            <div class="text-caption font-weight-mono text-grey-lighten-2 mt-1">
+              Payment Ref: {{ order.stripe_payment_intent_id || 'N/A' }}
+            </div>
+          </v-col>
+        </v-row>
       </div>
 
       <!-- Seats List -->
@@ -90,7 +123,7 @@
         <v-table theme="dark" class="rounded-lg border">
           <thead>
             <tr>
-              <th class="text-left font-weight-bold">Seat</th>
+              <th class="text-left font-weight-bold">Seat & Attendee</th>
               <th class="text-left font-weight-bold">Zone Tier</th>
               <th v-if="hasTickets" class="text-left font-weight-bold" style="min-width: 240px;">
                 Ticket & QR Pass
@@ -101,10 +134,16 @@
           <tbody>
             <tr v-for="s in order.seats" :key="s.seat_booking_id">
               <td class="font-weight-bold text-white py-4 align-middle">
-                <v-chip size="small" :color="getZoneColor(s)" variant="flat" class="mr-2 font-weight-bold">
-                  {{ s.row_label }}{{ s.seat_number }}
-                </v-chip>
-                Row {{ s.row_label }}, Seat {{ s.seat_number }}
+                <div class="d-flex align-center gap-2 mb-1">
+                  <v-chip size="small" :color="getZoneColor(s)" variant="flat" class="font-weight-bold">
+                    {{ s.row_label }}{{ s.seat_number }}
+                  </v-chip>
+                  <span>Row {{ s.row_label }}, Seat {{ s.seat_number }}</span>
+                </div>
+                <div v-if="s.attendee_name || s.attendee_phone" class="text-caption text-grey-lighten-1 font-weight-regular mt-1">
+                  <span v-if="s.attendee_name">👤 {{ s.attendee_name }}</span>
+                  <span v-if="s.attendee_phone" class="ml-2">📞 {{ s.attendee_phone }}</span>
+                </div>
               </td>
               <td class="align-middle">
                 <span class="text-body-2 text-grey-lighten-1">{{ s.zone_name }}</span>
@@ -295,6 +334,96 @@
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3000">
       {{ snackbar.text }}
     </v-snackbar>
+
+    <!-- Printable Official Tax Receipt (Shown in print view) -->
+    <div v-if="order" class="print-only-receipt">
+      <div class="receipt-header pb-4 mb-4 border-bottom">
+        <div class="d-flex justify-space-between align-start">
+          <div>
+            <div class="company-logo-text mb-1">
+              DREAM<span class="text-amber">CINEMA</span>
+            </div>
+            <div class="text-small font-bold text-dark">{{ order.organizer_tax_business_name || 'DreamCinema Live Productions Ltd.' }}</div>
+            <div class="text-small text-muted">Tax ID / VAT Reg: {{ order.organizer_tax_id || 'TAX-8842-TSB-2026' }}</div>
+            <div v-if="order.organizer_tax_address" class="text-small text-muted">{{ order.organizer_tax_address }}</div>
+            <div v-if="order.organizer_tax_email" class="text-small text-muted">{{ order.organizer_tax_email }} • {{ order.organizer_tax_phone }}</div>
+          </div>
+          <div class="text-right">
+            <h2 class="receipt-title text-uppercase font-bold text-dark mb-1">OFFICIAL TAX RECEIPT</h2>
+            <div class="font-mono text-small font-bold">Receipt No: REC-{{ order.id.substring(0, 8).toUpperCase() }}-{{ new Date(order.created_at).getFullYear() }}</div>
+            <div class="text-small text-muted">Date: {{ formatDate(order.created_at) }}</div>
+            <div class="text-small text-muted">Ref: {{ order.stripe_payment_intent_id || 'PAID' }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Customer & Event Specification Table -->
+      <table class="receipt-table mb-4">
+        <tbody>
+          <tr>
+            <th style="width: 25%;" class="bg-light-gray text-left">Billed To (Customer):</th>
+            <td style="width: 25%;" class="font-bold">{{ order.billing_name || order.user_email || 'Direct Admissions' }}</td>
+            <th style="width: 25%;" class="bg-light-gray text-left">Customer Tax ID / VAT:</th>
+            <td style="width: 25%;" class="font-mono">{{ order.tax_id || 'N/A' }}</td>
+          </tr>
+          <tr>
+            <th class="bg-light-gray text-left">Event & Show:</th>
+            <td class="font-bold">{{ order.event_title }}</td>
+            <th class="bg-light-gray text-left">Venue & Showtime:</th>
+            <td>{{ order.theater_name }} ({{ formatDate(order.starts_at) }})</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Items Table -->
+      <table class="receipt-table mb-4">
+        <thead>
+          <tr>
+            <th class="text-left">Seat & Zone Tier</th>
+            <th class="text-left">Ticket Holder (Attendee)</th>
+            <th class="text-center">Pass Code</th>
+            <th class="text-right">Price (USD)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="s in order.seats" :key="s.seat_booking_id">
+            <td class="font-bold">Row {{ s.row_label }}, Seat {{ s.seat_number }} ({{ s.zone_name }})</td>
+            <td>
+              <span class="font-bold">{{ s.attendee_name || order.billing_name || order.user_email }}</span>
+              <span v-if="s.attendee_phone" class="text-muted ml-2">({{ s.attendee_phone }})</span>
+            </td>
+            <td class="text-center font-mono font-bold">{{ getTicket(s.seat_booking_id)?.code || '—' }}</td>
+            <td class="text-right font-mono font-bold">${{ (s.price_cents / 100).toFixed(2) }}</td>
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <td colspan="3" class="text-right font-bold">Subtotal:</td>
+            <td class="text-right font-mono font-bold">${{ (order.total_amount_cents / 100).toFixed(2) }}</td>
+          </tr>
+          <tr v-if="order.refunded_amount_cents > 0">
+            <td colspan="3" class="text-right font-bold text-danger">Refunds Deducted:</td>
+            <td class="text-right font-mono font-bold text-danger">-${{ (order.refunded_amount_cents / 100).toFixed(2) }}</td>
+          </tr>
+          <tr class="row-total">
+            <td colspan="3" class="text-right font-bold text-large">TOTAL PAID:</td>
+            <td class="text-right font-mono font-bold text-large">
+              ${{ ((order.total_amount_cents - (order.refunded_amount_cents || 0)) / 100).toFixed(2) }}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+
+      <!-- Footer Stamp -->
+      <div class="d-flex justify-space-between align-end pt-4 border-top">
+        <div class="text-small text-muted">
+          Official Electronic Tax Receipt • System Reconciled & Paid
+        </div>
+        <div class="text-center">
+          <div class="stamp-paid">PAID & SETTLED</div>
+        </div>
+      </div>
+    </div>
   </v-container>
 </template>
 
@@ -324,6 +453,10 @@ const refundDialog = ref({
   submitting: false,
 });
 
+function printReceipt() {
+  window.print();
+}
+
 const hasTickets = computed(() => {
   if (!order.value) return false;
   return ['paid', 'partially_refunded', 'refunded'].includes(order.value.status);
@@ -348,15 +481,16 @@ const activeTickets = computed(() => {
 const canRefundOrder = computed(() => {
   if (!order.value || !authStore.isElevated) return false;
   return (
-    (order.value.status === 'paid' || order.value.status === 'partially_refunded') &&
+    ['paid', 'partially_refunded'].includes(order.value.status) &&
     activeTickets.value.length > 0
   );
 });
 
 const calculatedRefundAmount = computed(() => {
-  return tickets.value
-    .filter((t) => refundDialog.value.selectedTicketIds.includes(t.id))
-    .reduce((sum, t) => sum + (t.price_cents || 0), 0);
+  return refundDialog.value.selectedTicketIds.reduce((sum, tid) => {
+    const t = tickets.value.find((tk) => tk.id === tid);
+    return sum + (t?.price_cents || 0);
+  }, 0);
 });
 
 function toggleTicketSelection(ticketId) {
@@ -368,9 +502,9 @@ function toggleTicketSelection(ticketId) {
   }
 }
 
-function openRefundDialog(specificTicketId = null) {
-  if (specificTicketId) {
-    refundDialog.value.selectedTicketIds = [specificTicketId];
+function openRefundDialog(singleTicketId = null) {
+  if (singleTicketId) {
+    refundDialog.value.selectedTicketIds = [singleTicketId];
   } else {
     refundDialog.value.selectedTicketIds = activeTickets.value.map((t) => t.id);
   }
@@ -379,19 +513,23 @@ function openRefundDialog(specificTicketId = null) {
 }
 
 async function handleRefundSubmit() {
-  if (refundDialog.value.selectedTicketIds.length === 0 || !order.value) return;
+  if (refundDialog.value.selectedTicketIds.length === 0) {
+    showToast('Select at least one ticket to refund', 'warning');
+    return;
+  }
+
   refundDialog.value.submitting = true;
   try {
     const res = await api.post(`/orders/${order.value.id}/refund`, {
       ticket_ids: refundDialog.value.selectedTicketIds,
-      reason: refundDialog.value.reason || undefined,
+      reason: refundDialog.value.reason.trim() || undefined,
     });
-    showToast(`Refund processed successfully ($${(res.data.amount_cents / 100).toFixed(2)})`, 'success');
+
+    showToast(`Successfully refunded ${res.data.refunded_count} ticket(s)`, 'success');
     refundDialog.value.show = false;
     await fetchOrderDetail();
   } catch (err) {
-    const errMsg = err.response?.data?.error || 'Failed to process refund';
-    showToast(errMsg, 'error');
+    showToast(err.response?.data?.error || 'Failed to process refund', 'error');
   } finally {
     refundDialog.value.submitting = false;
   }
@@ -414,6 +552,7 @@ function formatDate(isoStr) {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
@@ -422,22 +561,22 @@ function formatDate(isoStr) {
 
 function getStatusColor(status) {
   switch (status) {
-    case 'paid': return 'success';
-    case 'partially_refunded': return 'deep-purple-accent-2';
-    case 'refunded': return 'grey-darken-1';
-    case 'pending_payment': return 'warning';
-    case 'cancelled': return 'grey';
-    case 'expired': return 'red-accent-3';
+    case 'paid': return 'emerald-darken-1';
+    case 'partially_refunded': return 'amber-darken-2';
+    case 'refunded': return 'red-accent-2';
+    case 'pending_payment': return 'orange-darken-2';
+    case 'cancelled': return 'grey-darken-1';
+    case 'expired': return 'amber-darken-2';
     default: return 'info';
   }
 }
 
 function getTicketStatusColor(status) {
   switch (status) {
-    case 'active': return 'success';
-    case 'used': return 'grey-darken-1';
-    case 'refunded': return 'deep-purple-accent-2';
-    case 'cancelled': return 'red';
+    case 'active': return 'emerald-darken-1';
+    case 'used': return 'blue-grey';
+    case 'refunded': return 'red-accent-2';
+    case 'cancelled': return 'grey-darken-1';
     case 'expired': return 'amber-darken-2';
     default: return 'info';
   }
@@ -556,5 +695,114 @@ onMounted(() => {
 
 .gap-4 {
   gap: 16px;
+}
+
+/* Print Only Receipt Styles */
+.print-only-receipt {
+  display: none;
+}
+
+@media print {
+  .print-only-receipt {
+    display: block !important;
+    background: #ffffff;
+    color: #1e293b;
+    padding: 10mm;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  .v-card, .v-btn, .v-table, .v-divider, .row-info {
+    display: none !important;
+  }
+
+  .receipt-header {
+    border-bottom: 2px solid #cbd5e1;
+  }
+
+  .company-logo-text {
+    font-size: 16pt;
+    font-weight: 900;
+    color: #0f172a;
+    letter-spacing: -0.5px;
+  }
+
+  .text-amber {
+    color: #d97706;
+  }
+
+  .text-dark {
+    color: #0f172a !important;
+  }
+
+  .receipt-title {
+    font-size: 13pt;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+
+  .receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+  }
+
+  .receipt-table th, .receipt-table td {
+    border: 1px solid #cbd5e1;
+    padding: 6px 10px;
+  }
+
+  .receipt-table th {
+    background-color: #f1f5f9;
+    font-weight: 700;
+    color: #334155;
+  }
+
+  .bg-light-gray {
+    background-color: #f8fafc !important;
+  }
+
+  .row-total {
+    background-color: #f8fafc;
+    border-top: 2px solid #0f172a;
+  }
+
+  .text-small {
+    font-size: 8.5pt;
+  }
+
+  .text-large {
+    font-size: 11pt;
+  }
+
+  .text-muted {
+    color: #64748b;
+  }
+
+  .text-danger {
+    color: #dc2626 !important;
+  }
+
+  .font-bold {
+    font-weight: 700;
+  }
+
+  .font-mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  .border-top {
+    border-top: 1.5px solid #cbd5e1;
+  }
+
+  .stamp-paid {
+    display: inline-block;
+    border: 2px solid #16a34a;
+    color: #16a34a;
+    font-weight: 900;
+    font-size: 9pt;
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+  }
 }
 </style>

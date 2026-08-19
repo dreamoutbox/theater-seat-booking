@@ -34,6 +34,11 @@ pub struct CreateEventPayload {
     pub max_seats_per_booking: Option<i32>,
     pub max_seats_per_user: Option<i32>,
     pub owner_id: Option<Uuid>,
+    pub tax_business_name: Option<String>,
+    pub tax_id: Option<String>,
+    pub tax_address: Option<String>,
+    pub tax_email: Option<String>,
+    pub tax_phone: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -234,14 +239,25 @@ pub async fn create_event(
         payload.owner_id.or(Some(auth_user.id))
     };
 
-    let event = EventRepository::save(&state.pool, title, max_booking, max_user, owner_id)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let event = EventRepository::save(
+        &state.pool,
+        title,
+        max_booking,
+        max_user,
+        owner_id,
+        payload.tax_business_name.as_deref(),
+        payload.tax_id.as_deref(),
+        payload.tax_address.as_deref(),
+        payload.tax_email.as_deref(),
+        payload.tax_phone.as_deref(),
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
 
     tracing::info!(event_id = %event.id, title = %event.title, user_id = %auth_user.id, "Created new event");
 
@@ -303,14 +319,26 @@ pub async fn update_event(
         payload.owner_id.or(existing.owner_id)
     };
 
-    let event = EventRepository::update(&state.pool, id, title, max_booking, max_user, owner_id)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let event = EventRepository::update(
+        &state.pool,
+        id,
+        title,
+        max_booking,
+        max_user,
+        owner_id,
+        payload.tax_business_name.as_deref().or(existing.tax_business_name.as_deref()),
+        payload.tax_id.as_deref().or(existing.tax_id.as_deref()),
+        payload.tax_address.as_deref().or(existing.tax_address.as_deref()),
+        payload.tax_email.as_deref().or(existing.tax_email.as_deref()),
+        payload.tax_phone.as_deref().or(existing.tax_phone.as_deref()),
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
 
     match event {
         Some(e) => {

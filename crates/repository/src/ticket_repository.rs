@@ -28,11 +28,13 @@ impl TicketRepository {
         user_id: Uuid,
         event_id: Uuid,
         showtime_id: Uuid,
+        attendee_name: Option<&str>,
+        attendee_phone: Option<&str>,
     ) -> Result<Ticket, sqlx::Error> {
         sqlx::query_as(
-            "INSERT INTO tickets (id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-             RETURNING id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status, used_at, used_by, refunded_at, refunded_by, created_at",
+            "INSERT INTO tickets (id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, attendee_name, attendee_phone, status)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
+             RETURNING id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, attendee_name, attendee_phone, status, used_at, used_by, refunded_at, refunded_by, created_at",
         )
         .bind(id)
         .bind(code)
@@ -41,6 +43,8 @@ impl TicketRepository {
         .bind(user_id)
         .bind(event_id)
         .bind(showtime_id)
+        .bind(attendee_name)
+        .bind(attendee_phone)
         .fetch_one(executor)
         .await
     }
@@ -56,11 +60,14 @@ impl TicketRepository {
             showtime_id: Uuid,
             event_id: Uuid,
             seat_booking_id: Uuid,
+            attendee_name: Option<String>,
+            attendee_phone: Option<String>,
         }
 
-        // 1. Fetch seat bookings with event_id
+        // 1. Fetch seat bookings with event_id and attendee info
         let items: Vec<SeatBookingForTicket> = sqlx::query_as(
-            "SELECT o.id AS order_id, o.user_id, o.showtime_id, st.event_id, sb.id AS seat_booking_id
+            "SELECT o.id AS order_id, o.user_id, o.showtime_id, st.event_id, sb.id AS seat_booking_id,
+                    os.attendee_name, os.attendee_phone
              FROM orders o
              JOIN order_seats os ON os.order_id = o.id
              JOIN seat_bookings sb ON sb.id = os.seat_booking_id
@@ -76,7 +83,7 @@ impl TicketRepository {
         for item in items {
             // Check if ticket already exists for this seat booking (idempotency)
             let existing: Option<Ticket> = sqlx::query_as(
-                "SELECT id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status, used_at, used_by, refunded_at, refunded_by, created_at
+                "SELECT id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, attendee_name, attendee_phone, status, used_at, used_by, refunded_at, refunded_by, created_at
                  FROM tickets
                  WHERE seat_booking_id = $1",
             )
@@ -102,6 +109,8 @@ impl TicketRepository {
                     item.user_id,
                     item.event_id,
                     item.showtime_id,
+                    item.attendee_name.as_deref(),
+                    item.attendee_phone.as_deref(),
                 )
                 .await
                 {
@@ -136,7 +145,8 @@ impl TicketRepository {
                 t.id, t.code, t.order_id, t.seat_booking_id, t.user_id, t.event_id,
                 e.title AS event_title, t.showtime_id, th.name AS theater_name,
                 st.starts_at, s.row_label, s.seat_number, z.name AS zone_name,
-                z.price_cents, t.status, t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
+                z.price_cents, t.attendee_name, t.attendee_phone, t.status,
+                t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
              FROM tickets t
              JOIN events e ON e.id = t.event_id
              JOIN showtimes st ON st.id = t.showtime_id
@@ -162,7 +172,8 @@ impl TicketRepository {
                 t.id, t.code, t.order_id, t.seat_booking_id, t.user_id, t.event_id,
                 e.title AS event_title, t.showtime_id, th.name AS theater_name,
                 st.starts_at, s.row_label, s.seat_number, z.name AS zone_name,
-                z.price_cents, t.status, t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
+                z.price_cents, t.attendee_name, t.attendee_phone, t.status,
+                t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
              FROM tickets t
              JOIN events e ON e.id = t.event_id
              JOIN showtimes st ON st.id = t.showtime_id
@@ -188,7 +199,8 @@ impl TicketRepository {
                 t.id, t.code, t.order_id, t.seat_booking_id, t.user_id, t.event_id,
                 e.title AS event_title, t.showtime_id, th.name AS theater_name,
                 st.starts_at, s.row_label, s.seat_number, z.name AS zone_name,
-                z.price_cents, t.status, t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
+                z.price_cents, t.attendee_name, t.attendee_phone, t.status,
+                t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
              FROM tickets t
              JOIN events e ON e.id = t.event_id
              JOIN showtimes st ON st.id = t.showtime_id
@@ -208,7 +220,7 @@ impl TicketRepository {
         id: Uuid,
     ) -> Result<Option<Ticket>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status, used_at, used_by, refunded_at, refunded_by, created_at
+            "SELECT id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, attendee_name, attendee_phone, status, used_at, used_by, refunded_at, refunded_by, created_at
              FROM tickets
              WHERE id = $1",
         )

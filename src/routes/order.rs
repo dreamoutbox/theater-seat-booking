@@ -13,8 +13,19 @@ use uuid::Uuid;
 use crate::{auth::AuthenticatedUser, routes::AppState};
 
 #[derive(Debug, Deserialize)]
+pub struct CreateOrderSeatItem {
+    pub seat_booking_id: Uuid,
+    pub attendee_name: Option<String>,
+    pub attendee_phone: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct CreateOrderRequest {
-    pub seat_booking_ids: Vec<Uuid>,
+    pub seat_booking_ids: Option<Vec<Uuid>>,
+    pub seats: Option<Vec<CreateOrderSeatItem>>,
+    pub billing_name: Option<String>,
+    pub tax_id: Option<String>,
+    pub billing_address: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -30,7 +41,15 @@ pub async fn create_order(
     State(state): State<AppState>,
     Json(payload): Json<CreateOrderRequest>,
 ) -> Result<(StatusCode, Json<CreateOrderResponse>), (StatusCode, Json<serde_json::Value>)> {
-    if payload.seat_booking_ids.is_empty() {
+    let seat_booking_ids: Vec<Uuid> = if let Some(ref seats) = payload.seats {
+        seats.iter().map(|s| s.seat_booking_id).collect()
+    } else if let Some(ref ids) = payload.seat_booking_ids {
+        ids.clone()
+    } else {
+        Vec::new()
+    };
+
+    if seat_booking_ids.is_empty() {
         return Err((
             StatusCode::BAD_REQUEST,
             Json(serde_json::json!({ "error": "At least one seat hold must be selected" })),
@@ -47,7 +66,7 @@ pub async fn create_order(
     // 1. Fetch and validate all requested seat_bookings:
     let holds = SeatBookingRepository::find_active_holds_by_user_and_seat_ids(
         &mut *tx,
-        &payload.seat_booking_ids,
+        &seat_booking_ids,
         auth_user.id,
     )
     .await
@@ -58,7 +77,7 @@ pub async fn create_order(
         )
     })?;
 
-    if holds.len() != payload.seat_booking_ids.len() {
+    if holds.len() != seat_booking_ids.len() {
         tx.rollback().await.ok();
         return Err((
             StatusCode::BAD_REQUEST,
@@ -105,6 +124,9 @@ pub async fn create_order(
         first_showtime_id,
         total_amount_cents,
         Some(&stripe_res.id),
+        payload.billing_name.as_deref(),
+        payload.tax_id.as_deref(),
+        payload.billing_address.as_deref(),
     )
     .await
     .map_err(|e| {
@@ -115,15 +137,32 @@ pub async fn create_order(
     })?;
 
     // 6. Insert order_seats
-    for hold in holds {
-        OrderRepository::save_order_seat(&mut *tx, order_id, hold.id, hold.price_cents)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({ "error": e.to_string() })),
-                )
-            })?;
+    for hold in &holds {
+        let (att_name, att_phone) = if let Some(ref seats) = payload.seats {
+            seats
+                .iter()
+                .find(|s| s.seat_booking_id == hold.id)
+                .map(|s| (s.attendee_name.as_deref(), s.attendee_phone.as_deref()))
+                .unwrap_or((None, None))
+        } else {
+            (None, None)
+        };
+
+        OrderRepository::save_order_seat(
+            &mut *tx,
+            order_id,
+            hold.id,
+            hold.price_cents,
+            att_name,
+            att_phone,
+        )
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
     }
 
     tx.commit().await.map_err(|e| {
@@ -183,6 +222,7 @@ pub async fn list_orders(
             user_id: o.user_id,
             user_email: o.user_email,
             showtime_id: o.showtime_id,
+            event_id: o.event_id,
             event_title: o.event_title,
             theater_name: o.theater_name,
             starts_at: o.starts_at,
@@ -191,6 +231,14 @@ pub async fn list_orders(
             status: o.status,
             stripe_payment_intent_id: o.stripe_payment_intent_id,
             stripe_client_secret: None,
+            billing_name: o.billing_name,
+            tax_id: o.tax_id,
+            billing_address: o.billing_address,
+            organizer_tax_business_name: o.organizer_tax_business_name,
+            organizer_tax_id: o.organizer_tax_id,
+            organizer_tax_address: o.organizer_tax_address,
+            organizer_tax_email: o.organizer_tax_email,
+            organizer_tax_phone: o.organizer_tax_phone,
             created_at: o.created_at,
             seats,
         });
@@ -243,6 +291,7 @@ pub async fn get_order(
         user_id: o.user_id,
         user_email: o.user_email,
         showtime_id: o.showtime_id,
+        event_id: o.event_id,
         event_title: o.event_title,
         theater_name: o.theater_name,
         starts_at: o.starts_at,
@@ -251,6 +300,14 @@ pub async fn get_order(
         status: o.status,
         stripe_payment_intent_id: o.stripe_payment_intent_id,
         stripe_client_secret: None,
+        billing_name: o.billing_name,
+        tax_id: o.tax_id,
+        billing_address: o.billing_address,
+        organizer_tax_business_name: o.organizer_tax_business_name,
+        organizer_tax_id: o.organizer_tax_id,
+        organizer_tax_address: o.organizer_tax_address,
+        organizer_tax_email: o.organizer_tax_email,
+        organizer_tax_phone: o.organizer_tax_phone,
         created_at: o.created_at,
         seats,
     }))

@@ -10,7 +10,8 @@ impl EventRepository {
         executor: E,
     ) -> Result<Vec<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number,
+                    tax_business_name, tax_id, tax_address, tax_email, tax_phone
              FROM events
              ORDER BY event_number, title",
         )
@@ -23,7 +24,8 @@ impl EventRepository {
         owner_id: Uuid,
     ) -> Result<Vec<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number,
+                    tax_business_name, tax_id, tax_address, tax_email, tax_phone
              FROM events
              WHERE owner_id = $1
              ORDER BY event_number, title",
@@ -38,7 +40,8 @@ impl EventRepository {
         id: Uuid,
     ) -> Result<Option<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number,
+                    tax_business_name, tax_id, tax_address, tax_email, tax_phone
              FROM events
              WHERE id = $1",
         )
@@ -52,7 +55,8 @@ impl EventRepository {
         title: &str,
     ) -> Result<Option<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number,
+                    tax_business_name, tax_id, tax_address, tax_email, tax_phone
              FROM events
              WHERE title = $1
              LIMIT 1",
@@ -68,16 +72,26 @@ impl EventRepository {
         max_seats_per_booking: i32,
         max_seats_per_user: i32,
         owner_id: Option<Uuid>,
+        tax_business_name: Option<&str>,
+        tax_id: Option<&str>,
+        tax_address: Option<&str>,
+        tax_email: Option<&str>,
+        tax_phone: Option<&str>,
     ) -> Result<Event, sqlx::Error> {
         sqlx::query_as(
-            "INSERT INTO events (title, max_seats_per_booking, max_seats_per_user, owner_id)
-             VALUES ($1, $2, $3, $4)
-             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number",
+            "INSERT INTO events (title, max_seats_per_booking, max_seats_per_user, owner_id, tax_business_name, tax_id, tax_address, tax_email, tax_phone)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number, tax_business_name, tax_id, tax_address, tax_email, tax_phone",
         )
         .bind(title)
         .bind(max_seats_per_booking)
         .bind(max_seats_per_user)
         .bind(owner_id)
+        .bind(tax_business_name)
+        .bind(tax_id)
+        .bind(tax_address)
+        .bind(tax_email)
+        .bind(tax_phone)
         .fetch_one(executor)
         .await
     }
@@ -89,20 +103,35 @@ impl EventRepository {
         max_seats_per_booking: i32,
         max_seats_per_user: i32,
         owner_id: Option<Uuid>,
+        tax_business_name: Option<&str>,
+        tax_id: Option<&str>,
+        tax_address: Option<&str>,
+        tax_email: Option<&str>,
+        tax_phone: Option<&str>,
     ) -> Result<Option<Event>, sqlx::Error> {
         sqlx::query_as(
             "UPDATE events
              SET title = $1,
                  max_seats_per_booking = $2,
                  max_seats_per_user = $3,
-                 owner_id = COALESCE($4, owner_id)
-             WHERE id = $5
-             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number",
+                 owner_id = COALESCE($4, owner_id),
+                 tax_business_name = $5,
+                 tax_id = $6,
+                 tax_address = $7,
+                 tax_email = $8,
+                 tax_phone = $9
+             WHERE id = $10
+             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number, tax_business_name, tax_id, tax_address, tax_email, tax_phone",
         )
         .bind(title)
         .bind(max_seats_per_booking)
         .bind(max_seats_per_user)
         .bind(owner_id)
+        .bind(tax_business_name)
+        .bind(tax_id)
+        .bind(tax_address)
+        .bind(tax_email)
+        .bind(tax_phone)
         .bind(id)
         .fetch_optional(executor)
         .await

@@ -131,6 +131,11 @@ pub struct Event {
     pub max_seats_per_user: i32,
     pub owner_id: Option<Uuid>,
     pub event_number: i64,
+    pub tax_business_name: Option<String>,
+    pub tax_id: Option<String>,
+    pub tax_address: Option<String>,
+    pub tax_email: Option<String>,
+    pub tax_phone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -192,6 +197,9 @@ pub struct Order {
     pub refunded_amount_cents: i64,
     pub status: String, // "pending_payment", "paid", "partially_refunded", "refunded", "cancelled", "expired"
     pub stripe_payment_intent_id: Option<String>,
+    pub billing_name: Option<String>,
+    pub tax_id: Option<String>,
+    pub billing_address: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -200,6 +208,8 @@ pub struct OrderSeat {
     pub order_id: Uuid,
     pub seat_booking_id: Uuid,
     pub price_cents: i64,
+    pub attendee_name: Option<String>,
+    pub attendee_phone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -210,6 +220,8 @@ pub struct OrderSeatDetail {
     pub seat_number: i32,
     pub zone_name: String,
     pub price_cents: i64,
+    pub attendee_name: Option<String>,
+    pub attendee_phone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -218,6 +230,7 @@ pub struct OrderDetailRow {
     pub user_id: Uuid,
     pub user_email: Option<String>,
     pub showtime_id: Uuid,
+    pub event_id: Uuid,
     pub event_title: String,
     pub theater_name: String,
     pub starts_at: DateTime<Utc>,
@@ -225,6 +238,14 @@ pub struct OrderDetailRow {
     pub refunded_amount_cents: i64,
     pub status: String,
     pub stripe_payment_intent_id: Option<String>,
+    pub billing_name: Option<String>,
+    pub tax_id: Option<String>,
+    pub billing_address: Option<String>,
+    pub organizer_tax_business_name: Option<String>,
+    pub organizer_tax_id: Option<String>,
+    pub organizer_tax_address: Option<String>,
+    pub organizer_tax_email: Option<String>,
+    pub organizer_tax_phone: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -234,6 +255,7 @@ pub struct OrderDetail {
     pub user_id: Uuid,
     pub user_email: Option<String>,
     pub showtime_id: Uuid,
+    pub event_id: Uuid,
     pub event_title: String,
     pub theater_name: String,
     pub starts_at: DateTime<Utc>,
@@ -242,6 +264,14 @@ pub struct OrderDetail {
     pub status: String,
     pub stripe_payment_intent_id: Option<String>,
     pub stripe_client_secret: Option<String>,
+    pub billing_name: Option<String>,
+    pub tax_id: Option<String>,
+    pub billing_address: Option<String>,
+    pub organizer_tax_business_name: Option<String>,
+    pub organizer_tax_id: Option<String>,
+    pub organizer_tax_address: Option<String>,
+    pub organizer_tax_email: Option<String>,
+    pub organizer_tax_phone: Option<String>,
     pub created_at: DateTime<Utc>,
     pub seats: Vec<OrderSeatDetail>,
 }
@@ -270,6 +300,8 @@ pub struct Ticket {
     pub user_id: Uuid,
     pub event_id: Uuid,
     pub showtime_id: Uuid,
+    pub attendee_name: Option<String>,
+    pub attendee_phone: Option<String>,
     pub status: String, // "active", "used", "cancelled", "expired", "refunded"
     pub used_at: Option<DateTime<Utc>>,
     pub used_by: Option<Uuid>,
@@ -294,6 +326,8 @@ pub struct TicketDetail {
     pub seat_number: i32,
     pub zone_name: String,
     pub price_cents: i64,
+    pub attendee_name: Option<String>,
+    pub attendee_phone: Option<String>,
     pub status: String,
     pub used_at: Option<DateTime<Utc>>,
     pub used_by: Option<Uuid>,
