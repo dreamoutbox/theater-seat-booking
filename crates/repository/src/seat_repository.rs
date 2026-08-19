@@ -22,7 +22,17 @@ impl SeatRepository {
                 sb.status,
                 u.email AS user_email
              FROM seats s
-             JOIN seat_bookings sb ON sb.seat_id = s.id AND sb.status IN ('held', 'confirmed')
+             JOIN seat_bookings sb ON sb.seat_id = s.id 
+                AND (
+                    (sb.status = 'held' AND sb.expires_at > now())
+                    OR (
+                        sb.status = 'confirmed' 
+                        AND EXISTS (
+                            SELECT 1 FROM tickets t 
+                            WHERE t.seat_booking_id = sb.id AND t.status = 'active'
+                        )
+                    )
+                )
              JOIN showtimes st ON st.id = sb.showtime_id
              JOIN events e ON e.id = st.event_id
              LEFT JOIN order_seats os ON os.seat_booking_id = sb.id
@@ -41,9 +51,18 @@ impl SeatRepository {
     ) -> Result<bool, sqlx::Error> {
         sqlx::query_scalar(
             "SELECT EXISTS(
-                SELECT 1 FROM seat_bookings sb WHERE sb.seat_id = $1 AND sb.status IN ('held', 'confirmed')
-                UNION
-                SELECT 1 FROM order_seats os JOIN seat_bookings sb2 ON sb2.id = os.seat_booking_id WHERE sb2.seat_id = $1
+                SELECT 1 FROM seat_bookings sb 
+                WHERE sb.seat_id = $1 
+                  AND (
+                      (sb.status = 'held' AND sb.expires_at > now())
+                      OR (
+                          sb.status = 'confirmed' 
+                          AND EXISTS (
+                              SELECT 1 FROM tickets t 
+                              WHERE t.seat_booking_id = sb.id AND t.status = 'active'
+                          )
+                      )
+                  )
             )",
         )
         .bind(seat_id)

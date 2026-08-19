@@ -144,18 +144,23 @@ impl TicketRepository {
             "SELECT 
                 t.id, t.code, t.order_id, t.seat_booking_id, t.user_id, t.event_id,
                 e.title AS event_title, t.showtime_id, th.name AS theater_name,
-                st.starts_at, s.row_label, s.seat_number, z.name AS zone_name,
-                z.price_cents, t.attendee_name, t.attendee_phone, t.status,
+                st.starts_at, 
+                COALESCE(s.row_label, os.row_label, '—') AS row_label, 
+                COALESCE(s.seat_number, os.seat_number, 0) AS seat_number, 
+                COALESCE(z.name, os.zone_name, 'Standard') AS zone_name,
+                COALESCE(z.price_cents, os.price_cents, 0) AS price_cents, 
+                t.attendee_name, t.attendee_phone, t.status,
                 t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
              FROM tickets t
              JOIN events e ON e.id = t.event_id
              JOIN showtimes st ON st.id = t.showtime_id
              JOIN theaters th ON th.id = st.theater_id
-             JOIN seat_bookings sb ON sb.id = t.seat_booking_id
-             JOIN seats s ON s.id = sb.seat_id
-             JOIN zones z ON z.id = s.zone_id
+             LEFT JOIN seat_bookings sb ON sb.id = t.seat_booking_id
+             LEFT JOIN seats s ON s.id = sb.seat_id
+             LEFT JOIN zones z ON z.id = s.zone_id
+             LEFT JOIN order_seats os ON os.seat_booking_id = t.seat_booking_id
              WHERE t.order_id = $1
-             ORDER BY s.row_label ASC, s.seat_number ASC",
+             ORDER BY COALESCE(s.row_label, os.row_label, '—') ASC, COALESCE(s.seat_number, os.seat_number, 0) ASC",
         )
         .bind(order_id)
         .fetch_all(executor)
@@ -171,16 +176,21 @@ impl TicketRepository {
             "SELECT 
                 t.id, t.code, t.order_id, t.seat_booking_id, t.user_id, t.event_id,
                 e.title AS event_title, t.showtime_id, th.name AS theater_name,
-                st.starts_at, s.row_label, s.seat_number, z.name AS zone_name,
-                z.price_cents, t.attendee_name, t.attendee_phone, t.status,
+                st.starts_at, 
+                COALESCE(s.row_label, os.row_label, '—') AS row_label, 
+                COALESCE(s.seat_number, os.seat_number, 0) AS seat_number, 
+                COALESCE(z.name, os.zone_name, 'Standard') AS zone_name,
+                COALESCE(z.price_cents, os.price_cents, 0) AS price_cents, 
+                t.attendee_name, t.attendee_phone, t.status,
                 t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
              FROM tickets t
              JOIN events e ON e.id = t.event_id
              JOIN showtimes st ON st.id = t.showtime_id
              JOIN theaters th ON th.id = st.theater_id
-             JOIN seat_bookings sb ON sb.id = t.seat_booking_id
-             JOIN seats s ON s.id = sb.seat_id
-             JOIN zones z ON z.id = s.zone_id
+             LEFT JOIN seat_bookings sb ON sb.id = t.seat_booking_id
+             LEFT JOIN seats s ON s.id = sb.seat_id
+             LEFT JOIN zones z ON z.id = s.zone_id
+             LEFT JOIN order_seats os ON os.seat_booking_id = t.seat_booking_id
              WHERE t.order_id = $1 AND t.id = ANY($2)
              FOR UPDATE OF t",
         )
@@ -198,16 +208,21 @@ impl TicketRepository {
             "SELECT 
                 t.id, t.code, t.order_id, t.seat_booking_id, t.user_id, t.event_id,
                 e.title AS event_title, t.showtime_id, th.name AS theater_name,
-                st.starts_at, s.row_label, s.seat_number, z.name AS zone_name,
-                z.price_cents, t.attendee_name, t.attendee_phone, t.status,
+                st.starts_at, 
+                COALESCE(s.row_label, os.row_label, '—') AS row_label, 
+                COALESCE(s.seat_number, os.seat_number, 0) AS seat_number, 
+                COALESCE(z.name, os.zone_name, 'Standard') AS zone_name,
+                COALESCE(z.price_cents, os.price_cents, 0) AS price_cents, 
+                t.attendee_name, t.attendee_phone, t.status,
                 t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
              FROM tickets t
              JOIN events e ON e.id = t.event_id
              JOIN showtimes st ON st.id = t.showtime_id
              JOIN theaters th ON th.id = st.theater_id
-             JOIN seat_bookings sb ON sb.id = t.seat_booking_id
-             JOIN seats s ON s.id = sb.seat_id
-             JOIN zones z ON z.id = s.zone_id
+             LEFT JOIN seat_bookings sb ON sb.id = t.seat_booking_id
+             LEFT JOIN seats s ON s.id = sb.seat_id
+             LEFT JOIN zones z ON z.id = s.zone_id
+             LEFT JOIN order_seats os ON os.seat_booking_id = t.seat_booking_id
              WHERE t.code = $1",
         )
         .bind(code)

@@ -43,8 +43,12 @@ impl OrderRepository {
         attendee_phone: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            "INSERT INTO order_seats (order_id, seat_booking_id, price_cents, attendee_name, attendee_phone)
-             VALUES ($1, $2, $3, $4, $5)",
+            "INSERT INTO order_seats (order_id, seat_booking_id, price_cents, attendee_name, attendee_phone, row_label, seat_number, zone_name)
+             SELECT $1, $2, $3, $4, $5, s.row_label, s.seat_number, z.name
+             FROM seat_bookings sb
+             LEFT JOIN seats s ON s.id = sb.seat_id
+             LEFT JOIN zones z ON z.id = s.zone_id
+             WHERE sb.id = $2",
         )
         .bind(order_id)
         .bind(seat_booking_id)
@@ -132,14 +136,18 @@ impl OrderRepository {
         order_id: Uuid,
     ) -> Result<Vec<OrderSeatDetail>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT os.seat_booking_id, s.id as seat_id, s.row_label, s.seat_number, z.name as zone_name,
+            "SELECT os.seat_booking_id, 
+                    COALESCE(s.id, sb.seat_id, os.seat_booking_id) as seat_id, 
+                    COALESCE(s.row_label, os.row_label, '—') as row_label, 
+                    COALESCE(s.seat_number, os.seat_number, 0) as seat_number, 
+                    COALESCE(z.name, os.zone_name, 'Standard') as zone_name,
                     os.price_cents, os.attendee_name, os.attendee_phone
              FROM order_seats os
-             JOIN seat_bookings sb ON sb.id = os.seat_booking_id
-             JOIN seats s ON s.id = sb.seat_id
-             JOIN zones z ON z.id = s.zone_id
+             LEFT JOIN seat_bookings sb ON sb.id = os.seat_booking_id
+             LEFT JOIN seats s ON s.id = sb.seat_id
+             LEFT JOIN zones z ON z.id = s.zone_id
              WHERE os.order_id = $1
-             ORDER BY s.row_label ASC, s.seat_number ASC",
+             ORDER BY COALESCE(s.row_label, os.row_label, '—') ASC, COALESCE(s.seat_number, os.seat_number, 0) ASC",
         )
         .bind(order_id)
         .fetch_all(executor)
