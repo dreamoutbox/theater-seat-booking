@@ -13,6 +13,7 @@ export const useAuthStore = defineStore('auth', () => {
   const isAdmin = computed(() => user.value?.role === 'admin');
   const isStaff = computed(() => ['admin', 'staff'].includes(user.value?.role));
   const isElevated = computed(() => ['admin', 'staff', 'event_organizer'].includes(user.value?.role));
+  const isGatekeeper = computed(() => user.value?.role === 'gatekeeper');
 
   async function fetchMe() {
     try {
@@ -85,6 +86,7 @@ export const useAuthStore = defineStore('auth', () => {
     isAdmin,
     isStaff,
     isElevated,
+    isGatekeeper,
     fetchMe,
     login,
     register,

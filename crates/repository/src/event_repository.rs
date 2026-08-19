@@ -10,10 +10,25 @@ impl EventRepository {
         executor: E,
     ) -> Result<Vec<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id
              FROM events
              ORDER BY title",
         )
+        .fetch_all(executor)
+        .await
+    }
+
+    pub async fn find_by_owner_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        owner_id: Uuid,
+    ) -> Result<Vec<Event>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id
+             FROM events
+             WHERE owner_id = $1
+             ORDER BY title",
+        )
+        .bind(owner_id)
         .fetch_all(executor)
         .await
     }
@@ -23,7 +38,7 @@ impl EventRepository {
         id: Uuid,
     ) -> Result<Option<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id
              FROM events
              WHERE id = $1",
         )
@@ -37,7 +52,7 @@ impl EventRepository {
         title: &str,
     ) -> Result<Option<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id
              FROM events
              WHERE title = $1
              LIMIT 1",
@@ -52,15 +67,17 @@ impl EventRepository {
         title: &str,
         max_seats_per_booking: i32,
         max_seats_per_user: i32,
+        owner_id: Option<Uuid>,
     ) -> Result<Event, sqlx::Error> {
         sqlx::query_as(
-            "INSERT INTO events (title, max_seats_per_booking, max_seats_per_user)
-             VALUES ($1, $2, $3)
-             RETURNING id, title, max_seats_per_booking, max_seats_per_user",
+            "INSERT INTO events (title, max_seats_per_booking, max_seats_per_user, owner_id)
+             VALUES ($1, $2, $3, $4)
+             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id",
         )
         .bind(title)
         .bind(max_seats_per_booking)
         .bind(max_seats_per_user)
+        .bind(owner_id)
         .fetch_one(executor)
         .await
     }
@@ -71,16 +88,21 @@ impl EventRepository {
         title: &str,
         max_seats_per_booking: i32,
         max_seats_per_user: i32,
+        owner_id: Option<Uuid>,
     ) -> Result<Option<Event>, sqlx::Error> {
         sqlx::query_as(
             "UPDATE events
-             SET title = $1, max_seats_per_booking = $2, max_seats_per_user = $3
-             WHERE id = $4
-             RETURNING id, title, max_seats_per_booking, max_seats_per_user",
+             SET title = $1,
+                 max_seats_per_booking = $2,
+                 max_seats_per_user = $3,
+                 owner_id = COALESCE($4, owner_id)
+             WHERE id = $5
+             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id",
         )
         .bind(title)
         .bind(max_seats_per_booking)
         .bind(max_seats_per_user)
+        .bind(owner_id)
         .bind(id)
         .fetch_optional(executor)
         .await

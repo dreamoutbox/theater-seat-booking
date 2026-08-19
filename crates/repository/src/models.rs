@@ -11,6 +11,7 @@ pub enum UserRole {
     Staff,
     EventOrganizer,
     Customer,
+    Gatekeeper,
 }
 
 impl UserRole {
@@ -20,6 +21,7 @@ impl UserRole {
             UserRole::Staff => "staff",
             UserRole::EventOrganizer => "event_organizer",
             UserRole::Customer => "customer",
+            UserRole::Gatekeeper => "gatekeeper",
         }
     }
 }
@@ -127,6 +129,7 @@ pub struct Event {
     pub title: String,
     pub max_seats_per_booking: i32,
     pub max_seats_per_user: i32,
+    pub owner_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -252,4 +255,56 @@ pub struct PaymentEvent {
 pub struct PartitionCandidate {
     pub showtime_id: Uuid,
     pub zone_id: Uuid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Ticket {
+    pub id: Uuid,
+    pub code: String,
+    pub order_id: Uuid,
+    pub seat_booking_id: Uuid,
+    pub user_id: Uuid,
+    pub event_id: Uuid,
+    pub showtime_id: Uuid,
+    pub status: String, // "active", "used", "cancelled", "expired"
+    pub used_at: Option<DateTime<Utc>>,
+    pub used_by: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct TicketDetail {
+    pub id: Uuid,
+    pub code: String,
+    pub order_id: Uuid,
+    pub seat_booking_id: Uuid,
+    pub user_id: Uuid,
+    pub event_id: Uuid,
+    pub event_title: String,
+    pub showtime_id: Uuid,
+    pub theater_name: String,
+    pub starts_at: DateTime<Utc>,
+    pub row_label: String,
+    pub seat_number: i32,
+    pub zone_name: String,
+    pub price_cents: i64,
+    pub status: String,
+    pub used_at: Option<DateTime<Utc>>,
+    pub used_by: Option<Uuid>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct EventGatekeeper {
+    pub event_id: Uuid,
+    pub user_id: Uuid,
+    pub assigned_by: Option<Uuid>,
+    pub assigned_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct GatekeeperDetail {
+    pub user_id: Uuid,
+    pub email: String,
+    pub assigned_at: DateTime<Utc>,
 }

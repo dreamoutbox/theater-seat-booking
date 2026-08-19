@@ -1,13 +1,15 @@
 pub mod auth;
 pub mod booking;
+pub mod gatekeeper;
 pub mod order;
 pub mod theater;
+pub mod ticket;
 pub mod webhook;
 
 use axum::{
     Router,
     http::{Method, header},
-    routing::{get, post},
+    routing::{delete, get, post},
 };
 use sqlx::PgPool;
 use std::sync::Arc;
@@ -90,6 +92,20 @@ pub fn create_router(state: AppState) -> Router {
         .route("/orders", post(order::create_order).get(order::list_orders))
         .route("/orders/{id}", get(order::get_order))
         .route("/orders/{id}/confirm-mock", post(order::confirm_mock_order))
+        .route("/orders/{id}/tickets", get(ticket::list_order_tickets))
+        // Tickets & Scanning
+        .route("/tickets/scan", post(ticket::scan_ticket))
+        .route("/tickets/{code}", get(ticket::get_ticket_by_code))
+        // Gatekeepers
+        .route(
+            "/events/{id}/gatekeepers",
+            get(gatekeeper::list_event_gatekeepers).post(gatekeeper::create_and_assign_gatekeeper),
+        )
+        .route(
+            "/events/{id}/gatekeepers/{user_id}",
+            delete(gatekeeper::remove_gatekeeper_from_event),
+        )
+        .route("/gatekeeper/events", get(gatekeeper::list_my_assigned_events))
         // Webhooks
         .route("/webhooks/stripe", post(webhook::stripe_webhook));
 

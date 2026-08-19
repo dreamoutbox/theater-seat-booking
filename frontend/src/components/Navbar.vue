@@ -21,7 +21,12 @@
       Manage Events
     </v-btn>
 
-    <v-btn v-if="authStore.isAuthenticated" variant="text" prepend-icon="mdi-ticket-confirmation" to="/orders"
+    <v-btn v-if="authStore.isGatekeeper || authStore.isElevated" variant="text" prepend-icon="mdi-qrcode-scan" to="/scan"
+      class="text-none font-weight-medium text-emerald-lighten-2">
+      Scan Passes
+    </v-btn>
+
+    <v-btn v-if="authStore.isAuthenticated && !authStore.isGatekeeper" variant="text" prepend-icon="mdi-ticket-confirmation" to="/orders"
       class="text-none font-weight-medium">
       {{ authStore.isElevated ? 'Manage Orders' : 'My Orders' }}
     </v-btn>
@@ -88,6 +93,7 @@ const demoAccounts = [
   { label: 'Admin', email: 'admin@theater.local', password: 'admin123', role: 'admin' },
   { label: 'Staff', email: 'staff@theater.local', password: 'staff123', role: 'staff' },
   { label: 'Organizer', email: 'organizer@theater.local', password: 'organizer123', role: 'event_organizer' },
+  { label: 'Gatekeeper', email: 'gatekeeper@theater.local', password: 'gatekeeper123', role: 'gatekeeper' },
   { label: 'Customer 1 (Alice)', email: 'alice@customer.local', password: 'customer123', role: 'customer' },
   { label: 'Customer 2 (Bob)', email: 'bob@customer.local', password: 'customer123', role: 'customer' },
 ];
@@ -102,13 +108,17 @@ function getRoleColor(role) {
     case 'admin': return 'red-accent-3';
     case 'staff': return 'cyan-accent-3';
     case 'event_organizer': return 'purple-accent-3';
+    case 'gatekeeper': return 'teal-accent-3';
     case 'customer': return 'amber-accent-3';
     default: return 'grey';
   }
 }
 
 async function quickLogin(email, password) {
-  await authStore.login(email, password);
+  const res = await authStore.login(email, password);
+  if (res.success && res.user?.role === 'gatekeeper') {
+    router.push('/scan');
+  }
 }
 
 async function handleLogout() {
@@ -116,3 +126,12 @@ async function handleLogout() {
   router.push('/login');
 }
 </script>
+
+<style scoped>
+.cursor-pointer {
+  cursor: pointer;
+}
+.text-emerald-lighten-2 {
+  color: #34d399 !important;
+}
+</style>

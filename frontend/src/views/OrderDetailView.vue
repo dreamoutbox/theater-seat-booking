@@ -66,9 +66,68 @@
         </div>
       </div>
 
+      <!-- Tickets & QR Pass (Visible when Paid) -->
+      <div v-if="order.status === 'paid'" class="mb-8">
+        <div class="d-flex align-center justify-space-between mb-4">
+          <div>
+            <h2 class="text-h5 font-weight-bold text-white mb-1 d-flex align-center gap-2">
+              <v-icon icon="mdi-qrcode-scan" color="amber-darken-1" size="28"></v-icon>
+              Digital Tickets & QR Entry Passes
+            </h2>
+            <div class="text-caption text-grey">Show this 6-digit code or QR code at the entrance for gatekeeper verification.</div>
+          </div>
+          <v-chip color="emerald" variant="tonal" size="small" class="font-weight-bold">
+            {{ tickets.length }} {{ tickets.length === 1 ? 'Pass' : 'Passes' }} Ready
+          </v-chip>
+        </div>
+
+        <v-row dense>
+          <v-col v-for="t in tickets" :key="t.id" cols="12" sm="6" md="6" class="pa-2">
+            <v-card theme="dark" class="ticket-pass-card rounded-xl pa-4 border bg-surface-variant h-100 d-flex flex-column justify-space-between">
+              <!-- Pass Header -->
+              <div class="d-flex justify-space-between align-start mb-3">
+                <div>
+                  <div class="text-caption text-grey text-uppercase font-weight-bold">Seat Assignment</div>
+                  <div class="text-h6 font-weight-black text-white">
+                    Row {{ t.row_label }}, Seat {{ t.seat_number }}
+                  </div>
+                  <v-chip size="x-small" :color="getZoneColor(t)" variant="flat" class="font-weight-bold mt-1">
+                    {{ t.zone_name }} • ${{ (t.price_cents / 100).toFixed(2) }}
+                  </v-chip>
+                </div>
+                <v-chip size="small" :color="getTicketStatusColor(t.status)" variant="flat" class="font-weight-bold text-uppercase">
+                  {{ t.status }}
+                </v-chip>
+              </div>
+
+              <!-- Pass QR Center -->
+              <div class="qr-box my-3 pa-3 rounded-lg d-flex flex-column align-center justify-center bg-grey-darken-4 border">
+                <div class="qr-wrapper pa-2 rounded-lg bg-white elevation-2">
+                  <qrcode-vue :value="t.code" :size="130" level="H" />
+                </div>
+                <div class="text-caption text-grey mt-2 font-weight-medium">Ticket Code</div>
+                <div class="text-h5 font-weight-black font-weight-mono text-amber-darken-1 letter-spacing-wide">
+                  {{ t.code }}
+                </div>
+              </div>
+
+              <!-- Pass Footer -->
+              <div class="text-caption text-grey text-center pt-2 border-top">
+                <template v-if="t.status === 'used'">
+                  <span class="text-grey font-weight-bold">✓ Scanned & Used at {{ formatDate(t.used_at) }}</span>
+                </template>
+                <template v-else>
+                  <span>Valid for event admission</span>
+                </template>
+              </div>
+            </v-card>
+          </v-col>
+        </v-row>
+      </div>
+
       <!-- Seats List -->
       <div class="mb-6">
-        <h2 class="text-h6 font-weight-bold text-white mb-3">Reserved Seats ({{ order.seats?.length || 0 }})</h2>
+        <h2 class="text-h6 font-weight-bold text-white mb-3">Order Items ({{ order.seats?.length || 0 }})</h2>
         <v-table theme="dark" class="rounded-lg border">
           <thead>
             <tr>
@@ -140,6 +199,7 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
+import QrcodeVue from 'qrcode.vue';
 import api from '../api/client';
 
 const props = defineProps({
@@ -148,6 +208,7 @@ const props = defineProps({
 
 const route = useRoute();
 const order = ref(null);
+const tickets = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const paying = ref(false);
@@ -185,6 +246,16 @@ function getStatusColor(status) {
   }
 }
 
+function getTicketStatusColor(status) {
+  switch (status) {
+    case 'active': return 'success';
+    case 'used': return 'grey-darken-1';
+    case 'cancelled': return 'red';
+    case 'expired': return 'amber-darken-2';
+    default: return 'info';
+  }
+}
+
 function formatStatus(status) {
   if (!status) return '';
   return status.replace('_', ' ');
@@ -209,10 +280,23 @@ async function fetchOrderDetail() {
   try {
     const res = await api.get(`/orders/${orderId}`);
     order.value = res.data;
+
+    if (order.value.status === 'paid') {
+      await fetchTickets(orderId);
+    }
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load order details';
   } finally {
     loading.value = false;
+  }
+}
+
+async function fetchTickets(orderId) {
+  try {
+    const res = await api.get(`/orders/${orderId}/tickets`);
+    tickets.value = res.data || [];
+  } catch (err) {
+    console.error('Failed to load tickets', err);
   }
 }
 
@@ -221,7 +305,7 @@ async function handlePayMock() {
   paying.value = true;
   try {
     await api.post(`/orders/${order.value.id}/confirm-mock`);
-    showToast('Payment successful! Seats confirmed.', 'success');
+    showToast('Payment successful! Tickets generated.', 'success');
     await fetchOrderDetail();
   } catch (err) {
     const errMsg = err.response?.data?.error || 'Payment failed';
@@ -253,6 +337,24 @@ onMounted(() => {
 .bg-surface-variant {
   background: #1e2330 !important;
   border-color: #2a3142 !important;
+}
+
+.ticket-pass-card {
+  border: 1px solid #333d52 !important;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ticket-pass-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.letter-spacing-wide {
+  letter-spacing: 4px;
+}
+
+.border-top {
+  border-top: 1px dashed #2a3142;
 }
 
 .gap-2 {

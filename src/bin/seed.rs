@@ -1,7 +1,7 @@
 use chrono::{Duration, Utc};
 use repository::{
-    EventRepository, SeatRepository, ShowtimeRepository, TheaterRepository, UserRepository,
-    UserRole, ZoneRepository,
+    EventRepository, GatekeeperRepository, SeatRepository, ShowtimeRepository, TheaterRepository,
+    UserRepository, UserRole, ZoneRepository,
 };
 use sqlx::PgPool;
 use theater_seat_booking::{
@@ -33,6 +33,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  - Admin:           admin@theater.local      / admin123");
     println!("  - Staff:           staff@theater.local      / staff123");
     println!("  - Event Organizer: organizer@theater.local  / organizer123");
+    println!("  - Gatekeeper:      gatekeeper@theater.local / gatekeeper123");
     println!("  - Customer 1:      alice@customer.local     / customer123");
     println!("  - Customer 2:      bob@customer.local       / customer123");
     println!("========================================================\n");
@@ -48,6 +49,11 @@ async fn seed_users(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> {
             "organizer@theater.local",
             "organizer123",
             UserRole::EventOrganizer,
+        ),
+        (
+            "gatekeeper@theater.local",
+            "gatekeeper123",
+            UserRole::Gatekeeper,
         ),
         ("alice@customer.local", "customer123", UserRole::Customer),
         ("bob@customer.local", "customer123", UserRole::Customer),
@@ -126,10 +132,19 @@ async fn seed_theater_and_shows(pool: &PgPool) -> Result<(), Box<dyn std::error:
     );
 
     // 4. Events
+    let organizer_opt = UserRepository::find_by_email(pool, "organizer@theater.local").await?;
+    let organizer_id = organizer_opt.map(|u| u.id);
+
     let event1_id: Uuid =
-        get_or_create_event(pool, "Interstellar Live Symphony & Screening").await?;
+        get_or_create_event(pool, "Interstellar Live Symphony & Screening", organizer_id).await?;
     let event2_id: Uuid =
-        get_or_create_event(pool, "Cyberpunk 2099: Orchestral Experience").await?;
+        get_or_create_event(pool, "Cyberpunk 2099: Orchestral Experience", organizer_id).await?;
+
+    // Assign gatekeeper to both events
+    if let Some(gatekeeper) = UserRepository::find_by_email(pool, "gatekeeper@theater.local").await? {
+        GatekeeperRepository::assign(pool, event1_id, gatekeeper.id, organizer_id).await?;
+        GatekeeperRepository::assign(pool, event2_id, gatekeeper.id, organizer_id).await?;
+    }
 
     // 5. Showtimes
     let now = Utc::now();
@@ -168,11 +183,15 @@ async fn get_or_create_zone(
     }
 }
 
-async fn get_or_create_event(pool: &PgPool, title: &str) -> Result<Uuid, sqlx::Error> {
+async fn get_or_create_event(
+    pool: &PgPool,
+    title: &str,
+    owner_id: Option<Uuid>,
+) -> Result<Uuid, sqlx::Error> {
     if let Some(event) = EventRepository::find_by_title(pool, title).await? {
         Ok(event.id)
     } else {
-        let event = EventRepository::save(pool, title, 6, 10).await?;
+        let event = EventRepository::save(pool, title, 6, 10, owner_id).await?;
         Ok(event.id)
     }
 }

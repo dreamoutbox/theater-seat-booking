@@ -219,6 +219,68 @@
           </tbody>
         </v-table>
       </v-card>
+
+      <!-- Gatekeepers Management Card -->
+      <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
+        <div class="d-flex justify-space-between align-center mb-4 flex-wrap gap-2">
+          <div>
+            <h2 class="text-h6 font-weight-bold text-white mb-1 d-flex align-center gap-2">
+              <v-icon icon="mdi-shield-account-outline" color="teal-accent-3" size="24"></v-icon>
+              Event Gatekeepers (Check-in Scanner Staff)
+            </h2>
+            <span class="text-caption text-grey">Staff authorized to scan QR tickets and verify admission for this event</span>
+          </div>
+          <v-btn
+            prepend-icon="mdi-account-plus"
+            color="teal-accent-3"
+            variant="tonal"
+            size="small"
+            class="text-none font-weight-bold"
+            @click="openAddGatekeeperDialog"
+          >
+            Add Gatekeeper
+          </v-btn>
+        </div>
+
+        <!-- Empty State -->
+        <div v-if="gatekeepers.length === 0" class="text-center pa-6 rounded-lg bg-surface-variant border border-dashed">
+          <v-icon icon="mdi-shield-account" size="40" color="grey" class="mb-2"></v-icon>
+          <div class="text-body-2 text-grey font-weight-medium">No gatekeepers assigned to this event yet.</div>
+          <div class="text-caption text-grey-darken-1 mt-1">Add scanner staff accounts to allow QR scanning at entrance.</div>
+        </div>
+
+        <!-- Gatekeepers Table -->
+        <v-table v-else class="showtimes-table rounded-lg border">
+          <thead>
+            <tr>
+              <th class="text-left font-weight-bold">Gatekeeper Email</th>
+              <th class="text-left font-weight-bold">Assigned At</th>
+              <th class="text-right font-weight-bold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="g in gatekeepers" :key="g.user_id">
+              <td class="font-weight-bold text-white py-3">
+                <v-icon icon="mdi-account-circle" color="teal-accent-3" size="18" class="mr-2"></v-icon>
+                {{ g.email }}
+              </td>
+              <td class="text-caption text-grey">
+                {{ formatDate(g.assigned_at) }}
+              </td>
+              <td class="text-right">
+                <v-btn
+                  icon="mdi-account-remove-outline"
+                  size="small"
+                  variant="text"
+                  color="red-lighten-2"
+                  title="Remove Gatekeeper from Event"
+                  @click="openRemoveGatekeeperDialog(g)"
+                ></v-btn>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
+      </v-card>
     </div>
 
     <!-- Edit Event Dialog -->
@@ -360,6 +422,54 @@
       </v-card>
     </v-dialog>
 
+    <!-- Add Gatekeeper Dialog -->
+    <v-dialog v-model="gatekeeperDialog.show" max-width="480">
+      <v-card theme="dark" class="rounded-xl pa-4">
+        <v-card-title class="text-h6 font-weight-bold d-flex align-center gap-2">
+          <v-icon icon="mdi-shield-account" color="teal-accent-3"></v-icon>
+          Add Gatekeeper Scanner
+        </v-card-title>
+        <v-card-text>
+          <div class="text-caption text-grey mb-3">
+            Create or assign a gatekeeper account for admission QR scanning at this event.
+          </div>
+          <v-text-field
+            v-model="gatekeeperDialog.email"
+            label="Gatekeeper Email"
+            type="email"
+            variant="outlined"
+            density="comfortable"
+            placeholder="e.g. staff.scanner@theater.local"
+            class="mb-3"
+            autofocus
+          ></v-text-field>
+          <v-text-field
+            v-model="gatekeeperDialog.password"
+            label="Temporary Password"
+            type="password"
+            variant="outlined"
+            density="comfortable"
+            placeholder="Min 6 characters"
+            hint="Scanner staff can use this to login and access /scan"
+            persistent-hint
+          ></v-text-field>
+        </v-card-text>
+        <v-card-actions class="pa-4 pt-0">
+          <v-btn variant="text" @click="gatekeeperDialog.show = false">Cancel</v-btn>
+          <v-spacer></v-spacer>
+          <v-btn
+            color="teal-accent-3"
+            variant="flat"
+            class="font-weight-bold text-none text-black"
+            :loading="gatekeeperDialog.saving"
+            @click="saveGatekeeper"
+          >
+            Assign Gatekeeper
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
     <!-- Delete Confirmation Dialog -->
     <v-dialog v-model="deleteDialog.show" max-width="420">
       <v-card theme="dark" class="rounded-xl pa-4">
@@ -406,6 +516,7 @@ const router = useRouter();
 const event = ref(null);
 const allShowtimes = ref([]);
 const theaters = ref([]);
+const gatekeepers = ref([]);
 const loading = ref(true);
 const error = ref(null);
 
@@ -432,6 +543,13 @@ const editEventDialog = ref({
   saving: false,
 });
 
+const gatekeeperDialog = ref({
+  show: false,
+  email: '',
+  password: '',
+  saving: false,
+});
+
 const showtimeDialog = ref({
   show: false,
   isEdit: false,
@@ -448,7 +566,7 @@ const theaterSelectorDialog = ref({
 
 const deleteDialog = ref({
   show: false,
-  type: '', // 'event' | 'showtime'
+  type: '', // 'event' | 'showtime' | 'gatekeeper'
   itemId: null,
   itemName: '',
   deleting: false,
@@ -488,11 +606,67 @@ async function loadData() {
     event.value = found;
     allShowtimes.value = showtimesRes.data;
     theaters.value = theatersRes.data;
+
+    await fetchGatekeepers(eventId);
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load event details';
   } finally {
     loading.value = false;
   }
+}
+
+async function fetchGatekeepers(eventId) {
+  try {
+    const res = await api.get(`/events/${eventId}/gatekeepers`);
+    gatekeepers.value = res.data || [];
+  } catch (err) {
+    console.error('Failed to load event gatekeepers', err);
+  }
+}
+
+function openAddGatekeeperDialog() {
+  gatekeeperDialog.value = {
+    show: true,
+    email: '',
+    password: '',
+    saving: false,
+  };
+}
+
+async function saveGatekeeper() {
+  if (!gatekeeperDialog.value.email || !gatekeeperDialog.value.email.includes('@')) {
+    showToast('Please enter a valid email', 'warning');
+    return;
+  }
+  if (!gatekeeperDialog.value.password || gatekeeperDialog.value.password.length < 6) {
+    showToast('Password must be at least 6 characters', 'warning');
+    return;
+  }
+
+  gatekeeperDialog.value.saving = true;
+  try {
+    await api.post(`/events/${event.value.id}/gatekeepers`, {
+      email: gatekeeperDialog.value.email.trim(),
+      password: gatekeeperDialog.value.password,
+    });
+    showToast('Gatekeeper added successfully', 'success');
+    gatekeeperDialog.value.show = false;
+    await fetchGatekeepers(event.value.id);
+  } catch (err) {
+    showToast(err.response?.data?.error || 'Failed to add gatekeeper', 'error');
+  } finally {
+    gatekeeperDialog.value.saving = false;
+  }
+}
+
+function openRemoveGatekeeperDialog(g) {
+  deleteDialog.value = {
+    show: true,
+    type: 'gatekeeper',
+    itemId: g.user_id,
+    itemName: `Gatekeeper (${g.email})`,
+    deleting: false,
+  };
 }
 
 function openEditEventDialog() {
@@ -655,6 +829,11 @@ async function confirmDelete() {
       deleteDialog.value.show = false;
       const showtimesRes = await api.get('/showtimes');
       allShowtimes.value = showtimesRes.data;
+    } else if (deleteDialog.value.type === 'gatekeeper') {
+      await api.delete(`/events/${event.value.id}/gatekeepers/${deleteDialog.value.itemId}`);
+      showToast('Gatekeeper removed successfully', 'success');
+      deleteDialog.value.show = false;
+      await fetchGatekeepers(event.value.id);
     }
   } catch (err) {
     showToast(err.response?.data?.error || 'Failed to delete item', 'error');

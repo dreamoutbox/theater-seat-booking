@@ -1,5 +1,5 @@
 use axum::{Json, extract::State, http::StatusCode};
-use repository::{OrderRepository, SeatBookingRepository};
+use repository::{OrderRepository, SeatBookingRepository, TicketRepository};
 use serde_json::Value;
 
 use crate::routes::AppState;
@@ -112,7 +112,16 @@ pub async fn stripe_webhook(
                         )
                     })?;
 
-                tracing::info!(order_id = %oid, "Payment confirmed; seats confirmed.");
+                TicketRepository::create_tickets_for_paid_order(&mut *tx, oid)
+                    .await
+                    .map_err(|e| {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(serde_json::json!({ "error": format!("Failed to generate tickets: {e}") })),
+                        )
+                    })?;
+
+                tracing::info!(order_id = %oid, "Payment confirmed; seats confirmed and tickets created.");
             }
         }
         "payment_intent.payment_failed" | "payment_intent.canceled" => {

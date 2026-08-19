@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
-use repository::{OrderDetail, OrderRepository, SeatBookingRepository, UserRole};
+use repository::{OrderDetail, OrderRepository, SeatBookingRepository, TicketRepository, UserRole};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -319,7 +319,17 @@ pub async fn confirm_mock_order(
             )
         })?;
 
-    // 4. Log mock payment event
+    // 4. Create tickets for the confirmed order
+    TicketRepository::create_tickets_for_paid_order(&mut *tx, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": format!("Failed to generate tickets: {e}") })),
+            )
+        })?;
+
+    // 5. Log mock payment event
     let mock_event_id = format!("evt_mock_{}", Uuid::new_v4());
     OrderRepository::save_payment_event(
         &mut *tx,

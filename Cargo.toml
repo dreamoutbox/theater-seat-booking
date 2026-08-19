@@ -1,20 +1,23 @@
-[workspace]
-members = [
-    ".",
-    "crates/repository",
-]
-
 [package]
 name = "theater-seat-booking"
 version = "0.1.0"
 edition = "2024"
+
+[workspace]
+members = [".", "crates/repository"]
 
 [dependencies]
 repository = { path = "crates/repository" }
 axum = { version = "0.8", features = ["macros"] }
 axum-extra = { version = "0.10", features = ["cookie"] }
 tokio = { version = "1", features = ["full"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "migrate"] }
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "postgres",
+    "uuid",
+    "chrono",
+    "migrate",
+] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 jsonwebtoken = "9.3"

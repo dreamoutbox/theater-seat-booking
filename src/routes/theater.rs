@@ -33,6 +33,7 @@ pub struct CreateEventPayload {
     pub title: String,
     pub max_seats_per_booking: Option<i32>,
     pub max_seats_per_user: Option<i32>,
+    pub owner_id: Option<Uuid>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -179,16 +180,24 @@ pub async fn delete_theater(
 }
 
 pub async fn list_events(
+    opt_user: OptionalAuthenticatedUser,
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Event>>, (StatusCode, Json<serde_json::Value>)> {
-    let events = EventRepository::find_all(&state.pool)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let events = if let Some(ref user) = opt_user.0 {
+        if user.role == UserRole::EventOrganizer {
+            EventRepository::find_by_owner_id(&state.pool, user.id).await
+        } else {
+            EventRepository::find_all(&state.pool).await
+        }
+    } else {
+        EventRepository::find_all(&state.pool).await
+    }
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
 
     Ok(Json(events))
 }
@@ -219,8 +228,13 @@ pub async fn create_event(
 
     let max_booking = payload.max_seats_per_booking.unwrap_or(6).max(1);
     let max_user = payload.max_seats_per_user.unwrap_or(10).max(1);
+    let owner_id = if auth_user.role == UserRole::EventOrganizer {
+        Some(auth_user.id)
+    } else {
+        payload.owner_id.or(Some(auth_user.id))
+    };
 
-    let event = EventRepository::save(&state.pool, title, max_booking, max_user)
+    let event = EventRepository::save(&state.pool, title, max_booking, max_user, owner_id)
         .await
         .map_err(|e| {
             (
@@ -251,6 +265,28 @@ pub async fn update_event(
         )
     })?;
 
+    let existing = EventRepository::find_by_id(&state.pool, id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Event not found" })),
+            )
+        })?;
+
+    if auth_user.role == UserRole::EventOrganizer && existing.owner_id != Some(auth_user.id) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "You do not own this event" })),
+        ));
+    }
+
     let title = payload.title.trim();
     if title.is_empty() {
         return Err((
@@ -261,8 +297,13 @@ pub async fn update_event(
 
     let max_booking = payload.max_seats_per_booking.unwrap_or(6).max(1);
     let max_user = payload.max_seats_per_user.unwrap_or(10).max(1);
+    let owner_id = if auth_user.role == UserRole::EventOrganizer {
+        existing.owner_id
+    } else {
+        payload.owner_id.or(existing.owner_id)
+    };
 
-    let event = EventRepository::update(&state.pool, id, title, max_booking, max_user)
+    let event = EventRepository::update(&state.pool, id, title, max_booking, max_user, owner_id)
         .await
         .map_err(|e| {
             (
@@ -298,6 +339,28 @@ pub async fn delete_event(
             Json(serde_json::json!({ "error": "Unauthorized" })),
         )
     })?;
+
+    let existing = EventRepository::find_by_id(&state.pool, id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Event not found" })),
+            )
+        })?;
+
+    if auth_user.role == UserRole::EventOrganizer && existing.owner_id != Some(auth_user.id) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "You do not own this event" })),
+        ));
+    }
 
     let deleted = EventRepository::delete_by_id(&state.pool, id)
         .await
