@@ -211,6 +211,16 @@ pub async fn scan_ticket(
         ));
     }
 
+    if ticket.status == "refunded" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Ticket has been REFUNDED and is invalid for admission",
+                "ticket": ticket
+            })),
+        ));
+    }
+
     if ticket.status != "active" {
         return Err((
             StatusCode::BAD_REQUEST,

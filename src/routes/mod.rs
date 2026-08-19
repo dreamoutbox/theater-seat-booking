@@ -1,3 +1,4 @@
+pub mod analytics;
 pub mod auth;
 pub mod booking;
 pub mod gatekeeper;
@@ -92,10 +93,13 @@ pub fn create_router(state: AppState) -> Router {
         .route("/orders", post(order::create_order).get(order::list_orders))
         .route("/orders/{id}", get(order::get_order))
         .route("/orders/{id}/confirm-mock", post(order::confirm_mock_order))
+        .route("/orders/{id}/refund", post(order::refund_order))
         .route("/orders/{id}/tickets", get(ticket::list_order_tickets))
         // Tickets & Scanning
         .route("/tickets/scan", post(ticket::scan_ticket))
         .route("/tickets/{code}", get(ticket::get_ticket_by_code))
+        // Analytics
+        .route("/analytics/dashboard", get(analytics::get_dashboard_data))
         // Gatekeepers
         .route(
             "/events/{id}/gatekeepers",

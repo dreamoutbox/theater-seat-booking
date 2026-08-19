@@ -85,4 +85,57 @@ impl StripeService {
             status: pi.status,
         })
     }
+
+    pub async fn create_refund(
+        &self,
+        payment_intent_id: &str,
+        amount_cents: i64,
+        reason: Option<&str>,
+    ) -> Result<String, String> {
+        // If mock mode or mock payment intent ID, generate mock refund ID
+        if self.secret_key.is_empty()
+            || self.secret_key.starts_with("sk_test_mock")
+            || payment_intent_id.starts_with("pi_mock_")
+        {
+            let mock_refund_id = format!("re_mock_{}", &uuid::Uuid::new_v4().to_string()[..8]);
+            return Ok(mock_refund_id);
+        }
+
+        let mut params = vec![
+            ("payment_intent", payment_intent_id.to_string()),
+            ("amount", amount_cents.to_string()),
+        ];
+        if let Some(r) = reason {
+            params.push(("reason", r.to_string()));
+        }
+
+        let response = self
+            .client
+            .post("https://api.stripe.com/v1/refunds")
+            .bearer_auth(&self.secret_key)
+            .form(&params)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to send refund request to Stripe: {e}"))?;
+
+        if !response.status().is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown Stripe error".to_string());
+            return Err(format!("Stripe refund error: {error_text}"));
+        }
+
+        #[derive(Deserialize)]
+        struct StripeRefundResponse {
+            id: String,
+        }
+
+        let refund_res: StripeRefundResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse Stripe refund response: {e}"))?;
+
+        Ok(refund_res.id)
+    }
 }
