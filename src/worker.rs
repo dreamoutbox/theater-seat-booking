@@ -1,4 +1,8 @@
 use chrono::{Duration, Utc};
+use repository::{
+    BookingQueueRepository, LockRepository, OrderRepository, PartitionCandidate,
+    SeatBookingRepository,
+};
 use sqlx::{PgPool, Postgres, Transaction};
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -6,7 +10,6 @@ use std::time::Duration as StdDuration;
 use uuid::Uuid;
 
 use crate::config::AppConfig;
-use crate::models::BookingQueueItem;
 
 pub fn partition_lock_key(showtime_id: &Uuid, zone_id: &Uuid) -> i64 {
     let mut hasher = DefaultHasher::new();
@@ -15,24 +18,10 @@ pub fn partition_lock_key(showtime_id: &Uuid, zone_id: &Uuid) -> i64 {
     hasher.finish() as i64
 }
 
-#[derive(Debug, Clone, sqlx::FromRow)]
-pub struct PartitionCandidate {
-    pub showtime_id: Uuid,
-    pub zone_id: Uuid,
-}
-
 pub async fn fetch_candidate_partitions(
     pool: &PgPool,
 ) -> Result<Vec<PartitionCandidate>, sqlx::Error> {
-    sqlx::query_as::<_, PartitionCandidate>(
-        "SELECT showtime_id, zone_id
-         FROM booking_queue
-         WHERE status = 'pending'
-         GROUP BY showtime_id, zone_id
-         ORDER BY MIN(created_at) ASC",
-    )
-    .fetch_all(pool)
-    .await
+    BookingQueueRepository::find_candidate_partitions(pool).await
 }
 
 pub async fn process_partition(
@@ -48,10 +37,7 @@ pub async fn process_partition(
         let mut tx: Transaction<'_, Postgres> = pool.begin().await?;
 
         // 1. Transaction-scoped advisory lock for the partition
-        let acquired: bool = sqlx::query_scalar("SELECT pg_try_advisory_xact_lock($1)")
-            .bind(lock_key)
-            .fetch_one(&mut *tx)
-            .await?;
+        let acquired = LockRepository::try_advisory_xact_lock(&mut *tx, lock_key).await?;
 
         if !acquired {
             tracing::debug!(
@@ -64,16 +50,11 @@ pub async fn process_partition(
         }
 
         // 2. Fetch the oldest pending booking in this partition
-        let row_opt = sqlx::query_as::<_, BookingQueueItem>(
-            "SELECT * FROM booking_queue
-             WHERE showtime_id = $1 AND zone_id = $2 AND status = 'pending'
-             ORDER BY created_at ASC
-             LIMIT 1
-             FOR UPDATE SKIP LOCKED",
+        let row_opt = BookingQueueRepository::find_oldest_pending_for_update_skip_locked(
+            &mut *tx,
+            showtime_id,
+            zone_id,
         )
-        .bind(showtime_id)
-        .bind(zone_id)
-        .fetch_optional(&mut *tx)
         .await?;
 
         let Some(row) = row_opt else {
@@ -92,19 +73,11 @@ pub async fn process_partition(
         );
 
         // 3. Check if the seat is already held or confirmed
-        // Defense-in-depth: status in ('held', 'confirmed') AND (confirmed OR unexpired hold)
-        let taken: bool = sqlx::query_scalar(
-            "SELECT EXISTS(
-                SELECT 1 FROM seat_bookings
-                WHERE showtime_id = $1 AND seat_id = $2
-                  AND status IN ('held','confirmed')
-                  AND (status = 'confirmed' OR expires_at > now())
-                FOR UPDATE
-            )",
+        let taken = SeatBookingRepository::check_seat_is_taken_for_update(
+            &mut *tx,
+            row.showtime_id,
+            row.seat_id,
         )
-        .bind(row.showtime_id)
-        .bind(row.seat_id)
-        .fetch_one(&mut *tx)
         .await?;
 
         let now = Utc::now();
@@ -115,42 +88,38 @@ pub async fn process_partition(
                 "Seat already taken or actively held. Marking booking as failed."
             );
 
-            sqlx::query(
-                "UPDATE booking_queue
-                 SET status = 'failed', failure_reason = 'seat_taken', processed_at = $1
-                 WHERE id = $2",
+            BookingQueueRepository::update_status(
+                &mut *tx,
+                booking_uuid,
+                "failed",
+                Some("seat_taken"),
+                now,
             )
-            .bind(now)
-            .bind(booking_uuid)
-            .execute(&mut *tx)
             .await?;
         } else {
             let expires_at = now + Duration::seconds(hold_ttl_seconds);
 
             // Insert hold into seat_bookings (backed by partial unique index)
-            let insert_res = sqlx::query(
-                "INSERT INTO seat_bookings (showtime_id, seat_id, user_id, booking_queue_id, status, held_at, expires_at)
-                 VALUES ($1, $2, $3, $4, 'held', $5, $6)",
+            let insert_res = SeatBookingRepository::save_hold(
+                &mut *tx,
+                row.showtime_id,
+                row.seat_id,
+                row.user_id,
+                booking_uuid,
+                now,
+                expires_at,
             )
-            .bind(row.showtime_id)
-            .bind(row.seat_id)
-            .bind(row.user_id)
-            .bind(booking_uuid)
-            .bind(now)
-            .bind(expires_at)
-            .execute(&mut *tx)
             .await;
 
             match insert_res {
                 Ok(_) => {
-                    sqlx::query(
-                        "UPDATE booking_queue
-                         SET status = 'success', failure_reason = NULL, processed_at = $1
-                         WHERE id = $2",
+                    BookingQueueRepository::update_status(
+                        &mut *tx,
+                        booking_uuid,
+                        "success",
+                        None,
+                        now,
                     )
-                    .bind(now)
-                    .bind(booking_uuid)
-                    .execute(&mut *tx)
                     .await?;
 
                     tracing::info!(
@@ -167,14 +136,13 @@ pub async fn process_partition(
                         "Seat unique constraint collision or insert error"
                     );
 
-                    sqlx::query(
-                        "UPDATE booking_queue
-                         SET status = 'failed', failure_reason = 'seat_taken', processed_at = $1
-                         WHERE id = $2",
+                    BookingQueueRepository::update_status(
+                        &mut *tx,
+                        booking_uuid,
+                        "failed",
+                        Some("seat_taken"),
+                        now,
                     )
-                    .bind(now)
-                    .bind(booking_uuid)
-                    .execute(&mut *tx)
                     .await?;
                 }
             }
@@ -236,32 +204,11 @@ pub async fn sweep_expired_holds(pool: &PgPool) -> Result<u64, sqlx::Error> {
     let mut tx = pool.begin().await?;
 
     // 1. Release the expired holds
-    let released_res = sqlx::query(
-        "UPDATE seat_bookings
-         SET status = 'released'
-         WHERE status = 'held' AND expires_at <= now()",
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    let released_count = released_res.rows_affected();
+    let released_count = SeatBookingRepository::release_expired_holds(&mut *tx).await?;
 
     // 2. Expire any order still waiting on payment whose seats just got released
-    let expired_orders_res = sqlx::query(
-        "UPDATE orders
-         SET status = 'expired'
-         WHERE status = 'pending_payment'
-           AND id IN (
-               SELECT os.order_id
-               FROM order_seats os
-               JOIN seat_bookings sb ON sb.id = os.seat_booking_id
-               WHERE sb.status = 'released'
-           )",
-    )
-    .execute(&mut *tx)
-    .await?;
-
-    let expired_orders_count = expired_orders_res.rows_affected();
+    let expired_orders_count =
+        OrderRepository::expire_pending_orders_with_released_seats(&mut *tx).await?;
 
     tx.commit().await?;
 

@@ -115,7 +115,7 @@
                   class="d-flex justify-space-between align-center pa-3 rounded-lg bg-surface-variant border"
                 >
                   <div class="d-flex align-center gap-2">
-                    <v-chip size="x-small" :color="getZoneColor(seat.zone_name)" variant="flat" class="font-weight-bold">
+                    <v-chip size="x-small" :color="getZoneColor(seat)" variant="flat" class="font-weight-bold">
                       {{ seat.row_label }}{{ seat.seat_number }}
                     </v-chip>
                     <div>
@@ -255,11 +255,16 @@ function formatDate(isoStr) {
   });
 }
 
-function getZoneColor(zoneName) {
-  if (!zoneName) return 'grey';
-  if (zoneName.includes('VIP')) return 'amber-darken-2';
-  if (zoneName.includes('Premium')) return 'indigo-darken-1';
-  return 'teal-darken-1';
+function getZoneColor(seatOrName) {
+  if (!seatOrName) return '#14b8a6';
+  if (typeof seatOrName === 'object') {
+    if (seatOrName.zone_color) return seatOrName.zone_color;
+    seatOrName = seatOrName.zone_name;
+  }
+  if (!seatOrName) return '#14b8a6';
+  if (seatOrName.toLowerCase().includes('vip')) return '#f59e0b';
+  if (seatOrName.toLowerCase().includes('premium')) return '#6366f1';
+  return '#14b8a6';
 }
 
 function onHeldSeatsChanged(payload) {

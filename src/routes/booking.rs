@@ -3,10 +3,14 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
+use repository::{
+    BookingQueueRepository, EventRepository, SeatBookingRepository, SeatRepository,
+    ShowtimeRepository,
+};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{auth::AuthenticatedUser, models::BookingQueueItem, routes::AppState};
+use crate::{auth::AuthenticatedUser, routes::AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct EnqueueBookingRequest {
@@ -52,33 +56,23 @@ pub async fn enqueue_booking(
 
     // 1. Check active booking count for this user
     // Active = held seat_bookings (with expires_at > now()) + pending/processing in booking_queue
-    let active_holds_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM seat_bookings
-         WHERE user_id = $1 AND status = 'held' AND expires_at > now()",
-    )
-    .bind(auth_user.id)
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let active_holds_count = SeatBookingRepository::count_active_holds_by_user_id(&mut *tx, auth_user.id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
-    let in_flight_queue_count: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM booking_queue
-         WHERE user_id = $1 AND status IN ('pending', 'processing')",
-    )
-    .bind(auth_user.id)
-    .fetch_one(&mut *tx)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let in_flight_queue_count = BookingQueueRepository::count_in_flight_by_user_id(&mut *tx, auth_user.id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
     let total_active = active_holds_count + in_flight_queue_count;
     if total_active >= state.config.max_bookings_per_user {
@@ -95,31 +89,22 @@ pub async fn enqueue_booking(
     }
 
     // Check event-level limits: max seats per booking session and max cumulative seats per person
-    let event_limits: Option<(i32, i32)> = sqlx::query_as(
-        "SELECT e.max_seats_per_booking, e.max_seats_per_user
-         FROM showtimes s
-         JOIN events e ON s.event_id = e.id
-         WHERE s.id = $1",
-    )
-    .bind(payload.showtime_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let event_limits = EventRepository::find_limits_by_showtime_id(&mut *tx, payload.showtime_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
     if let Some((max_booking, max_user)) = event_limits {
         // A. Limit per booking session / showtime
-        let showtime_active_holds: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM seat_bookings sb
-             WHERE sb.showtime_id = $1 AND sb.user_id = $2 AND sb.status = 'held' AND sb.expires_at > now()",
+        let showtime_active_holds = SeatBookingRepository::count_active_holds_by_showtime_and_user_id(
+            &mut *tx,
+            payload.showtime_id,
+            auth_user.id,
         )
-        .bind(payload.showtime_id)
-        .bind(auth_user.id)
-        .fetch_one(&mut *tx)
         .await
         .map_err(|e| {
             (
@@ -142,16 +127,11 @@ pub async fn enqueue_booking(
         }
 
         // B. Cumulative limit per customer for this entire event
-        let total_user_event_seats: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM seat_bookings sb
-             JOIN showtimes s ON sb.showtime_id = s.id
-             WHERE s.event_id = (SELECT event_id FROM showtimes WHERE id = $1)
-               AND sb.user_id = $2
-               AND (sb.status = 'confirmed' OR (sb.status = 'held' AND sb.expires_at > now()))",
+        let total_user_event_seats = SeatBookingRepository::count_confirmed_and_held_by_showtime_and_user_id(
+            &mut *tx,
+            payload.showtime_id,
+            auth_user.id,
         )
-        .bind(payload.showtime_id)
-        .bind(auth_user.id)
-        .fetch_one(&mut *tx)
         .await
         .map_err(|e| {
             (
@@ -175,9 +155,7 @@ pub async fn enqueue_booking(
     }
 
     // 2. Fetch the seat and zone to ensure existence
-    let zone_id: Option<Uuid> = sqlx::query_scalar("SELECT zone_id FROM seats WHERE id = $1")
-        .bind(payload.seat_id)
-        .fetch_optional(&mut *tx)
+    let zone_id = SeatRepository::find_zone_id_by_id(&mut *tx, payload.seat_id)
         .await
         .map_err(|e| {
             (
@@ -198,17 +176,14 @@ pub async fn enqueue_booking(
     };
 
     // Verify showtime exists
-    let showtime_exists: bool =
-        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM showtimes WHERE id = $1)")
-            .bind(payload.showtime_id)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({ "error": e.to_string() })),
-                )
-            })?;
+    let showtime_exists = ShowtimeRepository::exists_by_id(&mut *tx, payload.showtime_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
     if !showtime_exists {
         tx.rollback().await.ok();
@@ -219,17 +194,13 @@ pub async fn enqueue_booking(
     }
 
     // 3. Insert into booking_queue
-    let booking_uuid = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO booking_queue (id, user_id, showtime_id, zone_id, seat_id, status)
-         VALUES ($1, $2, $3, $4, $5, 'pending')",
+    let booking_uuid = BookingQueueRepository::save(
+        &mut *tx,
+        auth_user.id,
+        payload.showtime_id,
+        zone_id,
+        payload.seat_id,
     )
-    .bind(booking_uuid)
-    .bind(auth_user.id)
-    .bind(payload.showtime_id)
-    .bind(zone_id)
-    .bind(payload.seat_id)
-    .execute(&mut *tx)
     .await
     .map_err(|e| {
         (
@@ -267,15 +238,12 @@ pub async fn release_hold(
     State(state): State<AppState>,
     Json(payload): Json<ReleaseHoldRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let res = sqlx::query(
-        "UPDATE seat_bookings
-         SET status = 'released'
-         WHERE user_id = $1 AND showtime_id = $2 AND seat_id = $3 AND status = 'held'",
+    let released = SeatBookingRepository::release_hold_by_user_and_seat(
+        &state.pool,
+        auth_user.id,
+        payload.showtime_id,
+        payload.seat_id,
     )
-    .bind(auth_user.id)
-    .bind(payload.showtime_id)
-    .bind(payload.seat_id)
-    .execute(&state.pool)
     .await
     .map_err(|e| {
         (
@@ -284,7 +252,7 @@ pub async fn release_hold(
         )
     })?;
 
-    if res.rows_affected() == 0 {
+    if !released {
         return Err((
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({ "error": "Active seat hold not found for this user" })),
@@ -308,17 +276,14 @@ pub async fn get_booking_status(
     Path(uuid): Path<Uuid>,
     State(state): State<AppState>,
 ) -> Result<Json<BookingStatusResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let item: Option<BookingQueueItem> =
-        sqlx::query_as("SELECT * FROM booking_queue WHERE id = $1")
-            .bind(uuid)
-            .fetch_optional(&state.pool)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({ "error": e.to_string() })),
-                )
-            })?;
+    let item = BookingQueueRepository::find_by_id(&state.pool, uuid)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
     match item {
         Some(row) => Ok(Json(BookingStatusResponse {

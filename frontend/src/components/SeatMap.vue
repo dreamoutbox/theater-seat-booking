@@ -1,42 +1,39 @@
 <template>
   <div class="seat-map-container pa-4">
 
-
     <!-- Seating Legend -->
     <div class="d-flex flex-wrap justify-center align-center gap-3 mb-5 text-caption mt-8">
-      <div class="d-flex align-center gap-1">
-        <div class="legend-box zone-vip"></div>
-        <span class="text-grey-lighten-1">VIP</span>
+      <!-- Dynamic Zone Legends -->
+      <div v-for="zone in zones" :key="zone.id" class="d-flex align-center gap-1">
+        <div class="legend-box" :style="{
+          borderColor: zone.color,
+          background: hexToRgba(zone.color, 0.25)
+        }"></div>
+        <span class="text-grey-lighten-1">
+          {{ zone.name }}
+          <span v-if="zone.price_cents !== undefined" class="text-grey font-weight-mono ml-1" style="font-size: 11px;">
+            (${{ (zone.price_cents / 100).toFixed(2) }})
+          </span>
+        </span>
       </div>
-      <div class="d-flex align-center gap-1">
-        <div class="legend-box zone-premium"></div>
-        <span class="text-grey-lighten-1">Premium</span>
-      </div>
-      <div class="d-flex align-center gap-1">
-        <div class="legend-box zone-standard"></div>
-        <span class="text-grey-lighten-1">Standard</span>
-      </div>
+
+      <!-- Divider between zones and status items -->
+      <div v-if="zones.length > 0" class="legend-divider"></div>
+
+      <!-- Status Legends -->
       <div class="d-flex align-center gap-1">
         <div class="legend-box seat-held-mine-legend"></div>
         <span class="text-amber-darken-1 font-weight-bold">Your Hold (Click to cancel)</span>
       </div>
       <div class="d-flex align-center gap-1">
-        <div class="legend-box seat-processing"></div>
+        <div class="legend-box seat-processing-legend"></div>
         <span class="text-grey-lighten-1">In Queue</span>
       </div>
       <div class="d-flex align-center gap-1">
-        <div class="legend-box seat-taken"></div>
+        <div class="legend-box seat-taken-legend"></div>
         <span class="text-grey-lighten-1">Unavailable</span>
       </div>
     </div>
-
-    <!-- Cinema Screen visual (Matches Editor) -->
-    <div class="screen-wrapper mb-6">
-      <div class="cinema-screen">
-        <div class="screen-text">CINEMA SCREEN</div>
-      </div>
-    </div>
-
 
     <!-- In-flight Booking Queue Alert -->
     <v-alert v-if="inFlightBookings.length > 0" type="info" variant="tonal" density="compact"
@@ -46,6 +43,13 @@
         <span class="text-caption">Processing seat reservation in queue...</span>
       </div>
     </v-alert>
+
+    <!-- Cinema Screen visual (Matches Editor) -->
+    <div class="screen-wrapper mb-6">
+      <div class="cinema-screen">
+        <div class="screen-text">CINEMA SCREEN</div>
+      </div>
+    </div>
 
     <!-- Interactive Seating Grid Matrix (Matching Seat Map Editor layout) -->
     <div class="seat-canvas-container mt-10">
@@ -225,6 +229,21 @@ const myHeldSeats = computed(() => {
   return seats.value.filter((s) => s.is_mine && s.status === 'held');
 });
 
+const zones = computed(() => {
+  const map = new Map();
+  for (const s of seats.value) {
+    if (s.zone_id && !map.has(s.zone_id)) {
+      map.set(s.zone_id, {
+        id: s.zone_id,
+        name: s.zone_name,
+        color: getSeatColor(s),
+        price_cents: s.price_cents,
+      });
+    }
+  }
+  return Array.from(map.values());
+});
+
 function isSeatProcessing(seatId) {
   return processingSeatIds.value.has(seatId);
 }
@@ -236,18 +255,27 @@ function isSeatDisabled(seat) {
   return false;
 }
 
-function getZoneColorHex(name) {
-  if (!name) return '#94a3b8';
-  if (name.toLowerCase().includes('vip')) return '#f59e0b';
-  if (name.toLowerCase().includes('premium')) return '#6366f1';
-  return '#14b8a6';
+function hexToRgba(hex, alpha = 0.2) {
+  if (!hex || typeof hex !== 'string') return `rgba(20, 184, 166, ${alpha})`;
+  let c = hex.replace('#', '').trim();
+  if (c.length === 3) c = c.split('').map((x) => x + x).join('');
+  if (c.length !== 6) return `rgba(20, 184, 166, ${alpha})`;
+  const num = parseInt(c, 16);
+  if (isNaN(num)) return `rgba(20, 184, 166, ${alpha})`;
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function getZoneBgColorHex(name) {
-  if (!name) return 'rgba(148, 163, 184, 0.15)';
-  if (name.toLowerCase().includes('vip')) return 'rgba(245, 158, 11, 0.18)';
-  if (name.toLowerCase().includes('premium')) return 'rgba(99, 102, 241, 0.18)';
-  return 'rgba(20, 184, 166, 0.18)';
+function getSeatColor(seat) {
+  if (!seat) return '#14b8a6';
+  if (seat.zone_color) return seat.zone_color;
+  const name = (seat.zone_name || '').toLowerCase();
+  if (name.includes('vip')) return '#f59e0b';
+  if (name.includes('premium')) return '#6366f1';
+  if (name.includes('standard')) return '#14b8a6';
+  return '#14b8a6';
 }
 
 function getSeatStyle(seat) {
@@ -263,9 +291,10 @@ function getSeatStyle(seat) {
       background: '#1f2937',
     };
   }
+  const color = getSeatColor(seat);
   return {
-    borderColor: getZoneColorHex(seat.zone_name),
-    background: getZoneBgColorHex(seat.zone_name),
+    borderColor: color,
+    background: hexToRgba(color, 0.18),
   };
 }
 
@@ -497,26 +526,30 @@ defineExpose({
   width: 12px;
   height: 12px;
   border-radius: 3px;
+  border: 1.5px solid transparent;
+  flex-shrink: 0;
 }
 
-.zone-vip {
-  background: rgba(245, 158, 11, 0.25);
-  border: 1.5px solid #f59e0b;
-}
-
-.zone-premium {
-  background: rgba(99, 102, 241, 0.25);
-  border: 1.5px solid #6366f1;
-}
-
-.zone-standard {
-  background: rgba(20, 184, 166, 0.25);
-  border: 1.5px solid #14b8a6;
+.legend-divider {
+  width: 1px;
+  height: 14px;
+  background-color: #3b4256;
+  margin: 0 4px;
 }
 
 .seat-held-mine-legend {
   background: #f59e0b;
-  border: 1.5px solid #f59e0b;
+  border-color: #f59e0b;
+}
+
+.seat-processing-legend {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.seat-taken-legend {
+  background: #1f2937;
+  border-color: #374151;
 }
 
 .seat-canvas-container {

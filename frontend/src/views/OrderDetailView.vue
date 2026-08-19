@@ -80,7 +80,7 @@
           <tbody>
             <tr v-for="s in order.seats" :key="s.seat_booking_id">
               <td class="font-weight-bold text-white py-3">
-                <v-chip size="small" :color="getZoneColor(s.zone_name)" variant="flat" class="mr-2 font-weight-bold">
+                <v-chip size="small" :color="getZoneColor(s)" variant="flat" class="mr-2 font-weight-bold">
                   {{ s.row_label }}{{ s.seat_number }}
                 </v-chip>
                 Row {{ s.row_label }}, Seat {{ s.seat_number }}
@@ -190,11 +190,16 @@ function formatStatus(status) {
   return status.replace('_', ' ');
 }
 
-function getZoneColor(zoneName) {
-  if (!zoneName) return 'grey';
-  if (zoneName.includes('VIP')) return 'amber-darken-2';
-  if (zoneName.includes('Premium')) return 'indigo-darken-1';
-  return 'teal-darken-1';
+function getZoneColor(seatOrName) {
+  if (!seatOrName) return '#14b8a6';
+  if (typeof seatOrName === 'object') {
+    if (seatOrName.zone_color) return seatOrName.zone_color;
+    seatOrName = seatOrName.zone_name;
+  }
+  if (!seatOrName) return '#14b8a6';
+  if (seatOrName.toLowerCase().includes('vip')) return '#f59e0b';
+  if (seatOrName.toLowerCase().includes('premium')) return '#6366f1';
+  return '#14b8a6';
 }
 
 async function fetchOrderDetail() {

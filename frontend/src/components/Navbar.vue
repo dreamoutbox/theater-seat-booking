@@ -2,7 +2,7 @@
   <v-app-bar color="#131722" density="comfortable" elevation="3" class="px-4 border-b">
     <v-toolbar-title class="d-flex align-center cursor-pointer font-weight-bold" @click="$router.push('/')">
       <v-icon icon="mdi-theater" color="amber-darken-1" class="mr-2" size="28"></v-icon>
-      <span class="text-white">HORIZON<span class="text-amber-darken-1 font-weight-light">CINEMA</span></span>
+      <span class="text-white">DREAM<span class="text-amber-darken-1 font-weight-light">CINEMA</span></span>
     </v-toolbar-title>
 
     <v-spacer></v-spacer>

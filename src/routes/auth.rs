@@ -4,11 +4,12 @@ use axum::{
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
+use repository::UserRepository;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     auth::{AUTH_COOKIE_NAME, AuthenticatedUser, generate_jwt, hash_password, verify_password},
-    models::{User, UserRole, UserSummary},
+    models::{UserRole, UserSummary},
     routes::AppState,
 };
 
@@ -51,9 +52,7 @@ pub async fn register(
 
     let role = payload.role.unwrap_or(UserRole::Customer);
 
-    let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)")
-        .bind(&email)
-        .fetch_one(&state.pool)
+    let exists = UserRepository::exists_by_email(&state.pool, &email)
         .await
         .map_err(|e| {
             (
@@ -76,21 +75,14 @@ pub async fn register(
         )
     })?;
 
-    let user: User = sqlx::query_as(
-        "INSERT INTO users (email, password_hash, role) VALUES ($1, $2, $3)
-         RETURNING id, email, password_hash, role, created_at",
-    )
-    .bind(&email)
-    .bind(&password_hash)
-    .bind(role)
-    .fetch_one(&state.pool)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let user = UserRepository::save(&state.pool, &email, &password_hash, role)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
     let token =
         generate_jwt(user.id, &user.email, user.role, &state.config.jwt_secret).map_err(|e| {
@@ -127,18 +119,14 @@ pub async fn login(
 ) -> Result<Response, (StatusCode, Json<serde_json::Value>)> {
     let email = payload.email.trim().to_lowercase();
 
-    let user_opt: Option<User> = sqlx::query_as(
-        "SELECT id, email, password_hash, role, created_at FROM users WHERE email = $1",
-    )
-    .bind(&email)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let user_opt = UserRepository::find_by_email(&state.pool, &email)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
     let user = match user_opt {
         Some(u) => u,
@@ -211,18 +199,14 @@ pub async fn me(
     auth_user: AuthenticatedUser,
     State(state): State<AppState>,
 ) -> Result<Json<UserSummary>, (StatusCode, Json<serde_json::Value>)> {
-    let user: Option<User> = sqlx::query_as(
-        "SELECT id, email, password_hash, role, created_at FROM users WHERE id = $1",
-    )
-    .bind(auth_user.id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let user = UserRepository::find_by_id(&state.pool, auth_user.id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
     match user {
         Some(u) => Ok(Json(u.into())),

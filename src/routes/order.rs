@@ -3,14 +3,11 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
+use repository::{OrderDetail, OrderRepository, SeatBookingRepository, UserRole};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::{
-    auth::AuthenticatedUser,
-    models::{OrderDetail, OrderSeatDetail, UserRole},
-    routes::AppState,
-};
+use crate::{auth::AuthenticatedUser, routes::AppState};
 
 #[derive(Debug, Deserialize)]
 pub struct CreateOrderRequest {
@@ -45,28 +42,11 @@ pub async fn create_order(
     })?;
 
     // 1. Fetch and validate all requested seat_bookings:
-    // Must belong to auth_user, status = 'held', expires_at > now()
-    #[derive(sqlx::FromRow)]
-    struct HoldItem {
-        id: Uuid,
-        showtime_id: Uuid,
-        price_cents: i64,
-    }
-
-    let holds: Vec<HoldItem> = sqlx::query_as(
-        "SELECT sb.id, sb.showtime_id, z.price_cents
-         FROM seat_bookings sb
-         JOIN seats s ON s.id = sb.seat_id
-         JOIN zones z ON z.id = s.zone_id
-         WHERE (sb.id = ANY($1) OR sb.seat_id = ANY($1))
-           AND sb.user_id = $2 
-           AND sb.status = 'held' 
-           AND sb.expires_at > now()
-         FOR UPDATE OF sb",
+    let holds = SeatBookingRepository::find_active_holds_by_user_and_seat_ids(
+        &mut *tx,
+        &payload.seat_booking_ids,
+        auth_user.id,
     )
-    .bind(&payload.seat_booking_ids)
-    .bind(auth_user.id)
-    .fetch_all(&mut *tx)
     .await
     .map_err(|e| {
         (
@@ -115,16 +95,13 @@ pub async fn create_order(
         })?;
 
     // 5. Insert order
-    sqlx::query(
-        "INSERT INTO orders (id, user_id, showtime_id, total_amount_cents, status, stripe_payment_intent_id)
-         VALUES ($1, $2, $3, $4, 'pending_payment', $5)",
+    OrderRepository::save(
+        &mut *tx,
+        auth_user.id,
+        first_showtime_id,
+        total_amount_cents,
+        Some(&stripe_res.id),
     )
-    .bind(order_id)
-    .bind(auth_user.id)
-    .bind(first_showtime_id)
-    .bind(total_amount_cents)
-    .bind(&stripe_res.id)
-    .execute(&mut *tx)
     .await
     .map_err(|e| {
         (
@@ -135,21 +112,14 @@ pub async fn create_order(
 
     // 6. Insert order_seats
     for hold in holds {
-        sqlx::query(
-            "INSERT INTO order_seats (order_id, seat_booking_id, price_cents)
-             VALUES ($1, $2, $3)",
-        )
-        .bind(order_id)
-        .bind(hold.id)
-        .bind(hold.price_cents)
-        .execute(&mut *tx)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+        OrderRepository::save_order_seat(&mut *tx, order_id, hold.id, hold.price_cents)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?;
     }
 
     tx.commit().await.map_err(|e| {
@@ -185,51 +155,10 @@ pub async fn list_orders(
         || auth_user.role == UserRole::Staff
         || auth_user.role == UserRole::EventOrganizer;
 
-    #[derive(sqlx::FromRow)]
-    struct OrderRow {
-        id: Uuid,
-        user_id: Uuid,
-        user_email: Option<String>,
-        showtime_id: Uuid,
-        event_title: String,
-        theater_name: String,
-        starts_at: chrono::DateTime<chrono::Utc>,
-        total_amount_cents: i64,
-        status: String,
-        stripe_payment_intent_id: Option<String>,
-        created_at: chrono::DateTime<chrono::Utc>,
-    }
-
-    let orders_query = if is_elevated {
-        "SELECT o.id, o.user_id, u.email as user_email, o.showtime_id,
-                e.title as event_title, t.name as theater_name, s.starts_at,
-                o.total_amount_cents, o.status, o.stripe_payment_intent_id, o.created_at
-         FROM orders o
-         JOIN users u ON u.id = o.user_id
-         JOIN showtimes s ON s.id = o.showtime_id
-         JOIN events e ON e.id = s.event_id
-         JOIN theaters t ON t.id = s.theater_id
-         ORDER BY o.created_at DESC"
+    let order_rows = if is_elevated {
+        OrderRepository::find_all_order_details(&state.pool).await
     } else {
-        "SELECT o.id, o.user_id, u.email as user_email, o.showtime_id,
-                e.title as event_title, t.name as theater_name, s.starts_at,
-                o.total_amount_cents, o.status, o.stripe_payment_intent_id, o.created_at
-         FROM orders o
-         JOIN users u ON u.id = o.user_id
-         JOIN showtimes s ON s.id = o.showtime_id
-         JOIN events e ON e.id = s.event_id
-         JOIN theaters t ON t.id = s.theater_id
-         WHERE o.user_id = $1
-         ORDER BY o.created_at DESC"
-    };
-
-    let order_rows: Vec<OrderRow> = if is_elevated {
-        sqlx::query_as(orders_query).fetch_all(&state.pool).await
-    } else {
-        sqlx::query_as(orders_query)
-            .bind(auth_user.id)
-            .fetch_all(&state.pool)
-            .await
+        OrderRepository::find_order_details_by_user_id(&state.pool, auth_user.id).await
     }
     .map_err(|e| {
         (
@@ -241,19 +170,9 @@ pub async fn list_orders(
     let mut result = Vec::with_capacity(order_rows.len());
 
     for o in order_rows {
-        let seats: Vec<OrderSeatDetail> = sqlx::query_as(
-            "SELECT os.seat_booking_id, s.id as seat_id, s.row_label, s.seat_number, z.name as zone_name, os.price_cents
-             FROM order_seats os
-             JOIN seat_bookings sb ON sb.id = os.seat_booking_id
-             JOIN seats s ON s.id = sb.seat_id
-             JOIN zones z ON z.id = s.zone_id
-             WHERE os.order_id = $1
-             ORDER BY s.row_label ASC, s.seat_number ASC",
-        )
-        .bind(o.id)
-        .fetch_all(&state.pool)
-        .await
-        .unwrap_or_default();
+        let seats = OrderRepository::find_order_seats_by_order_id(&state.pool, o.id)
+            .await
+            .unwrap_or_default();
 
         result.push(OrderDetail {
             id: o.id,
@@ -280,41 +199,14 @@ pub async fn get_order(
     auth_user: AuthenticatedUser,
     State(state): State<AppState>,
 ) -> Result<Json<OrderDetail>, (StatusCode, Json<serde_json::Value>)> {
-    #[derive(sqlx::FromRow)]
-    struct OrderRow {
-        id: Uuid,
-        user_id: Uuid,
-        user_email: Option<String>,
-        showtime_id: Uuid,
-        event_title: String,
-        theater_name: String,
-        starts_at: chrono::DateTime<chrono::Utc>,
-        total_amount_cents: i64,
-        status: String,
-        stripe_payment_intent_id: Option<String>,
-        created_at: chrono::DateTime<chrono::Utc>,
-    }
-
-    let order_opt: Option<OrderRow> = sqlx::query_as(
-        "SELECT o.id, o.user_id, u.email as user_email, o.showtime_id,
-                e.title as event_title, t.name as theater_name, s.starts_at,
-                o.total_amount_cents, o.status, o.stripe_payment_intent_id, o.created_at
-         FROM orders o
-         JOIN users u ON u.id = o.user_id
-         JOIN showtimes s ON s.id = o.showtime_id
-         JOIN events e ON e.id = s.event_id
-         JOIN theaters t ON t.id = s.theater_id
-         WHERE o.id = $1",
-    )
-    .bind(id)
-    .fetch_optional(&state.pool)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let order_opt = OrderRepository::find_order_detail_by_id(&state.pool, id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
     let o = match order_opt {
         Some(row) => row,
@@ -337,19 +229,9 @@ pub async fn get_order(
         ));
     }
 
-    let seats: Vec<OrderSeatDetail> = sqlx::query_as(
-        "SELECT os.seat_booking_id, s.id as seat_id, s.row_label, s.seat_number, z.name as zone_name, os.price_cents
-         FROM order_seats os
-         JOIN seat_bookings sb ON sb.id = os.seat_booking_id
-         JOIN seats s ON s.id = sb.seat_id
-         JOIN zones z ON z.id = s.zone_id
-         WHERE os.order_id = $1
-         ORDER BY s.row_label ASC, s.seat_number ASC",
-    )
-    .bind(o.id)
-    .fetch_all(&state.pool)
-    .await
-    .unwrap_or_default();
+    let seats = OrderRepository::find_order_seats_by_order_id(&state.pool, o.id)
+        .await
+        .unwrap_or_default();
 
     Ok(Json(OrderDetail {
         id: o.id,
@@ -382,18 +264,18 @@ pub async fn confirm_mock_order(
     })?;
 
     // 1. Fetch order
-    let order_status: Option<String> =
-        sqlx::query_scalar("SELECT status FROM orders WHERE id = $1 AND user_id = $2 FOR UPDATE")
-            .bind(order_id)
-            .bind(auth_user.id)
-            .fetch_optional(&mut *tx)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({ "error": e.to_string() })),
-                )
-            })?;
+    let order_status = OrderRepository::find_status_by_id_and_user_for_update(
+        &mut *tx,
+        order_id,
+        auth_user.id,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
 
     let status = match order_status {
         Some(s) => s,
@@ -417,9 +299,7 @@ pub async fn confirm_mock_order(
     }
 
     // 2. Mark order as paid
-    sqlx::query("UPDATE orders SET status = 'paid' WHERE id = $1")
-        .bind(order_id)
-        .execute(&mut *tx)
+    OrderRepository::update_status(&mut *tx, order_id, "paid")
         .await
         .map_err(|e| {
             (
@@ -429,30 +309,23 @@ pub async fn confirm_mock_order(
         })?;
 
     // 3. Mark held seats as confirmed
-    sqlx::query(
-        "UPDATE seat_bookings
-         SET status = 'confirmed'
-         WHERE id IN (SELECT seat_booking_id FROM order_seats WHERE order_id = $1)",
-    )
-    .bind(order_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    SeatBookingRepository::update_status_by_order_id(&mut *tx, order_id, "confirmed")
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
 
     // 4. Log mock payment event
     let mock_event_id = format!("evt_mock_{}", Uuid::new_v4());
-    sqlx::query(
-        "INSERT INTO payment_events (stripe_event_id, order_id, type)
-         VALUES ($1, $2, 'payment_intent.succeeded')",
+    OrderRepository::save_payment_event(
+        &mut *tx,
+        &mock_event_id,
+        Some(order_id),
+        "payment_intent.succeeded",
     )
-    .bind(&mock_event_id)
-    .bind(order_id)
-    .execute(&mut *tx)
     .await
     .map_err(|e| {
         (

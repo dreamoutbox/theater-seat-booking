@@ -47,10 +47,10 @@ CREATE TABLE showtimes (
 -- The queue: one row per seat-click request
 CREATE TABLE booking_queue (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id),
-    showtime_id UUID NOT NULL REFERENCES showtimes(id),
-    zone_id UUID NOT NULL REFERENCES zones(id),
-    seat_id UUID NOT NULL REFERENCES seats(id),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    showtime_id UUID NOT NULL REFERENCES showtimes(id) ON DELETE CASCADE,
+    zone_id UUID NOT NULL REFERENCES zones(id) ON DELETE CASCADE,
+    seat_id UUID NOT NULL REFERENCES seats(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'pending'
         CHECK (status IN ('pending','processing','success','failed')),
     failure_reason TEXT,
@@ -64,10 +64,10 @@ CREATE INDEX idx_booking_queue_partition
 -- Source of truth for seat occupancy
 CREATE TABLE seat_bookings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    showtime_id UUID NOT NULL REFERENCES showtimes(id),
-    seat_id UUID NOT NULL REFERENCES seats(id),
-    user_id UUID NOT NULL REFERENCES users(id),
-    booking_queue_id UUID REFERENCES booking_queue(id),
+    showtime_id UUID NOT NULL REFERENCES showtimes(id) ON DELETE CASCADE,
+    seat_id UUID NOT NULL REFERENCES seats(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    booking_queue_id UUID REFERENCES booking_queue(id) ON DELETE SET NULL,
     status TEXT NOT NULL CHECK (status IN ('held','confirmed','released')),
     held_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     expires_at TIMESTAMPTZ NOT NULL
@@ -80,8 +80,8 @@ CREATE UNIQUE INDEX uniq_active_seat_per_showtime
 
 CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id),
-    showtime_id UUID NOT NULL REFERENCES showtimes(id),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    showtime_id UUID NOT NULL REFERENCES showtimes(id) ON DELETE CASCADE,
     total_amount_cents BIGINT NOT NULL CHECK (total_amount_cents >= 0),
     status TEXT NOT NULL DEFAULT 'pending_payment'
         CHECK (status IN ('pending_payment','paid','cancelled','expired')),
@@ -91,7 +91,7 @@ CREATE TABLE orders (
 
 CREATE TABLE order_seats (
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    seat_booking_id UUID NOT NULL REFERENCES seat_bookings(id),
+    seat_booking_id UUID NOT NULL REFERENCES seat_bookings(id) ON DELETE CASCADE,
     price_cents BIGINT NOT NULL,
     PRIMARY KEY (order_id, seat_booking_id)
 );
@@ -100,7 +100,7 @@ CREATE TABLE order_seats (
 CREATE TABLE payment_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     stripe_event_id TEXT UNIQUE NOT NULL,
-    order_id UUID REFERENCES orders(id),
+    order_id UUID REFERENCES orders(id) ON DELETE SET NULL,
     type TEXT NOT NULL,
     processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

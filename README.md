@@ -45,7 +45,13 @@ This seeds theaters, VIP/Premium/Standard zones, seat grids, showtimes, and demo
 
 ### 3. Development Workflow Scripts
 
-Three dedicated helper scripts are provided for local development:
+Dedicated helper scripts are provided for local development:
+
+- **Reset Database & Run Migrations**:
+  ```bash
+  ./dev-reset-db.sh
+  ```
+  Drops/recreates schema, runs all migrations, and seeds default accounts and sample showtimes.
 
 - **Run Backend API Server**:
   ```bash
