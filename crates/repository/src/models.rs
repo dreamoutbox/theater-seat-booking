@@ -130,6 +130,7 @@ pub struct Event {
     pub max_seats_per_booking: i32,
     pub max_seats_per_user: i32,
     pub owner_id: Option<Uuid>,
+    pub event_number: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

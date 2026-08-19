@@ -30,4 +30,18 @@ onMounted(async () => {
 .main-content {
   background-color: #0d111a;
 }
+
+@media print {
+  header, nav, .v-app-bar, .v-navigation-drawer, .v-footer, .no-print {
+    display: none !important;
+  }
+  .v-main, .main-content {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+  }
+  .app-root {
+    background-color: #ffffff !important;
+  }
+}
 </style>

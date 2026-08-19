@@ -10,9 +10,9 @@ impl EventRepository {
         executor: E,
     ) -> Result<Vec<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number
              FROM events
-             ORDER BY title",
+             ORDER BY event_number, title",
         )
         .fetch_all(executor)
         .await
@@ -23,10 +23,10 @@ impl EventRepository {
         owner_id: Uuid,
     ) -> Result<Vec<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number
              FROM events
              WHERE owner_id = $1
-             ORDER BY title",
+             ORDER BY event_number, title",
         )
         .bind(owner_id)
         .fetch_all(executor)
@@ -38,7 +38,7 @@ impl EventRepository {
         id: Uuid,
     ) -> Result<Option<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number
              FROM events
              WHERE id = $1",
         )
@@ -52,7 +52,7 @@ impl EventRepository {
         title: &str,
     ) -> Result<Option<Event>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id
+            "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number
              FROM events
              WHERE title = $1
              LIMIT 1",
@@ -72,7 +72,7 @@ impl EventRepository {
         sqlx::query_as(
             "INSERT INTO events (title, max_seats_per_booking, max_seats_per_user, owner_id)
              VALUES ($1, $2, $3, $4)
-             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id",
+             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number",
         )
         .bind(title)
         .bind(max_seats_per_booking)
@@ -97,7 +97,7 @@ impl EventRepository {
                  max_seats_per_user = $3,
                  owner_id = COALESCE($4, owner_id)
              WHERE id = $5
-             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id",
+             RETURNING id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number",
         )
         .bind(title)
         .bind(max_seats_per_booking)

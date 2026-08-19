@@ -67,7 +67,7 @@
             </div>
             <div class="text-right">
               <h1 class="report-title text-uppercase font-bold">Financial & Tax Statement</h1>
-              <div class="report-id font-mono">Statement Ref: FS-{{ (event?.id || '').substring(0, 8).toUpperCase() }}-{{ new Date().getFullYear() }}</div>
+              <div class="report-id font-mono">Statement Ref: {{ statementRef }}</div>
               <div class="text-small text-muted">Generated on: {{ formatFullDate(reportGeneratedAt) }}</div>
             </div>
           </div>
@@ -165,7 +165,7 @@
 
         <!-- Showtime-by-Showtime Financial Breakdown -->
         <div class="section-title mb-2">2. SHOWTIME SESSION BREAKDOWN & ATTENDANCE AUDIT</div>
-        <table class="report-table mb-5">
+        <table class="report-table mb-6">
           <thead>
             <tr>
               <th class="text-left">Session Date & Venue</th>
@@ -217,15 +217,6 @@
           </tfoot>
         </table>
 
-        <!-- Tax & Legal Compliance Note -->
-        <div class="tax-declaration-box pa-3 rounded mb-5 bg-light-gray border text-small">
-          <div class="font-bold mb-1">TAX & REGULATORY COMPLIANCE DECLARATION</div>
-          <div class="text-muted">
-            This document represents a certified summary of box office admissions and ticket refunds processed through the DreamCinema ticketing engine.
-            The figures above reflect net sales revenue collected during the active ticketing window. Event Organizers are responsible for remitting applicable municipal, state, or federal value-added taxes (VAT/GST/Sales Tax) based on local jurisdiction laws.
-          </div>
-        </div>
-
         <!-- Signature & Verification Footer -->
         <div class="report-signatures pt-4 border-top">
           <div class="d-flex justify-space-between align-end">
@@ -235,13 +226,13 @@
               <div class="text-small text-muted">Authorized Signature & Date</div>
             </div>
             <div class="qr-verify text-center">
-              <div class="text-small font-mono text-muted">AUDIT HASH: {{ generateAuditHash() }}</div>
-              <div class="text-small text-muted">System Verified • DreamCinema Automated Ledger</div>
+              <div class="text-small font-bold text-muted">DreamCinema Automated Clearance</div>
+              <div class="text-small text-muted">System Verified & Reconciled</div>
             </div>
             <div class="sign-box text-center">
               <div class="sign-line mb-1"></div>
               <div class="text-small font-bold">Cinema Financial Auditor</div>
-              <div class="text-small text-muted">DreamCinema Automated Clearance</div>
+              <div class="text-small text-muted">Official Verification & Stamp</div>
             </div>
           </div>
         </div>
@@ -312,6 +303,14 @@ const totalCapacity = computed(() => {
   return showtimes.value.reduce((sum, st) => sum + (st.total_seats || 0), 0);
 });
 
+const statementRef = computed(() => {
+  const d = reportGeneratedAt.value || new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const seq = event.value?.event_number != null ? event.value.event_number : 1;
+  return `FIN-${yyyy}-${mm}-${seq}`;
+});
+
 const eventDateRange = computed(() => {
   if (showtimes.value.length === 0) return 'No showtimes scheduled';
   const sorted = [...showtimes.value].sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
@@ -319,12 +318,6 @@ const eventDateRange = computed(() => {
   const last = formatDate(sorted[sorted.length - 1].starts_at);
   return first === last ? first : `${first} — ${last}`;
 });
-
-function generateAuditHash() {
-  const eid = props.id || route.params.id || 'EVT';
-  const net = metrics.value.net_profit_cents || 0;
-  return `0x${eid.substring(0, 4)}${net.toString(16).toUpperCase()}FF89`;
-}
 
 async function loadReportData() {
   const eventId = props.id || route.params.id;
