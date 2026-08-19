@@ -188,7 +188,8 @@ pub struct Order {
     pub user_id: Uuid,
     pub showtime_id: Uuid,
     pub total_amount_cents: i64,
-    pub status: String, // "pending_payment", "paid", "cancelled", "expired"
+    pub refunded_amount_cents: i64,
+    pub status: String, // "pending_payment", "paid", "partially_refunded", "refunded", "cancelled", "expired"
     pub stripe_payment_intent_id: Option<String>,
     pub created_at: DateTime<Utc>,
 }
@@ -220,6 +221,7 @@ pub struct OrderDetailRow {
     pub theater_name: String,
     pub starts_at: DateTime<Utc>,
     pub total_amount_cents: i64,
+    pub refunded_amount_cents: i64,
     pub status: String,
     pub stripe_payment_intent_id: Option<String>,
     pub created_at: DateTime<Utc>,
@@ -235,6 +237,7 @@ pub struct OrderDetail {
     pub theater_name: String,
     pub starts_at: DateTime<Utc>,
     pub total_amount_cents: i64,
+    pub refunded_amount_cents: i64,
     pub status: String,
     pub stripe_payment_intent_id: Option<String>,
     pub stripe_client_secret: Option<String>,
@@ -266,9 +269,11 @@ pub struct Ticket {
     pub user_id: Uuid,
     pub event_id: Uuid,
     pub showtime_id: Uuid,
-    pub status: String, // "active", "used", "cancelled", "expired"
+    pub status: String, // "active", "used", "cancelled", "expired", "refunded"
     pub used_at: Option<DateTime<Utc>>,
     pub used_by: Option<Uuid>,
+    pub refunded_at: Option<DateTime<Utc>>,
+    pub refunded_by: Option<Uuid>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -291,6 +296,8 @@ pub struct TicketDetail {
     pub status: String,
     pub used_at: Option<DateTime<Utc>>,
     pub used_by: Option<Uuid>,
+    pub refunded_at: Option<DateTime<Utc>>,
+    pub refunded_by: Option<Uuid>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -307,4 +314,57 @@ pub struct GatekeeperDetail {
     pub user_id: Uuid,
     pub email: String,
     pub assigned_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct Refund {
+    pub id: Uuid,
+    pub order_id: Uuid,
+    pub amount_cents: i64,
+    pub stripe_refund_id: Option<String>,
+    pub refunded_by: Option<Uuid>,
+    pub reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RefundDetail {
+    pub id: Uuid,
+    pub order_id: Uuid,
+    pub amount_cents: i64,
+    pub stripe_refund_id: Option<String>,
+    pub refunded_by: Option<Uuid>,
+    pub refunded_by_email: Option<String>,
+    pub reason: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub ticket_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct EventDashboardMetrics {
+    pub gross_sales_cents: i64,
+    pub total_refunds_cents: i64,
+    pub net_profit_cents: i64,
+    pub total_tickets_created: i64,
+    pub active_tickets: i64,
+    pub used_tickets: i64,
+    pub refunded_tickets: i64,
+    pub attendance_rate_percent: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct ShowtimeDashboardRow {
+    pub showtime_id: Uuid,
+    pub event_id: Uuid,
+    pub event_title: String,
+    pub theater_id: Uuid,
+    pub theater_name: String,
+    pub starts_at: DateTime<Utc>,
+    pub total_seats: i64,
+    pub sold_seats: i64,
+    pub used_tickets: i64,
+    pub refunded_tickets: i64,
+    pub gross_cents: i64,
+    pub refunded_cents: i64,
+    pub net_cents: i64,
 }

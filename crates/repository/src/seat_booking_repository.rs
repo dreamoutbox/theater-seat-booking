@@ -167,4 +167,19 @@ impl SeatBookingRepository {
         .await?;
         Ok(res.rows_affected())
     }
+
+    pub async fn release_by_ids<'e, E: PgExecutor<'e>>(
+        executor: E,
+        seat_booking_ids: &[Uuid],
+    ) -> Result<u64, sqlx::Error> {
+        let res = sqlx::query(
+            "UPDATE seat_bookings
+             SET status = 'released'
+             WHERE id = ANY($1) AND status = 'confirmed'",
+        )
+        .bind(seat_booking_ids)
+        .execute(executor)
+        .await?;
+        Ok(res.rows_affected())
+    }
 }

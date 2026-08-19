@@ -52,7 +52,7 @@ impl OrderRepository {
         sqlx::query_as(
             "SELECT o.id, o.user_id, u.email as user_email, o.showtime_id,
                     e.title as event_title, t.name as theater_name, s.starts_at,
-                    o.total_amount_cents, o.status, o.stripe_payment_intent_id, o.created_at
+                    o.total_amount_cents, o.refunded_amount_cents, o.status, o.stripe_payment_intent_id, o.created_at
              FROM orders o
              JOIN users u ON u.id = o.user_id
              JOIN showtimes s ON s.id = o.showtime_id
@@ -71,7 +71,7 @@ impl OrderRepository {
         sqlx::query_as(
             "SELECT o.id, o.user_id, u.email as user_email, o.showtime_id,
                     e.title as event_title, t.name as theater_name, s.starts_at,
-                    o.total_amount_cents, o.status, o.stripe_payment_intent_id, o.created_at
+                    o.total_amount_cents, o.refunded_amount_cents, o.status, o.stripe_payment_intent_id, o.created_at
              FROM orders o
              JOIN users u ON u.id = o.user_id
              JOIN showtimes s ON s.id = o.showtime_id
@@ -92,7 +92,7 @@ impl OrderRepository {
         sqlx::query_as(
             "SELECT o.id, o.user_id, u.email as user_email, o.showtime_id,
                     e.title as event_title, t.name as theater_name, s.starts_at,
-                    o.total_amount_cents, o.status, o.stripe_payment_intent_id, o.created_at
+                    o.total_amount_cents, o.refunded_amount_cents, o.status, o.stripe_payment_intent_id, o.created_at
              FROM orders o
              JOIN users u ON u.id = o.user_id
              JOIN showtimes s ON s.id = o.showtime_id
@@ -190,6 +190,40 @@ impl OrderRepository {
         )
         .bind(stripe_event_id)
         .fetch_one(executor)
+        .await
+    }
+
+    pub async fn update_refund_status<'e, E: PgExecutor<'e>>(
+        executor: E,
+        order_id: Uuid,
+        status: &str,
+        new_total_refunded_cents: i64,
+    ) -> Result<bool, sqlx::Error> {
+        let res = sqlx::query(
+            "UPDATE orders SET status = $1, refunded_amount_cents = $2 WHERE id = $3",
+        )
+        .bind(status)
+        .bind(new_total_refunded_cents)
+        .bind(order_id)
+        .execute(executor)
+        .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    pub async fn find_order_with_event_owner_for_update<'e, E: PgExecutor<'e>>(
+        executor: E,
+        order_id: Uuid,
+    ) -> Result<Option<(Uuid, String, Option<String>, Option<Uuid>, i64, i64)>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT o.id, o.status, o.stripe_payment_intent_id, e.owner_id, o.total_amount_cents, o.refunded_amount_cents
+             FROM orders o
+             JOIN showtimes s ON s.id = o.showtime_id
+             JOIN events e ON e.id = s.event_id
+             WHERE o.id = $1
+             FOR UPDATE OF o",
+        )
+        .bind(order_id)
+        .fetch_optional(executor)
         .await
     }
 

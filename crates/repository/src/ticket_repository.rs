@@ -32,7 +32,7 @@ impl TicketRepository {
         sqlx::query_as(
             "INSERT INTO tickets (id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status)
              VALUES ($1, $2, $3, $4, $5, $6, $7, 'active')
-             RETURNING id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status, used_at, used_by, created_at",
+             RETURNING id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status, used_at, used_by, refunded_at, refunded_by, created_at",
         )
         .bind(id)
         .bind(code)
@@ -58,28 +58,25 @@ impl TicketRepository {
             seat_booking_id: Uuid,
         }
 
+        // 1. Fetch seat bookings with event_id
         let items: Vec<SeatBookingForTicket> = sqlx::query_as(
-            "SELECT 
-                o.id AS order_id,
-                o.user_id,
-                o.showtime_id,
-                s.event_id,
-                os.seat_booking_id
+            "SELECT o.id AS order_id, o.user_id, o.showtime_id, st.event_id, sb.id AS seat_booking_id
              FROM orders o
-             JOIN showtimes s ON s.id = o.showtime_id
              JOIN order_seats os ON os.order_id = o.id
+             JOIN seat_bookings sb ON sb.id = os.seat_booking_id
+             JOIN showtimes st ON st.id = o.showtime_id
              WHERE o.id = $1",
         )
         .bind(order_id)
         .fetch_all(&mut *conn)
         .await?;
 
-        let mut tickets = Vec::with_capacity(items.len());
+        let mut tickets = Vec::new();
 
         for item in items {
-            // Check if ticket already created for this seat_booking
+            // Check if ticket already exists for this seat booking (idempotency)
             let existing: Option<Ticket> = sqlx::query_as(
-                "SELECT id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status, used_at, used_by, created_at
+                "SELECT id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status, used_at, used_by, refunded_at, refunded_by, created_at
                  FROM tickets
                  WHERE seat_booking_id = $1",
             )
@@ -139,7 +136,7 @@ impl TicketRepository {
                 t.id, t.code, t.order_id, t.seat_booking_id, t.user_id, t.event_id,
                 e.title AS event_title, t.showtime_id, th.name AS theater_name,
                 st.starts_at, s.row_label, s.seat_number, z.name AS zone_name,
-                z.price_cents, t.status, t.used_at, t.used_by, t.created_at
+                z.price_cents, t.status, t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
              FROM tickets t
              JOIN events e ON e.id = t.event_id
              JOIN showtimes st ON st.id = t.showtime_id
@@ -155,6 +152,33 @@ impl TicketRepository {
         .await
     }
 
+    pub async fn find_by_ids_and_order_id_for_update<'e, E: PgExecutor<'e>>(
+        executor: E,
+        ticket_ids: &[Uuid],
+        order_id: Uuid,
+    ) -> Result<Vec<TicketDetail>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT 
+                t.id, t.code, t.order_id, t.seat_booking_id, t.user_id, t.event_id,
+                e.title AS event_title, t.showtime_id, th.name AS theater_name,
+                st.starts_at, s.row_label, s.seat_number, z.name AS zone_name,
+                z.price_cents, t.status, t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
+             FROM tickets t
+             JOIN events e ON e.id = t.event_id
+             JOIN showtimes st ON st.id = t.showtime_id
+             JOIN theaters th ON th.id = st.theater_id
+             JOIN seat_bookings sb ON sb.id = t.seat_booking_id
+             JOIN seats s ON s.id = sb.seat_id
+             JOIN zones z ON z.id = s.zone_id
+             WHERE t.order_id = $1 AND t.id = ANY($2)
+             FOR UPDATE OF t",
+        )
+        .bind(order_id)
+        .bind(ticket_ids)
+        .fetch_all(executor)
+        .await
+    }
+
     pub async fn find_by_code<'e, E: PgExecutor<'e>>(
         executor: E,
         code: &str,
@@ -164,7 +188,7 @@ impl TicketRepository {
                 t.id, t.code, t.order_id, t.seat_booking_id, t.user_id, t.event_id,
                 e.title AS event_title, t.showtime_id, th.name AS theater_name,
                 st.starts_at, s.row_label, s.seat_number, z.name AS zone_name,
-                z.price_cents, t.status, t.used_at, t.used_by, t.created_at
+                z.price_cents, t.status, t.used_at, t.used_by, t.refunded_at, t.refunded_by, t.created_at
              FROM tickets t
              JOIN events e ON e.id = t.event_id
              JOIN showtimes st ON st.id = t.showtime_id
@@ -184,7 +208,7 @@ impl TicketRepository {
         id: Uuid,
     ) -> Result<Option<Ticket>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status, used_at, used_by, created_at
+            "SELECT id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, status, used_at, used_by, refunded_at, refunded_by, created_at
              FROM tickets
              WHERE id = $1",
         )
@@ -210,6 +234,37 @@ impl TicketRepository {
         .execute(executor)
         .await?;
         Ok(res.rows_affected() > 0)
+    }
+
+    pub async fn mark_tickets_refunded<'e, E: PgExecutor<'e>>(
+        executor: E,
+        ticket_ids: &[Uuid],
+        refunded_by: Uuid,
+    ) -> Result<u64, sqlx::Error> {
+        let now = Utc::now();
+        let res = sqlx::query(
+            "UPDATE tickets
+             SET status = 'refunded', refunded_at = $1, refunded_by = $2
+             WHERE id = ANY($3) AND status = 'active'",
+        )
+        .bind(now)
+        .bind(refunded_by)
+        .bind(ticket_ids)
+        .execute(executor)
+        .await?;
+        Ok(res.rows_affected())
+    }
+
+    pub async fn count_active_tickets_by_order_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        order_id: Uuid,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM tickets WHERE order_id = $1 AND status = 'active'",
+        )
+        .bind(order_id)
+        .fetch_one(executor)
+        .await
     }
 
     pub async fn cancel_by_seat_booking_id<'e, E: PgExecutor<'e>>(
