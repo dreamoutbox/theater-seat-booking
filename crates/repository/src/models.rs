@@ -403,3 +403,16 @@ pub struct ShowtimeDashboardRow {
     pub refunded_cents: i64,
     pub net_cents: i64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct BookedSeatInfo {
+    pub seat_id: Uuid,
+    pub row_label: String,
+    pub seat_number: i32,
+    pub showtime_id: Uuid,
+    pub order_id: Option<Uuid>,
+    pub event_title: String,
+    pub starts_at: DateTime<Utc>,
+    pub status: String,
+    pub user_email: Option<String>,
+}

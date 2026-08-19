@@ -5,8 +5,8 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use repository::{
-    Event, EventRepository, SaveLayoutPayload, SeatRepository, ShowtimeDetail, ShowtimeRepository,
-    Theater, TheaterLayout, TheaterRepository, UserRole, ZoneRepository,
+    BookedSeatInfo, Event, EventRepository, SaveLayoutPayload, SeatRepository, ShowtimeDetail,
+    ShowtimeRepository, Theater, TheaterLayout, TheaterRepository, UserRole, ZoneRepository,
 };
 use serde::Deserialize;
 use uuid::Uuid;
@@ -802,7 +802,25 @@ pub async fn save_theater_layout(
         })?;
 
     for (seat_id, r_label, s_num) in existing_seats {
-        if !current_seat_keys.contains(&(r_label, s_num)) {
+        if !current_seat_keys.contains(&(r_label.clone(), s_num)) {
+            // Check if seat has active bookings or tickets
+            let has_bookings = SeatRepository::has_active_bookings_or_orders(&mut *tx, seat_id)
+                .await
+                .unwrap_or(false);
+
+            if has_bookings {
+                tx.rollback().await.ok();
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": format!(
+                            "Cannot remove seat Row {}, Seat {} because it has active customer bookings or tickets.",
+                            r_label, s_num
+                        )
+                    })),
+                ));
+            }
+
             SeatRepository::delete_by_id(&mut *tx, seat_id)
                 .await
                 .map_err(|e| {
@@ -862,4 +880,32 @@ pub async fn save_theater_layout(
         zones,
         seats,
     }))
+}
+
+pub async fn get_theater_booked_seats(
+    Path(theater_id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<BookedSeatInfo>>, (StatusCode, Json<serde_json::Value>)> {
+    check_role(
+        &auth_user,
+        &[UserRole::Admin, UserRole::Staff, UserRole::EventOrganizer],
+    )
+    .map_err(|_e| {
+        (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Unauthorized" })),
+        )
+    })?;
+
+    let booked = SeatRepository::find_booked_seats_by_theater_id(&state.pool, theater_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    Ok(Json(booked))
 }

@@ -182,4 +182,35 @@ impl SeatBookingRepository {
         .await?;
         Ok(res.rows_affected())
     }
+
+    pub async fn update_seat_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        seat_booking_id: Uuid,
+        new_seat_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        let res = sqlx::query(
+            "UPDATE seat_bookings
+             SET seat_id = $1
+             WHERE id = $2",
+        )
+        .bind(new_seat_id)
+        .bind(seat_booking_id)
+        .execute(executor)
+        .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    pub async fn find_by_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        id: Uuid,
+    ) -> Result<Option<crate::models::SeatBooking>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT id, showtime_id, seat_id, user_id, booking_queue_id, status, held_at, expires_at
+             FROM seat_bookings
+             WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(executor)
+        .await
+    }
 }

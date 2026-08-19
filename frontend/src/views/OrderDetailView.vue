@@ -134,11 +134,22 @@
           <tbody>
             <tr v-for="s in order.seats" :key="s.seat_booking_id">
               <td class="font-weight-bold text-white py-4 align-middle">
-                <div class="d-flex align-center gap-2 mb-1">
+                <div class="d-flex align-center gap-2 mb-1 flex-wrap">
                   <v-chip size="small" :color="getZoneColor(s)" variant="flat" class="font-weight-bold">
                     {{ s.row_label }}{{ s.seat_number }}
                   </v-chip>
                   <span>Row {{ s.row_label }}, Seat {{ s.seat_number }}</span>
+                  <v-btn
+                    v-if="['paid', 'partially_refunded'].includes(order.status) && (!hasTickets || getTicket(s.seat_booking_id)?.status === 'active')"
+                    size="x-small"
+                    color="amber-darken-1"
+                    variant="tonal"
+                    prepend-icon="mdi-swap-horizontal"
+                    class="text-none font-weight-bold ml-1"
+                    @click="openChangeSeatModal(s)"
+                  >
+                    Change Seat
+                  </v-btn>
                 </div>
                 <div v-if="s.attendee_name || s.attendee_phone" class="text-caption text-grey-lighten-1 font-weight-regular mt-1">
                   <span v-if="s.attendee_name">👤 {{ s.attendee_name }}</span>
@@ -326,6 +337,134 @@
             @click="handleRefundSubmit"
           >
             Confirm Refund ({{ refundDialog.selectedTicketIds.length }})
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
+    <!-- Change Seat Modal Dialog -->
+    <v-dialog v-model="changeSeatDialog.show" max-width="880" theme="dark">
+      <v-card theme="dark" class="rounded-xl pa-6 border bg-surface">
+        <div class="d-flex justify-space-between align-center mb-4">
+          <div class="d-flex align-center gap-3">
+            <v-avatar color="amber-darken-1" variant="tonal" size="44">
+              <v-icon icon="mdi-swap-horizontal" size="24"></v-icon>
+            </v-avatar>
+            <div>
+              <h3 class="text-h6 font-weight-bold text-white">Change Seat Assignment</h3>
+              <span class="text-caption text-grey">Select an available seat for {{ order?.event_title }}</span>
+            </div>
+          </div>
+          <v-btn icon="mdi-close" variant="text" size="small" @click="changeSeatDialog.show = false"></v-btn>
+        </div>
+
+        <v-divider class="mb-4"></v-divider>
+
+        <!-- Seat Comparison Card -->
+        <div class="pa-4 rounded-xl bg-surface-variant border mb-4">
+          <v-row dense align="center">
+            <v-col cols="12" sm="5">
+              <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Current Seat</div>
+              <div class="d-flex align-center gap-2">
+                <v-chip size="small" color="grey-darken-1" variant="flat" class="font-weight-bold">
+                  {{ changeSeatDialog.oldSeat?.row_label }}{{ changeSeatDialog.oldSeat?.seat_number }}
+                </v-chip>
+                <span class="text-body-2 font-weight-bold text-white">
+                  Row {{ changeSeatDialog.oldSeat?.row_label }}, Seat {{ changeSeatDialog.oldSeat?.seat_number }}
+                </span>
+                <span class="text-caption text-grey">({{ changeSeatDialog.oldSeat?.zone_name }})</span>
+              </div>
+            </v-col>
+            <v-col cols="12" sm="2" class="text-center">
+              <v-icon icon="mdi-arrow-right-bold" color="amber-darken-1" size="24"></v-icon>
+            </v-col>
+            <v-col cols="12" sm="5">
+              <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">New Selected Seat</div>
+              <div v-if="changeSeatDialog.newSeat" class="d-flex align-center gap-2">
+                <v-chip size="small" color="amber-darken-1" variant="flat" class="font-weight-bold">
+                  {{ changeSeatDialog.newSeat.row_label }}{{ changeSeatDialog.newSeat.seat_number }}
+                </v-chip>
+                <span class="text-body-2 font-weight-bold text-amber-darken-1">
+                  Row {{ changeSeatDialog.newSeat.row_label }}, Seat {{ changeSeatDialog.newSeat.seat_number }}
+                </span>
+                <span class="text-caption text-grey">({{ changeSeatDialog.newSeat.zone_name }} - ${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2) }})</span>
+              </div>
+              <div v-else class="text-caption text-grey-lighten-1 font-italic">
+                Click any available (colored) seat below to select
+              </div>
+            </v-col>
+          </v-row>
+        </div>
+
+        <!-- Interactive Visual Seat Map Grid -->
+        <div v-if="changeSeatDialog.loadingSeats" class="py-12 text-center">
+          <v-progress-circular indeterminate color="amber-darken-1" size="48"></v-progress-circular>
+          <div class="text-caption text-grey mt-3">Loading theater seat layout...</div>
+        </div>
+        <div v-else class="seat-picker-canvas pa-4 rounded-xl border bg-black mb-4 overflow-x-auto">
+          <!-- Screen Banner -->
+          <div class="picker-screen mb-6 mx-auto">
+            <span class="picker-screen-text">STAGE / SCREEN</span>
+          </div>
+
+          <!-- Seating Grid -->
+          <div class="d-flex flex-column gap-1 align-center">
+            <div v-for="row in changeSeatGridRows" :key="row.label" class="d-flex align-center gap-1">
+              <div class="picker-row-header">{{ row.label }}</div>
+              <div class="d-flex align-center gap-1">
+                <template v-for="slot in row.slots" :key="`${row.label}-${slot.seatNumber}`">
+                  <!-- Seat exists -->
+                  <button
+                    v-if="slot.seat"
+                    type="button"
+                    class="picker-seat-node"
+                    :class="{
+                      'picker-seat-selected': changeSeatDialog.newSeat?.id === slot.seat.id,
+                      'picker-seat-current': slot.seat.id === changeSeatDialog.oldSeat?.seat_id,
+                      'picker-seat-unavailable': isSeatUnavailableInPicker(slot.seat),
+                    }"
+                    :disabled="isSeatUnavailableInPicker(slot.seat)"
+                    :style="getPickerSeatStyle(slot.seat)"
+                    :title="`Row ${slot.seat.row_label}, Seat ${slot.seat.seat_number} (${slot.seat.zone_name}) - ${slot.seat.status === 'available' ? 'Available' : 'Unavailable'}`"
+                    @click="selectNewSeat(slot.seat)"
+                  >
+                    <span class="picker-seat-label">{{ slot.seat.seat_number }}</span>
+                    <v-icon
+                      v-if="changeSeatDialog.newSeat?.id === slot.seat.id"
+                      icon="mdi-check"
+                      size="10"
+                      color="white"
+                      class="picker-check"
+                    ></v-icon>
+                    <v-icon
+                      v-else-if="isSeatUnavailableInPicker(slot.seat)"
+                      icon="mdi-lock"
+                      size="10"
+                      color="grey"
+                    ></v-icon>
+                  </button>
+                  <!-- Empty walkway slot -->
+                  <div v-else class="picker-empty-slot"></div>
+                </template>
+              </div>
+              <div class="picker-row-header">{{ row.label }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-end gap-3">
+          <v-btn variant="text" class="text-none font-weight-bold" :disabled="changeSeatDialog.submitting" @click="changeSeatDialog.show = false">
+            Cancel
+          </v-btn>
+          <v-btn
+            color="amber-darken-1"
+            variant="flat"
+            class="text-none font-weight-bold px-6"
+            :loading="changeSeatDialog.submitting"
+            :disabled="!changeSeatDialog.newSeat"
+            @click="handleConfirmChangeSeat"
+          >
+            Confirm Change to Row {{ changeSeatDialog.newSeat?.row_label }}{{ changeSeatDialog.newSeat?.seat_number }}
           </v-btn>
         </div>
       </v-card>
@@ -641,6 +780,159 @@ async function handlePayMock() {
   }
 }
 
+// Change Seat State & Logic
+const changeSeatDialog = ref({
+  show: false,
+  oldSeat: null,
+  newSeat: null,
+  loadingSeats: false,
+  submitting: false,
+  seats: [],
+});
+
+const changeSeatGridRows = computed(() => {
+  const seats = changeSeatDialog.value.seats;
+  if (!seats.length) return [];
+
+  const map = new Map();
+  let maxCol = 0;
+  let maxRowIdx = 0;
+
+  for (const s of seats) {
+    map.set(`${s.row_label}-${s.seat_number}`, s);
+    if (s.seat_number > maxCol) maxCol = s.seat_number;
+    const rIdx = rowLabelToIndex(s.row_label);
+    if (rIdx > maxRowIdx) maxRowIdx = rIdx;
+  }
+
+  const rows = [];
+  for (let r = 0; r <= maxRowIdx; r++) {
+    const label = indexToRowLabel(r);
+    const slots = [];
+    for (let c = 1; c <= maxCol; c++) {
+      slots.push({
+        seatNumber: c,
+        seat: map.get(`${label}-${c}`) || null,
+      });
+    }
+    if (slots.some((sl) => sl.seat)) {
+      rows.push({ label, slots });
+    }
+  }
+  return rows;
+});
+
+function rowLabelToIndex(label) {
+  if (!label) return 0;
+  let res = 0;
+  for (let i = 0; i < label.length; i++) {
+    res = res * 26 + (label.charCodeAt(i) - 64);
+  }
+  return res - 1;
+}
+
+function indexToRowLabel(idx) {
+  let label = '';
+  let n = idx;
+  while (n >= 0) {
+    label = String.fromCharCode((n % 26) + 65) + label;
+    n = Math.floor(n / 26) - 1;
+  }
+  return label;
+}
+
+function isSeatUnavailableInPicker(seat) {
+  if (!seat) return true;
+  if (seat.id === changeSeatDialog.value.oldSeat?.seat_id) return true;
+  return seat.status !== 'available';
+}
+
+function hexToRgba(hex, alpha = 0.2) {
+  if (!hex || typeof hex !== 'string') return `rgba(20, 184, 166, ${alpha})`;
+  let c = hex.replace('#', '').trim();
+  if (c.length === 3) c = c.split('').map((x) => x + x).join('');
+  const num = parseInt(c, 16);
+  if (isNaN(num)) return `rgba(20, 184, 166, ${alpha})`;
+  const r = (num >> 16) & 255;
+  const g = (num >> 8) & 255;
+  const b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function getPickerSeatStyle(seat) {
+  if (changeSeatDialog.value.newSeat?.id === seat.id) {
+    return {
+      borderColor: '#f59e0b',
+      background: 'rgba(245, 158, 11, 0.4)',
+    };
+  }
+  if (seat.id === changeSeatDialog.value.oldSeat?.seat_id) {
+    return {
+      borderColor: '#6b7280',
+      background: '#374151',
+    };
+  }
+  if (seat.status !== 'available') {
+    return {
+      borderColor: '#374151',
+      background: '#1f2937',
+    };
+  }
+  const color = getZoneColor(seat);
+  return {
+    borderColor: color,
+    background: hexToRgba(color, 0.2),
+  };
+}
+
+function selectNewSeat(seat) {
+  if (isSeatUnavailableInPicker(seat)) return;
+  changeSeatDialog.value.newSeat = seat;
+}
+
+async function openChangeSeatModal(seatItem) {
+  changeSeatDialog.value = {
+    show: true,
+    oldSeat: seatItem,
+    newSeat: null,
+    loadingSeats: true,
+    submitting: false,
+    seats: [],
+  };
+
+  try {
+    const res = await api.get(`/showtimes/${order.value.showtime_id}/seats`);
+    changeSeatDialog.value.seats = res.data || [];
+  } catch (err) {
+    showToast('Failed to load showtime seats', 'error');
+  } finally {
+    changeSeatDialog.value.loadingSeats = false;
+  }
+}
+
+async function handleConfirmChangeSeat() {
+  if (!changeSeatDialog.value.oldSeat || !changeSeatDialog.value.newSeat) return;
+
+  changeSeatDialog.value.submitting = true;
+  try {
+    const res = await api.post(`/orders/${order.value.id}/change-seat`, {
+      old_seat_booking_id: changeSeatDialog.value.oldSeat.seat_booking_id,
+      new_seat_id: changeSeatDialog.value.newSeat.id,
+    });
+
+    showToast(`Seat changed to Row ${changeSeatDialog.value.newSeat.row_label}, Seat ${changeSeatDialog.value.newSeat.seat_number} successfully!`, 'success');
+    changeSeatDialog.value.show = false;
+    order.value = res.data;
+    if (['paid', 'partially_refunded', 'refunded'].includes(order.value.status)) {
+      await fetchTickets(order.value.id);
+    }
+  } catch (err) {
+    showToast(err.response?.data?.error || 'Failed to change seat', 'error');
+  } finally {
+    changeSeatDialog.value.submitting = false;
+  }
+}
+
 onMounted(() => {
   fetchOrderDetail();
 });
@@ -695,6 +987,100 @@ onMounted(() => {
 
 .gap-4 {
   gap: 16px;
+}
+
+/* Seat Picker Styles */
+.seat-picker-canvas {
+  background: #0f131c !important;
+  border-color: #2a3142 !important;
+  max-height: 400px;
+}
+
+.picker-screen {
+  height: 18px;
+  max-width: 320px;
+  background: linear-gradient(180deg, #f59e0b 0%, rgba(245, 158, 11, 0.1) 100%);
+  border-radius: 50% 50% 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.picker-screen-text {
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: #fff;
+  font-weight: 800;
+  opacity: 0.8;
+}
+
+.picker-row-header {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #64748b;
+}
+
+.picker-seat-node {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid #4b5563;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.picker-seat-node:hover:not(:disabled) {
+  transform: scale(1.15);
+  border-color: #f59e0b !important;
+  z-index: 2;
+}
+
+.picker-seat-selected {
+  border-color: #f59e0b !important;
+  border-width: 2px !important;
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  z-index: 3;
+}
+
+.picker-seat-current {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+}
+
+.picker-seat-unavailable {
+  opacity: 0.35;
+  cursor: not-allowed !important;
+}
+
+.picker-seat-label {
+  font-size: 9px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.picker-check {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #f59e0b;
+  border-radius: 50%;
+}
+
+.picker-empty-slot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
 }
 
 /* Print Only Receipt Styles */

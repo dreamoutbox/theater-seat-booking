@@ -82,6 +82,10 @@ pub fn create_router(state: AppState) -> Router {
             "/theaters/{id}/layout",
             get(theater::get_theater_layout).put(theater::save_theater_layout),
         )
+        .route(
+            "/theaters/{id}/booked-seats",
+            get(theater::get_theater_booked_seats),
+        )
         // Booking Queue
         .route("/bookings", post(booking::enqueue_booking))
         .route("/bookings/{uuid}", get(booking::get_booking_status))
@@ -94,6 +98,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/orders/{id}", get(order::get_order))
         .route("/orders/{id}/confirm-mock", post(order::confirm_mock_order))
         .route("/orders/{id}/refund", post(order::refund_order))
+        .route("/orders/{id}/change-seat", post(order::change_seat))
         .route("/orders/{id}/tickets", get(ticket::list_order_tickets))
         // Tickets & Scanning
         .route("/tickets/scan", post(ticket::scan_ticket))

@@ -4,8 +4,8 @@ use axum::{
     http::StatusCode,
 };
 use repository::{
-    OrderDetail, OrderRepository, RefundRepository, SeatBookingRepository, TicketRepository,
-    UserRole,
+    OrderDetail, OrderRepository, RefundRepository, SeatBookingRepository, SeatRepository,
+    TicketRepository, UserRole, ZoneRepository,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -650,5 +650,186 @@ pub async fn refund_order(
         stripe_refund_id,
         status: new_status.to_string(),
         refunded_ticket_count: tickets.len(),
+    }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ChangeSeatRequest {
+    pub old_seat_booking_id: Uuid,
+    pub new_seat_id: Uuid,
+}
+
+pub async fn change_seat(
+    Path(order_id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+    Json(payload): Json<ChangeSeatRequest>,
+) -> Result<Json<OrderDetail>, (StatusCode, Json<serde_json::Value>)> {
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // 1. Fetch order info & lock
+    let order_info = OrderRepository::find_order_with_event_owner_for_update(&mut *tx, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let (order_user_id, status, _, event_owner_id, _, _) = match order_info {
+        Some(info) => info,
+        None => {
+            tx.rollback().await.ok();
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Order not found" })),
+            ));
+        }
+    };
+
+    // 2. Authorization check
+    let is_owner = auth_user.id == order_user_id;
+    let is_admin_or_staff = auth_user.role == UserRole::Admin || auth_user.role == UserRole::Staff;
+    let is_event_organizer = auth_user.role == UserRole::EventOrganizer && event_owner_id == Some(auth_user.id);
+
+    if !is_owner && !is_admin_or_staff && !is_event_organizer {
+        tx.rollback().await.ok();
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Unauthorized to modify this order" })),
+        ));
+    }
+
+    // 3. Status check
+    if status != "paid" && status != "partially_refunded" {
+        tx.rollback().await.ok();
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": format!("Cannot change seats on order with status '{status}'") })),
+        ));
+    }
+
+    // 4. Verify old seat booking exists and is confirmed
+    let old_booking = SeatBookingRepository::find_by_id(&mut *tx, payload.old_seat_booking_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let booking = match old_booking {
+        Some(b) if b.status == "confirmed" => b,
+        _ => {
+            tx.rollback().await.ok();
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "The specified seat booking is not an active confirmed booking" })),
+            ));
+        }
+    };
+
+    // 5. Check if new_seat_id is taken
+    let is_taken = SeatBookingRepository::check_seat_is_taken_for_update(&mut *tx, booking.showtime_id, payload.new_seat_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    if is_taken {
+        tx.rollback().await.ok();
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({ "error": "The requested new seat is already booked or held by another customer" })),
+        ));
+    }
+
+    // 6. Update seat_id on seat_booking
+    SeatBookingRepository::update_seat_id(&mut *tx, payload.old_seat_booking_id, payload.new_seat_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": format!("Failed to update seat booking: {e}") })),
+            )
+        })?;
+
+    // 7. Update new zone price on order_seats if applicable
+    if let Some(zone_id) = SeatRepository::find_zone_id_by_id(&mut *tx, payload.new_seat_id).await.unwrap_or(None) {
+        if let Some(zone) = ZoneRepository::find_by_id(&mut *tx, zone_id).await.unwrap_or(None) {
+            OrderRepository::update_order_seat_price(&mut *tx, order_id, payload.old_seat_booking_id, zone.price_cents)
+                .await
+                .ok();
+        }
+    }
+
+    tx.commit().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    tracing::info!(
+        order_id = %order_id,
+        seat_booking_id = %payload.old_seat_booking_id,
+        new_seat_id = %payload.new_seat_id,
+        "Seat changed successfully"
+    );
+
+    // Fetch and return fresh order details
+    let order_detail = OrderRepository::find_order_detail_by_id(&state.pool, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Order not found after update" })),
+            )
+        })?;
+
+    let seats = OrderRepository::find_order_seats_by_order_id(&state.pool, order_id)
+        .await
+        .unwrap_or_default();
+
+    Ok(Json(OrderDetail {
+        id: order_detail.id,
+        user_id: order_detail.user_id,
+        user_email: order_detail.user_email,
+        showtime_id: order_detail.showtime_id,
+        event_id: order_detail.event_id,
+        event_title: order_detail.event_title,
+        theater_name: order_detail.theater_name,
+        starts_at: order_detail.starts_at,
+        total_amount_cents: order_detail.total_amount_cents,
+        refunded_amount_cents: order_detail.refunded_amount_cents,
+        status: order_detail.status,
+        stripe_payment_intent_id: order_detail.stripe_payment_intent_id,
+        stripe_client_secret: None,
+        billing_name: order_detail.billing_name,
+        tax_id: order_detail.tax_id,
+        billing_address: order_detail.billing_address,
+        organizer_tax_business_name: order_detail.organizer_tax_business_name,
+        organizer_tax_id: order_detail.organizer_tax_id,
+        organizer_tax_address: order_detail.organizer_tax_address,
+        organizer_tax_email: order_detail.organizer_tax_email,
+        organizer_tax_phone: order_detail.organizer_tax_phone,
+        created_at: order_detail.created_at,
+        seats,
     }))
 }

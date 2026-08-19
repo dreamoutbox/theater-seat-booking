@@ -1,11 +1,55 @@
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-use crate::models::{Seat, SeatWithStatus};
+use crate::models::{BookedSeatInfo, Seat, SeatWithStatus};
 
 pub struct SeatRepository;
 
 impl SeatRepository {
+    pub async fn find_booked_seats_by_theater_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        theater_id: Uuid,
+    ) -> Result<Vec<BookedSeatInfo>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT 
+                s.id AS seat_id,
+                s.row_label,
+                s.seat_number,
+                sb.showtime_id,
+                os.order_id,
+                e.title AS event_title,
+                st.starts_at,
+                sb.status,
+                u.email AS user_email
+             FROM seats s
+             JOIN seat_bookings sb ON sb.seat_id = s.id AND sb.status IN ('held', 'confirmed')
+             JOIN showtimes st ON st.id = sb.showtime_id
+             JOIN events e ON e.id = st.event_id
+             LEFT JOIN order_seats os ON os.seat_booking_id = sb.id
+             LEFT JOIN users u ON u.id = sb.user_id
+             WHERE s.theater_id = $1
+             ORDER BY s.row_label ASC, s.seat_number ASC, st.starts_at ASC",
+        )
+        .bind(theater_id)
+        .fetch_all(executor)
+        .await
+    }
+
+    pub async fn has_active_bookings_or_orders<'e, E: PgExecutor<'e>>(
+        executor: E,
+        seat_id: Uuid,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM seat_bookings sb WHERE sb.seat_id = $1 AND sb.status IN ('held', 'confirmed')
+                UNION
+                SELECT 1 FROM order_seats os JOIN seat_bookings sb2 ON sb2.id = os.seat_booking_id WHERE sb2.seat_id = $1
+            )",
+        )
+        .bind(seat_id)
+        .fetch_one(executor)
+        .await
+    }
     pub async fn find_by_theater_id<'e, E: PgExecutor<'e>>(
         executor: E,
         theater_id: Uuid,

@@ -221,20 +221,35 @@
                       :class="{
                         'seat-node-selected': isSeatSelected(slot.rowLabel, slot.seatNumber),
                         'seat-node-move-preview': isSlotInMovePreview(slot.rowLabel, slot.seatNumber),
+                        'seat-node-locked': isSeatLocked(slot.seat),
                       }"
                       :style="{
-                        borderColor: getZoneColorHex(getZoneName(slot.seat.zone_id)),
+                        borderColor: isSeatLocked(slot.seat)
+                          ? '#ef4444'
+                          : getZoneColorHex(getZoneName(slot.seat.zone_id)),
                         background: isSeatSelected(slot.rowLabel, slot.seatNumber)
                           ? 'rgba(245, 158, 11, 0.35)'
-                          : getZoneBgColorHex(getZoneName(slot.seat.zone_id)),
+                          : isSeatLocked(slot.seat)
+                            ? 'rgba(239, 68, 68, 0.2)'
+                            : getZoneBgColorHex(getZoneName(slot.seat.zone_id)),
                       }"
-                      :title="`Row ${slot.rowLabel}, Seat ${slot.seatNumber} (${getZoneName(slot.seat.zone_id)} - $${(getZonePrice(slot.seat.zone_id) / 100).toFixed(2)}) • Drag to move`"
+                      :title="isSeatLocked(slot.seat)
+                        ? `🔒 LOCKED: Row ${slot.rowLabel}, Seat ${slot.seatNumber} is booked in '${getBookedSeatInfo(slot.seat)?.event_title || 'Show'}' (${getBookedSeatInfo(slot.seat)?.order_id ? 'Order #' + getBookedSeatInfo(slot.seat).order_id.substring(0,8) : 'Held'}) • Right-click to view order`
+                        : `Row ${slot.rowLabel}, Seat ${slot.seatNumber} (${getZoneName(slot.seat.zone_id)} - $${(getZonePrice(slot.seat.zone_id) / 100).toFixed(2)}) • Drag to move`"
                       :data-row="slot.rowLabel"
                       :data-seat="slot.seatNumber"
+                      @contextmenu.prevent.stop="handleSeatContextMenu($event, slot.seat)"
                     >
                       <span class="seat-number-label">{{ slot.seatNumber }}</span>
                       <v-icon
-                        v-if="isSeatSelected(slot.rowLabel, slot.seatNumber)"
+                        v-if="isSeatLocked(slot.seat)"
+                        icon="mdi-lock"
+                        size="11"
+                        color="red-accent-2"
+                        class="locked-seat-icon"
+                      ></v-icon>
+                      <v-icon
+                        v-else-if="isSeatSelected(slot.rowLabel, slot.seatNumber)"
                         icon="mdi-check"
                         size="11"
                         color="amber-darken-1"
@@ -738,6 +753,45 @@
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3000">
       {{ snackbar.text }}
     </v-snackbar>
+
+    <!-- Right-Click Context Menu on Locked / Booked Seat -->
+    <v-menu
+      v-model="contextMenu.show"
+      :target="[contextMenu.x, contextMenu.y]"
+      theme="dark"
+      location="bottom start"
+    >
+      <v-list density="compact" class="rounded-lg bg-surface border elevation-8" style="min-width: 220px;">
+        <v-list-subheader class="font-weight-bold text-caption text-grey text-uppercase px-3 py-1">
+          Seat {{ contextMenu.seat?.row_label }}{{ contextMenu.seat?.seat_number }}
+        </v-list-subheader>
+
+        <v-list-item
+          v-if="contextMenu.bookingInfo?.order_id"
+          prepend-icon="mdi-open-in-new"
+          title="Go to Order"
+          :subtitle="`Order #${contextMenu.bookingInfo.order_id.substring(0, 8)} • ${contextMenu.bookingInfo.event_title}`"
+          class="text-teal-accent-3 font-weight-bold cursor-pointer"
+          @click="openOrderPage(contextMenu.bookingInfo.order_id)"
+        ></v-list-item>
+
+        <v-list-item
+          v-else-if="contextMenu.bookingInfo"
+          prepend-icon="mdi-clock-outline"
+          title="Seat Held in Queue"
+          :subtitle="`${contextMenu.bookingInfo.event_title} (${contextMenu.bookingInfo.user_email || 'In Progress'})`"
+          disabled
+        ></v-list-item>
+
+        <v-list-item
+          v-else
+          prepend-icon="mdi-check-circle-outline"
+          title="Available (No Bookings)"
+          subtitle="Seat is free to modify"
+          disabled
+        ></v-list-item>
+      </v-list>
+    </v-menu>
   </v-container>
 </template>
 
@@ -760,6 +814,52 @@ const currentTheaterName = computed(() => {
 });
 const draftZones = ref([]);
 const draftSeats = ref([]);
+
+const bookedSeats = ref([]);
+const bookedSeatsMap = computed(() => {
+  const map = new Map();
+  for (const b of bookedSeats.value) {
+    if (b.seat_id) map.set(b.seat_id, b);
+    if (b.row_label && b.seat_number) {
+      map.set(`${b.row_label}-${b.seat_number}`, b);
+    }
+  }
+  return map;
+});
+
+function isSeatLocked(seat) {
+  if (!seat) return false;
+  return bookedSeatsMap.value.has(seat.id) || bookedSeatsMap.value.has(`${seat.row_label}-${seat.seat_number}`);
+}
+
+function getBookedSeatInfo(seat) {
+  if (!seat) return null;
+  return bookedSeatsMap.value.get(seat.id) || bookedSeatsMap.value.get(`${seat.row_label}-${seat.seat_number}`) || null;
+}
+
+const contextMenu = ref({
+  show: false,
+  x: 0,
+  y: 0,
+  seat: null,
+  bookingInfo: null,
+});
+
+function handleSeatContextMenu(e, seat) {
+  const bInfo = getBookedSeatInfo(seat);
+  contextMenu.value = {
+    show: true,
+    x: e.clientX,
+    y: e.clientY,
+    seat,
+    bookingInfo: bInfo,
+  };
+}
+
+function openOrderPage(orderId) {
+  if (!orderId) return;
+  window.open(`/orders/${orderId}`, '_blank');
+}
 
 const selectedSeatKeys = ref(new Set()); // Set of "ROW-SEATNUM" strings
 const hintSlotsToCreate = ref(new Set()); // Set of "ROW-SEATNUM" empty slots currently in marquee
@@ -1430,11 +1530,31 @@ function applyBulkRowLabel() {
 function bulkDeleteSelectedSeats() {
   const count = selectedSeatKeys.value.size;
   if (count === 0) return;
-  draftSeats.value = draftSeats.value.filter(
-    s => !selectedSeatKeys.value.has(`${s.row_label}-${s.seat_number}`)
-  );
+
+  const lockedKeys = [];
+  for (const key of selectedSeatKeys.value) {
+    if (bookedSeatsMap.value.has(key)) {
+      lockedKeys.push(key);
+    }
+  }
+
+  if (lockedKeys.length > 0) {
+    showToast(`Cannot delete ${lockedKeys.length} locked seat(s) with active customer bookings (${lockedKeys.join(', ')})`, 'warning');
+  }
+
+  draftSeats.value = draftSeats.value.filter(s => {
+    const key = `${s.row_label}-${s.seat_number}`;
+    if (bookedSeatsMap.value.has(s.id) || bookedSeatsMap.value.has(key)) {
+      return true; // Retain locked seats
+    }
+    return !selectedSeatKeys.value.has(key);
+  });
+
   clearSelection();
-  showToast(`Deleted ${count} seat(s) — grid walkways preserved`, 'info');
+  const deletedCount = count - lockedKeys.length;
+  if (deletedCount > 0) {
+    showToast(`Deleted ${deletedCount} seat(s) — grid walkways preserved`, 'info');
+  }
 }
 
 // Keyboard shortcuts (Delete / Backspace / Esc)
@@ -1585,8 +1705,12 @@ async function fetchLayout() {
   slotElementMap.clear();
 
   try {
-    const res = await api.get(`/theaters/${selectedTheaterId.value}/layout`);
+    const [res, bookedRes] = await Promise.all([
+      api.get(`/theaters/${selectedTheaterId.value}/layout`),
+      api.get(`/theaters/${selectedTheaterId.value}/booked-seats`).catch(() => ({ data: [] })),
+    ]);
     originalLayout.value = res.data;
+    bookedSeats.value = bookedRes.data || [];
     draftZones.value = JSON.parse(JSON.stringify(res.data.zones || []));
     draftSeats.value = JSON.parse(JSON.stringify(res.data.seats || []));
 

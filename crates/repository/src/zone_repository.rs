@@ -6,6 +6,20 @@ use crate::models::Zone;
 pub struct ZoneRepository;
 
 impl ZoneRepository {
+    pub async fn find_by_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        id: Uuid,
+    ) -> Result<Option<Zone>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT id, theater_id, name, price_cents, color
+             FROM zones
+             WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(executor)
+        .await
+    }
+
     pub async fn find_by_theater_id<'e, E: PgExecutor<'e>>(
         executor: E,
         theater_id: Uuid,

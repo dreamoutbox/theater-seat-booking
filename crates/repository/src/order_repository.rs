@@ -267,4 +267,23 @@ impl OrderRepository {
         .await?;
         Ok(())
     }
+
+    pub async fn update_order_seat_price<'e, E: PgExecutor<'e>>(
+        executor: E,
+        order_id: Uuid,
+        seat_booking_id: Uuid,
+        new_price_cents: i64,
+    ) -> Result<bool, sqlx::Error> {
+        let res = sqlx::query(
+            "UPDATE order_seats
+             SET price_cents = $1
+             WHERE order_id = $2 AND seat_booking_id = $3",
+        )
+        .bind(new_price_cents)
+        .bind(order_id)
+        .bind(seat_booking_id)
+        .execute(executor)
+        .await?;
+        Ok(res.rows_affected() > 0)
+    }
 }
