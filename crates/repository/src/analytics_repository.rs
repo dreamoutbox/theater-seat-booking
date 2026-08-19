@@ -23,8 +23,8 @@ impl AnalyticsRepository {
 
         let row: MetricsRow = sqlx::query_as(
             "SELECT 
-                COALESCE(SUM(o.total_amount_cents), 0) AS gross_sales_cents,
-                COALESCE(SUM(o.refunded_amount_cents), 0) AS total_refunds_cents,
+                COALESCE(SUM(o.total_amount_cents), 0)::BIGINT AS gross_sales_cents,
+                COALESCE(SUM(o.refunded_amount_cents), 0)::BIGINT AS total_refunds_cents,
                 (
                     SELECT COUNT(*)
                     FROM tickets t
@@ -128,12 +128,12 @@ impl AnalyticsRepository {
                     SELECT SUM(o.total_amount_cents)
                     FROM orders o
                     WHERE o.showtime_id = st.id AND o.status IN ('paid', 'partially_refunded', 'refunded')
-                ), 0) AS gross_cents,
+                ), 0)::BIGINT AS gross_cents,
                 COALESCE((
                     SELECT SUM(o.refunded_amount_cents)
                     FROM orders o
                     WHERE o.showtime_id = st.id AND o.status IN ('paid', 'partially_refunded', 'refunded')
-                ), 0) AS refunded_cents,
+                ), 0)::BIGINT AS refunded_cents,
                 (
                     COALESCE((
                         SELECT SUM(o.total_amount_cents)
@@ -145,7 +145,7 @@ impl AnalyticsRepository {
                         FROM orders o
                         WHERE o.showtime_id = st.id AND o.status IN ('paid', 'partially_refunded', 'refunded')
                     ), 0)
-                ) AS net_cents
+                )::BIGINT AS net_cents
              FROM showtimes st
              JOIN events e ON e.id = st.event_id
              JOIN theaters th ON th.id = st.theater_id
