@@ -254,59 +254,63 @@
           </span>
         </div>
 
-        <div class="d-flex flex-column gap-3">
-          <v-card
-            v-for="r in refunds"
-            :key="r.id"
-            variant="outlined"
-            class="pa-4 rounded-lg border bg-surface-variant"
-          >
-            <div class="d-flex flex-wrap justify-space-between align-start gap-2 mb-2">
-              <div>
-                <div class="d-flex align-center gap-2 flex-wrap mb-1">
-                  <span class="text-caption text-grey font-weight-mono text-uppercase">Refund ID</span>
-                  <span class="text-caption font-weight-mono text-red-accent-2 font-weight-bold">#{{ r.id }}</span>
-                  <v-chip size="x-small" color="red-accent-2" variant="tonal" class="font-weight-bold">
-                    -${{ (r.amount_cents / 100).toFixed(2) }}
-                  </v-chip>
+        <v-table theme="dark" class="rounded-lg border">
+          <thead>
+            <tr>
+              <th class="text-left font-weight-bold">Refund ID & Time</th>
+              <th class="text-left font-weight-bold">Processed By</th>
+              <th class="text-left font-weight-bold">Refunded Seats & Tickets</th>
+              <th class="text-left font-weight-bold">Reason / Gateway Ref</th>
+              <th class="text-right font-weight-bold">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in refunds" :key="r.id">
+              <td class="py-3 align-middle">
+                <div class="font-weight-mono text-caption text-red-accent-2 font-weight-bold">
+                  #{{ r.id.slice(0, 8) }}
                 </div>
                 <div class="text-caption text-grey">
-                  Processed on <strong class="text-white">{{ formatDate(r.created_at) }}</strong>
-                  <span v-if="r.refunded_by_email"> by <strong class="text-white">{{ r.refunded_by_email }}</strong></span>
+                  {{ formatDate(r.created_at) }}
                 </div>
-              </div>
-
-              <div class="text-right">
-                <div v-if="r.stripe_refund_id" class="text-caption font-weight-mono text-grey-lighten-2">
-                  Gateway Ref: {{ r.stripe_refund_id }}
+              </td>
+              <td class="align-middle">
+                <div class="text-body-2 text-white">
+                  {{ r.refunded_by_email || 'System' }}
                 </div>
-                <div v-if="r.reason" class="text-caption text-amber-darken-1 font-italic mt-1">
-                  Reason: {{ r.reason }}
+              </td>
+              <td class="py-3 align-middle">
+                <div v-if="r.items && r.items.length > 0" class="d-flex flex-wrap gap-1">
+                  <v-chip
+                    v-for="item in r.items"
+                    :key="item.ticket_id"
+                    size="x-small"
+                    color="red-accent-2"
+                    variant="tonal"
+                    class="font-weight-bold"
+                  >
+                    Row {{ item.row_label }}{{ item.seat_number }}
+                    <span v-if="item.ticket_code" class="font-weight-mono ml-1 text-grey-lighten-1">[{{ item.ticket_code }}]</span>
+                    <span class="ml-1 font-weight-mono">(${{ (item.price_cents / 100).toFixed(2) }})</span>
+                  </v-chip>
                 </div>
-              </div>
-            </div>
-
-            <!-- Refunded Tickets List -->
-            <div v-if="r.items && r.items.length > 0" class="pt-2 border-top">
-              <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Refunded Tickets:</div>
-              <div class="d-flex flex-wrap gap-2">
-                <v-chip
-                  v-for="item in r.items"
-                  :key="item.ticket_id"
-                  size="small"
-                  color="red-accent-2"
-                  variant="outlined"
-                  class="font-weight-bold"
-                >
-                  <v-icon icon="mdi-ticket-outline" start size="14"></v-icon>
-                  Row {{ item.row_label }}, Seat {{ item.seat_number }} ({{ item.zone_name }})
-                  <span v-if="item.ticket_code" class="font-weight-mono ml-1 text-grey-lighten-1">[{{ item.ticket_code }}]</span>
-                  <span class="ml-1 text-white font-weight-mono">${{ (item.price_cents / 100).toFixed(2) }}</span>
-                </v-chip>
-              </div>
-            </div>
-          </v-card>
-        </div>
+                <span v-else class="text-caption text-grey">—</span>
+              </td>
+              <td class="py-3 align-middle">
+                <div v-if="r.reason" class="text-body-2 text-white">
+                  {{ r.reason }}
+                </div>
+                <div v-if="r.stripe_refund_id" class="text-caption text-grey font-weight-mono">
+                  Ref: {{ r.stripe_refund_id }}
+                </div>
+                <span v-if="!r.reason && !r.stripe_refund_id" class="text-caption text-grey">—</span>
+              </td>
+              <td class="text-right font-weight-mono font-weight-bold text-red-accent-2 align-middle">
+                -${{ (r.amount_cents / 100).toFixed(2) }}
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
       </div>
 
       <!-- Seat Change History Section -->
@@ -320,53 +324,82 @@
           </div>
         </div>
 
-        <div class="d-flex flex-column gap-3">
-          <v-card
-            v-for="sc in seatChanges"
-            :key="sc.id"
-            variant="outlined"
-            class="pa-4 rounded-lg border bg-surface-variant"
-          >
-            <div class="d-flex flex-wrap justify-space-between align-center gap-3">
-              <div class="d-flex align-center gap-3 flex-wrap">
-                <!-- From seat -->
+        <v-table theme="dark" class="rounded-lg border">
+          <thead>
+            <tr>
+              <th class="text-left font-weight-bold">Time & Processor</th>
+              <th class="text-left font-weight-bold">Ticket Code</th>
+              <th class="text-left font-weight-bold">Previous Seat</th>
+              <th class="text-left font-weight-bold" style="width: 36px;"></th>
+              <th class="text-left font-weight-bold">New Assigned Seat</th>
+              <th class="text-left font-weight-bold">Change Type & Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="sc in seatChanges" :key="sc.id">
+              <td class="py-3 align-middle">
+                <div class="text-caption text-white font-weight-bold">
+                  {{ formatDate(sc.created_at) }}
+                </div>
+                <div class="text-caption text-grey">
+                  {{ sc.changed_by_email || 'Customer Self-service' }}
+                </div>
+              </td>
+              <td class="align-middle font-weight-mono font-weight-bold text-amber-darken-1">
+                {{ sc.ticket_code || '—' }}
+              </td>
+              <td class="py-3 align-middle">
                 <div class="d-flex align-center gap-2">
                   <v-chip size="small" color="grey-darken-1" variant="flat" class="font-weight-bold">
                     {{ sc.old_row_label }}{{ sc.old_seat_number }}
                   </v-chip>
-                  <span class="text-body-2 text-grey-lighten-1">
-                    Row {{ sc.old_row_label }}, Seat {{ sc.old_seat_number }} ({{ sc.old_zone_name }})
-                  </span>
+                  <div>
+                    <div class="text-caption font-weight-bold text-white">
+                      Row {{ sc.old_row_label }}, Seat {{ sc.old_seat_number }}
+                    </div>
+                    <div class="text-caption text-grey">
+                      {{ sc.old_zone_name }} · ${{ (sc.old_price_cents / 100).toFixed(2) }}
+                    </div>
+                  </div>
                 </div>
-
+              </td>
+              <td class="text-center align-middle px-1">
                 <v-icon icon="mdi-arrow-right" color="amber-darken-1" size="18"></v-icon>
-
-                <!-- To seat -->
+              </td>
+              <td class="py-3 align-middle">
                 <div class="d-flex align-center gap-2">
                   <v-chip size="small" color="amber-darken-1" variant="flat" class="font-weight-bold">
                     {{ sc.new_row_label }}{{ sc.new_seat_number }}
                   </v-chip>
-                  <span class="text-body-2 font-weight-bold text-white">
-                    Row {{ sc.new_row_label }}, Seat {{ sc.new_seat_number }} ({{ sc.new_zone_name }})
-                  </span>
+                  <div>
+                    <div class="text-caption font-weight-bold text-amber-darken-1">
+                      Row {{ sc.new_row_label }}, Seat {{ sc.new_seat_number }}
+                    </div>
+                    <div class="text-caption text-grey">
+                      {{ sc.new_zone_name }} · ${{ (sc.new_price_cents / 100).toFixed(2) }}
+                    </div>
+                  </div>
                 </div>
-              </div>
-
-              <div class="text-right">
-                <div class="text-caption text-grey">
-                  {{ formatDate(sc.created_at) }}
-                  <span v-if="sc.changed_by_email"> by {{ sc.changed_by_email }}</span>
+              </td>
+              <td class="py-3 align-middle">
+                <div class="d-flex align-center gap-1 flex-wrap mb-1">
+                  <v-chip
+                    size="x-small"
+                    :color="getSeatChangeColor(sc)"
+                    variant="tonal"
+                    class="font-weight-bold"
+                    :prepend-icon="getSeatChangeIcon(sc)"
+                  >
+                    {{ getSeatChangeLabel(sc) }}
+                  </v-chip>
                 </div>
-                <div v-if="sc.ticket_code" class="text-caption font-weight-mono text-amber-darken-1">
-                  Ticket: {{ sc.ticket_code }}
+                <div v-if="sc.reason" class="text-caption text-grey-lighten-1">
+                  <strong>Reason:</strong> {{ sc.reason }}
                 </div>
-              </div>
-            </div>
-            <div v-if="sc.reason" class="text-caption text-grey mt-2">
-              <strong>Reason:</strong> {{ sc.reason }}
-            </div>
-          </v-card>
-        </div>
+              </td>
+            </tr>
+          </tbody>
+        </v-table>
       </div>
 
       <v-divider class="mb-6"></v-divider>
