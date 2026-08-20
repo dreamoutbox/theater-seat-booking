@@ -157,6 +157,7 @@ theater-seat-booking/
 | `./dev-frontend.sh` | Start Vite dev server on port 5173 (proxies `/api` to backend) |
 | `cargo check --workspace` | Verify all crates compile without errors |
 | `cargo run --bin seed` | Re-seed demo data (idempotent, skips existing) |
+| `./test-e2e.sh` | Reset database & run all Playwright E2E tests (supports flags e.g. `--headed`, `--ui`) |
 
 > **IMPORTANT**: Always run `cargo check --workspace` after backend changes.
 > **Do NOT run tests automatically** — the user runs tests manually and reports results.

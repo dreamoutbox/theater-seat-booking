@@ -57,6 +57,7 @@ async fn seed_users(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> {
         ),
         ("alice@customer.local", "customer123", UserRole::Customer),
         ("bob@customer.local", "customer123", UserRole::Customer),
+        ("charlie@customer.local", "customer123", UserRole::Customer),
     ];
 
     for (email, password, role) in users {
