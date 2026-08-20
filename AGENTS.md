@@ -532,3 +532,9 @@ Run `git add . && git commit -m "..."` after each logical phase of work. Use con
 
 ### Response Format
 All API responses are JSON. Error responses: `{ "error": "message string" }`. Success responses return the relevant struct or `{ "success": true, "message": "..." }`.
+
+### Playwright Tests: Seat & Account Isolation for Parallel Execution
+When writing end-to-end Playwright tests:
+- **Never reuse the same seat across different test files** (e.g., Test A uses `D1`, Test B uses `D2`, Test C uses `D3`). The booking engine uses Postgres advisory locks and partial unique constraints on `(showtime_id, seat_id)` that will cause lock contention, race conditions, and test timeouts if tests run concurrently.
+- **Use distinct demo accounts** (e.g., `alice@customer.local` vs `bob@customer.local`) when multiple tests perform checkout or account actions in parallel.
+- Playwright is configured to run tests in parallel (`fullyParallel: true`). Strict seat and account isolation ensures fast, flake-free execution.
