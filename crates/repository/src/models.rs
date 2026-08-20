@@ -208,6 +208,7 @@ pub struct OrderSeat {
     pub order_id: Uuid,
     pub seat_booking_id: Uuid,
     pub price_cents: i64,
+    pub original_price_cents: Option<i64>,
     pub attendee_name: Option<String>,
     pub attendee_phone: Option<String>,
 }
@@ -220,6 +221,7 @@ pub struct OrderSeatDetail {
     pub seat_number: i32,
     pub zone_name: String,
     pub price_cents: i64,
+    pub original_price_cents: Option<i64>,
     pub attendee_name: Option<String>,
     pub attendee_phone: Option<String>,
 }

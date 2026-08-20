@@ -43,8 +43,8 @@ impl OrderRepository {
         attendee_phone: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         sqlx::query(
-            "INSERT INTO order_seats (order_id, seat_booking_id, price_cents, attendee_name, attendee_phone, row_label, seat_number, zone_name)
-             SELECT $1, $2, $3, $4, $5, s.row_label, s.seat_number, z.name
+            "INSERT INTO order_seats (order_id, seat_booking_id, price_cents, original_price_cents, attendee_name, attendee_phone, row_label, seat_number, zone_name)
+             SELECT $1, $2, $3, $3, $4, $5, s.row_label, s.seat_number, z.name
              FROM seat_bookings sb
              LEFT JOIN seats s ON s.id = sb.seat_id
              LEFT JOIN zones z ON z.id = s.zone_id
@@ -141,7 +141,9 @@ impl OrderRepository {
                     COALESCE(s.row_label, os.row_label, '—') as row_label, 
                     COALESCE(s.seat_number, os.seat_number, 0) as seat_number, 
                     COALESCE(z.name, os.zone_name, 'Standard') as zone_name,
-                    os.price_cents, os.attendee_name, os.attendee_phone
+                    os.price_cents, 
+                    COALESCE(os.original_price_cents, os.price_cents) as original_price_cents,
+                    os.attendee_name, os.attendee_phone
              FROM order_seats os
              LEFT JOIN seat_bookings sb ON sb.id = os.seat_booking_id
              LEFT JOIN seats s ON s.id = sb.seat_id
@@ -159,25 +161,21 @@ impl OrderRepository {
         id: Uuid,
         user_id: Uuid,
     ) -> Result<Option<String>, sqlx::Error> {
-        sqlx::query_scalar(
-            "SELECT status FROM orders WHERE id = $1 AND user_id = $2 FOR UPDATE",
-        )
-        .bind(id)
-        .bind(user_id)
-        .fetch_optional(executor)
-        .await
+        sqlx::query_scalar("SELECT status FROM orders WHERE id = $1 AND user_id = $2 FOR UPDATE")
+            .bind(id)
+            .bind(user_id)
+            .fetch_optional(executor)
+            .await
     }
 
     pub async fn find_id_by_payment_intent_for_update<'e, E: PgExecutor<'e>>(
         executor: E,
         payment_intent_id: &str,
     ) -> Result<Option<Uuid>, sqlx::Error> {
-        sqlx::query_scalar(
-            "SELECT id FROM orders WHERE stripe_payment_intent_id = $1 FOR UPDATE",
-        )
-        .bind(payment_intent_id)
-        .fetch_optional(executor)
-        .await
+        sqlx::query_scalar("SELECT id FROM orders WHERE stripe_payment_intent_id = $1 FOR UPDATE")
+            .bind(payment_intent_id)
+            .fetch_optional(executor)
+            .await
     }
 
     pub async fn update_status<'e, E: PgExecutor<'e>>(
@@ -216,12 +214,10 @@ impl OrderRepository {
         executor: E,
         stripe_event_id: &str,
     ) -> Result<bool, sqlx::Error> {
-        sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM payment_events WHERE stripe_event_id = $1)",
-        )
-        .bind(stripe_event_id)
-        .fetch_one(executor)
-        .await
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM payment_events WHERE stripe_event_id = $1)")
+            .bind(stripe_event_id)
+            .fetch_one(executor)
+            .await
     }
 
     pub async fn update_refund_status<'e, E: PgExecutor<'e>>(
@@ -230,14 +226,13 @@ impl OrderRepository {
         status: &str,
         new_total_refunded_cents: i64,
     ) -> Result<bool, sqlx::Error> {
-        let res = sqlx::query(
-            "UPDATE orders SET status = $1, refunded_amount_cents = $2 WHERE id = $3",
-        )
-        .bind(status)
-        .bind(new_total_refunded_cents)
-        .bind(order_id)
-        .execute(executor)
-        .await?;
+        let res =
+            sqlx::query("UPDATE orders SET status = $1, refunded_amount_cents = $2 WHERE id = $3")
+                .bind(status)
+                .bind(new_total_refunded_cents)
+                .bind(order_id)
+                .execute(executor)
+                .await?;
         Ok(res.rows_affected() > 0)
     }
 
@@ -318,5 +313,24 @@ impl OrderRepository {
         .execute(executor)
         .await?;
         Ok(res.rows_affected() > 0)
+    }
+
+    pub async fn update_total_amount_from_seats<'e, E: PgExecutor<'e>>(
+        executor: E,
+        order_id: Uuid,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE orders
+             SET total_amount_cents = (
+                 SELECT COALESCE(SUM(price_cents), 0)
+                 FROM order_seats
+                 WHERE order_id = $1
+             )
+             WHERE id = $1",
+        )
+        .bind(order_id)
+        .execute(executor)
+        .await?;
+        Ok(())
     }
 }

@@ -705,6 +705,7 @@ pub struct ChangeSeatRequest {
     pub old_seat_booking_id: Uuid,
     pub new_seat_id: Uuid,
     pub reason: Option<String>,
+    pub is_free_upgrade: Option<bool>,
 }
 
 pub async fn change_seat(
@@ -850,7 +851,21 @@ pub async fn change_seat(
             )
         })?;
 
-    // 10. Update snapshot on order_seats
+    // 10. Determine pricing (Free upgrade vs price update)
+    let is_elevated = auth_user.role == UserRole::Admin || auth_user.role == UserRole::Staff || is_event_organizer;
+    let is_free_upgrade = payload.is_free_upgrade.unwrap_or(false) && is_elevated;
+    let effective_price_cents = if is_free_upgrade {
+        old_price_cents
+    } else {
+        new_seat.price_cents
+    };
+    let price_difference_cents = if is_free_upgrade {
+        0
+    } else {
+        new_seat.price_cents - old_price_cents
+    };
+
+    // Update snapshot on order_seats
     OrderRepository::update_order_seat_full(
         &mut *tx,
         order_id,
@@ -858,7 +873,7 @@ pub async fn change_seat(
         &new_seat.row_label,
         new_seat.seat_number,
         &new_seat.zone_name,
-        new_seat.price_cents,
+        effective_price_cents,
     )
     .await
     .map_err(|e| {
@@ -868,12 +883,24 @@ pub async fn change_seat(
         )
     })?;
 
+    // 10b. Recalculate orders.total_amount_cents from actual seat prices
+    OrderRepository::update_total_amount_from_seats(&mut *tx, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": format!("Failed to recalculate order total: {e}") })),
+            )
+        })?;
+
     // 11. Record seat change log entry
     let change_log_id = Uuid::new_v4();
     let metadata = serde_json::json!({
         "old_zone_name": old_zone_name,
         "new_zone_name": new_seat.zone_name,
-        "price_difference_cents": new_seat.price_cents - old_price_cents,
+        "catalog_new_price_cents": new_seat.price_cents,
+        "price_difference_cents": price_difference_cents,
+        "is_free_upgrade": is_free_upgrade,
         "changed_by_role": auth_user.role.as_str(),
         "ticket_code": ticket_opt.as_ref().map(|t| t.code.clone()),
     });
@@ -894,7 +921,7 @@ pub async fn change_seat(
         &new_seat.row_label,
         new_seat.seat_number,
         &new_seat.zone_name,
-        new_seat.price_cents,
+        effective_price_cents,
         Some(auth_user.id),
         payload.reason.as_deref(),
         Some(metadata),

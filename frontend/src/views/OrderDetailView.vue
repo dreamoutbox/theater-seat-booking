@@ -151,6 +151,18 @@
                     Change Seat
                   </v-btn>
                 </div>
+                <!-- Upgrade / Seat Change Origin Badge -->
+                <div v-if="getLatestSeatChange(s.seat_booking_id)" class="d-flex align-center gap-1 mt-1 flex-wrap">
+                  <v-chip
+                    size="x-small"
+                    :color="getSeatChangeColor(getLatestSeatChange(s.seat_booking_id))"
+                    variant="tonal"
+                    class="font-weight-bold"
+                    :prepend-icon="getSeatChangeIcon(getLatestSeatChange(s.seat_booking_id))"
+                  >
+                    {{ getSeatChangeLabel(getLatestSeatChange(s.seat_booking_id)) }}
+                  </v-chip>
+                </div>
                 <div v-if="s.attendee_name || s.attendee_phone" class="text-caption text-grey-lighten-1 font-weight-regular mt-1">
                   <span v-if="s.attendee_name">👤 {{ s.attendee_name }}</span>
                   <span v-if="s.attendee_phone" class="ml-2">📞 {{ s.attendee_phone }}</span>
@@ -205,9 +217,23 @@
                 <span v-else class="text-caption text-grey">Generating ticket...</span>
               </td>
               <td class="text-right font-weight-mono font-weight-bold text-white align-middle">
-                <span :class="{ 'text-decoration-line-through text-grey': getTicket(s.seat_booking_id)?.status === 'refunded' }">
+                <div :class="{ 'text-decoration-line-through text-grey': getTicket(s.seat_booking_id)?.status === 'refunded' }">
                   ${{ (s.price_cents / 100).toFixed(2) }}
-                </span>
+                </div>
+                <div
+                  v-if="getLatestSeatChange(s.seat_booking_id)?.metadata?.is_free_upgrade"
+                  class="text-caption text-purple-accent-2 font-weight-bold"
+                  title="Complimentary Upgrade"
+                >
+                  <span>Free Upgrade</span>
+                </div>
+                <div
+                  v-else-if="s.original_price_cents && s.original_price_cents !== s.price_cents"
+                  class="text-caption text-grey font-weight-regular font-mono"
+                  title="Original purchase price before seat change"
+                >
+                  <span class="text-grey-lighten-1">Orig: ${{ (s.original_price_cents / 100).toFixed(2) }}</span>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -581,6 +607,50 @@
           </div>
         </div>
 
+        <!-- Free Upgrade Option & Reason Field for Elevated Staff/Admin -->
+        <div v-if="changeSeatDialog.newSeat" class="mb-4">
+          <div
+            v-if="authStore.isElevated && changeSeatDialog.newSeat.price_cents > (changeSeatDialog.oldSeat?.price_cents || 0)"
+            class="pa-3 rounded-lg border bg-surface-variant mb-3"
+          >
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+              <div>
+                <div class="d-flex align-center gap-2">
+                  <v-icon
+                    :icon="changeSeatDialog.isFreeUpgrade ? 'mdi-gift-outline' : 'mdi-currency-usd'"
+                    :color="changeSeatDialog.isFreeUpgrade ? 'purple-accent-2' : 'amber-darken-1'"
+                  ></v-icon>
+                  <span class="font-weight-bold text-white text-body-2">Free Upgrade / Complimentary Move</span>
+                </div>
+                <div class="text-caption text-grey mt-1">
+                  <span v-if="changeSeatDialog.isFreeUpgrade">
+                    Order total remains <strong>${{ ((changeSeatDialog.oldSeat?.price_cents || 0) / 100).toFixed(2) }}</strong>. No extra charge will be billed to the customer.
+                  </span>
+                  <span v-else>
+                    Order total will be updated to <strong>${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2) }}</strong> (+${{ (((changeSeatDialog.newSeat.price_cents || 0) - (changeSeatDialog.oldSeat?.price_cents || 0)) / 100).toFixed(2) }} price difference).
+                  </span>
+                </div>
+              </div>
+              <v-switch
+                v-model="changeSeatDialog.isFreeUpgrade"
+                color="purple-accent-2"
+                hide-details
+                density="compact"
+                inset
+              ></v-switch>
+            </div>
+          </div>
+
+          <v-text-field
+            v-model="changeSeatDialog.reason"
+            label="Reason for Seat Change (Optional)"
+            placeholder="e.g. Complimentary VIP upgrade, Operational reseating, Customer request"
+            density="compact"
+            variant="outlined"
+            hide-details
+          ></v-text-field>
+        </div>
+
         <div class="d-flex justify-end gap-3">
           <v-btn variant="text" class="text-none font-weight-bold" :disabled="changeSeatDialog.submitting" @click="changeSeatDialog.show = false">
             Cancel
@@ -655,13 +725,23 @@
         </thead>
         <tbody>
           <tr v-for="s in order.seats" :key="s.seat_booking_id">
-            <td class="font-bold">Row {{ s.row_label }}, Seat {{ s.seat_number }} ({{ s.zone_name }})</td>
+            <td class="font-bold">
+              Row {{ s.row_label }}, Seat {{ s.seat_number }} ({{ s.zone_name }})
+              <div v-if="getLatestSeatChange(s.seat_booking_id)" class="text-muted" style="font-size: 11px; font-weight: normal;">
+                ↳ {{ getSeatChangeLabel(getLatestSeatChange(s.seat_booking_id)) }}
+              </div>
+            </td>
             <td>
               <span class="font-bold">{{ s.attendee_name || order.billing_name || order.user_email }}</span>
               <span v-if="s.attendee_phone" class="text-muted ml-2">({{ s.attendee_phone }})</span>
             </td>
             <td class="text-center font-mono font-bold">{{ getTicket(s.seat_booking_id)?.code || '—' }}</td>
-            <td class="text-right font-mono font-bold">${{ (s.price_cents / 100).toFixed(2) }}</td>
+            <td class="text-right font-mono font-bold">
+              <div>${{ (s.price_cents / 100).toFixed(2) }}</div>
+              <div v-if="s.original_price_cents && s.original_price_cents !== s.price_cents" style="font-size: 10px; font-weight: normal; color: #666;">
+                (Orig: ${{ (s.original_price_cents / 100).toFixed(2) }})
+              </div>
+            </td>
           </tr>
         </tbody>
         <tfoot>
@@ -869,6 +949,61 @@ function getZoneColor(seatOrName) {
   return '#14b8a6';
 }
 
+const seatChangesByBookingId = computed(() => {
+  const map = new Map();
+  for (const sc of seatChanges.value) {
+    if (sc.seat_booking_id) {
+      if (!map.has(sc.seat_booking_id)) {
+        map.set(sc.seat_booking_id, []);
+      }
+      map.get(sc.seat_booking_id).push(sc);
+    }
+  }
+  return map;
+});
+
+function getSeatChanges(seatBookingId) {
+  return seatChangesByBookingId.value.get(seatBookingId) || [];
+}
+
+function getLatestSeatChange(seatBookingId) {
+  const list = getSeatChanges(seatBookingId);
+  return list.length > 0 ? list[0] : null;
+}
+
+function getSeatChangeLabel(sc) {
+  if (!sc) return '';
+  if (sc.metadata?.is_free_upgrade) {
+    return `🎁 Free Upgrade from Row ${sc.old_row_label}${sc.old_seat_number} (${sc.old_zone_name} · $${(sc.old_price_cents / 100).toFixed(2)})`;
+  }
+  const priceDiff = sc.new_price_cents - sc.old_price_cents;
+  if (priceDiff > 0) {
+    return `Upgraded from Row ${sc.old_row_label}${sc.old_seat_number} (${sc.old_zone_name} · $${(sc.old_price_cents / 100).toFixed(2)})`;
+  } else if (priceDiff < 0) {
+    return `Downgraded from Row ${sc.old_row_label}${sc.old_seat_number} (${sc.old_zone_name} · $${(sc.old_price_cents / 100).toFixed(2)})`;
+  } else {
+    return `Relocated from Row ${sc.old_row_label}${sc.old_seat_number} (${sc.old_zone_name})`;
+  }
+}
+
+function getSeatChangeColor(sc) {
+  if (!sc) return 'grey';
+  if (sc.metadata?.is_free_upgrade) return 'purple-accent-2';
+  const priceDiff = sc.new_price_cents - sc.old_price_cents;
+  if (priceDiff > 0) return 'amber-darken-1';
+  if (priceDiff < 0) return 'cyan-accent-3';
+  return 'blue-grey';
+}
+
+function getSeatChangeIcon(sc) {
+  if (!sc) return 'mdi-swap-horizontal';
+  if (sc.metadata?.is_free_upgrade) return 'mdi-gift-outline';
+  const priceDiff = sc.new_price_cents - sc.old_price_cents;
+  if (priceDiff > 0) return 'mdi-arrow-up-bold-circle-outline';
+  if (priceDiff < 0) return 'mdi-arrow-down-bold-circle-outline';
+  return 'mdi-swap-horizontal';
+}
+
 async function fetchOrderDetail() {
   const orderId = props.id || route.params.id;
   loading.value = true;
@@ -886,6 +1021,7 @@ async function fetchOrderDetail() {
     }
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load order details';
+    console.error('Fetch order error:', err);
   } finally {
     loading.value = false;
   }
@@ -940,6 +1076,8 @@ const changeSeatDialog = ref({
   newSeat: null,
   loadingSeats: false,
   submitting: false,
+  isFreeUpgrade: true,
+  reason: '',
   seats: [],
 });
 
@@ -1050,6 +1188,8 @@ async function openChangeSeatModal(seatItem) {
     newSeat: null,
     loadingSeats: true,
     submitting: false,
+    isFreeUpgrade: true,
+    reason: '',
     seats: [],
   };
 
@@ -1071,6 +1211,8 @@ async function handleConfirmChangeSeat() {
     const res = await api.post(`/orders/${order.value.id}/change-seat`, {
       old_seat_booking_id: changeSeatDialog.value.oldSeat.seat_booking_id,
       new_seat_id: changeSeatDialog.value.newSeat.id,
+      is_free_upgrade: changeSeatDialog.value.isFreeUpgrade,
+      reason: changeSeatDialog.value.reason?.trim() || undefined,
     });
 
     showToast(`Seat changed to Row ${changeSeatDialog.value.newSeat.row_label}, Seat ${changeSeatDialog.value.newSeat.seat_number} successfully!`, 'success');

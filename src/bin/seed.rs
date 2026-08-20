@@ -91,14 +91,13 @@ async fn seed_theater_and_shows(pool: &PgPool) -> Result<(), Box<dyn std::error:
     println!("  Theater ID: {}", theater_id);
 
     // 2. Zones
-    let vip_zone_id: Uuid =
-        get_or_create_zone(pool, theater_id, "VIP Lounge", 2500, "#f59e0b").await?;
+    let vip_zone_id: Uuid = get_or_create_zone(pool, theater_id, "VIP", 3000, "#f59e0b").await?;
     let premium_zone_id: Uuid =
-        get_or_create_zone(pool, theater_id, "Premium Stalls", 1800, "#6366f1").await?;
+        get_or_create_zone(pool, theater_id, "Premium", 2000, "#6366f1").await?;
     let standard_zone_id: Uuid =
-        get_or_create_zone(pool, theater_id, "Standard Circle", 1200, "#14b8a6").await?;
+        get_or_create_zone(pool, theater_id, "Standard", 1000, "#14b8a6").await?;
 
-    println!("  Zones configured: VIP ($25.00), Premium ($18.00), Standard ($12.00)");
+    println!("  Zones configured: VIP ($30.00), Premium ($20.00), Standard ($10.00)");
 
     // 3. Seats (5 rows: A=VIP, B & C=Premium, D & E=Standard; 10 seats each = 50 seats)
     let rows = vec![
@@ -141,7 +140,9 @@ async fn seed_theater_and_shows(pool: &PgPool) -> Result<(), Box<dyn std::error:
         get_or_create_event(pool, "Cyberpunk 2099: Orchestral Experience", organizer_id).await?;
 
     // Assign gatekeeper to both events
-    if let Some(gatekeeper) = UserRepository::find_by_email(pool, "gatekeeper@theater.local").await? {
+    if let Some(gatekeeper) =
+        UserRepository::find_by_email(pool, "gatekeeper@theater.local").await?
+    {
         GatekeeperRepository::assign(pool, event1_id, gatekeeper.id, organizer_id).await?;
         GatekeeperRepository::assign(pool, event2_id, gatekeeper.id, organizer_id).await?;
     }
