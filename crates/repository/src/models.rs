@@ -363,6 +363,16 @@ pub struct Refund {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RefundTicketItem {
+    pub ticket_id: Uuid,
+    pub ticket_code: Option<String>,
+    pub row_label: Option<String>,
+    pub seat_number: Option<i32>,
+    pub zone_name: Option<String>,
+    pub price_cents: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RefundDetail {
     pub id: Uuid,
     pub order_id: Uuid,
@@ -373,6 +383,66 @@ pub struct RefundDetail {
     pub reason: Option<String>,
     pub created_at: DateTime<Utc>,
     pub ticket_ids: Vec<Uuid>,
+    pub items: Vec<RefundTicketItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct TicketSeatChange {
+    pub id: Uuid,
+    pub order_id: Uuid,
+    pub ticket_id: Option<Uuid>,
+    pub seat_booking_id: Option<Uuid>,
+    pub showtime_id: Uuid,
+    pub old_seat_id: Option<Uuid>,
+    pub new_seat_id: Option<Uuid>,
+    pub old_row_label: String,
+    pub old_seat_number: i32,
+    pub old_zone_name: String,
+    pub old_price_cents: i64,
+    pub new_row_label: String,
+    pub new_seat_number: i32,
+    pub new_zone_name: String,
+    pub new_price_cents: i64,
+    pub changed_by: Option<Uuid>,
+    pub reason: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct TicketSeatChangeDetail {
+    pub id: Uuid,
+    pub order_id: Uuid,
+    pub ticket_id: Option<Uuid>,
+    pub ticket_code: Option<String>,
+    pub seat_booking_id: Option<Uuid>,
+    pub showtime_id: Uuid,
+    pub old_seat_id: Option<Uuid>,
+    pub new_seat_id: Option<Uuid>,
+    pub old_row_label: String,
+    pub old_seat_number: i32,
+    pub old_zone_name: String,
+    pub old_price_cents: i64,
+    pub new_row_label: String,
+    pub new_seat_number: i32,
+    pub new_zone_name: String,
+    pub new_price_cents: i64,
+    pub changed_by: Option<Uuid>,
+    pub changed_by_email: Option<String>,
+    pub reason: Option<String>,
+    pub metadata: Option<serde_json::Value>,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct SeatWithZoneInfo {
+    pub id: Uuid,
+    pub theater_id: Uuid,
+    pub zone_id: Uuid,
+    pub row_label: String,
+    pub seat_number: i32,
+    pub zone_name: String,
+    pub price_cents: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

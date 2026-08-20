@@ -348,6 +348,7 @@ This is the largest file (~65KB). It is a fully custom canvas-like seat editor:
 | `event_gatekeepers` | Assigns gatekeeper users to specific events |
 | `refunds` | Audit trail of ticket refund transactions |
 | `refund_tickets` | Join table: refund ↔ tickets refunded |
+| `ticket_seat_changes` | Historical tracking log for seat changes with machine-readable metadata |
 
 ### Key Constraints
 
@@ -403,13 +404,16 @@ All routes are prefixed with `/api`.
 | POST | `/release-hold` | Customer | Release held seat |
 | GET | `/booking/status/:uuid` | Customer | Poll queue item status |
 
-### Orders & Refunds
+### Orders, Refunds & Seat Changes
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | POST/GET | `/orders` | Auth | Create order or list orders |
 | GET | `/orders/:id` | Auth | Get order detail |
 | POST | `/orders/:id/confirm-mock` | Auth | Mock payment confirmation |
 | POST | `/orders/:id/refund` | Elevated | Refund specific tickets in an order & release seats |
+| GET | `/orders/:id/refunds` | Auth | Get refund transaction history for an order |
+| POST | `/orders/:id/change-seat` | Auth | Change seat for a booked ticket and log change |
+| GET | `/orders/:id/seat-changes` | Auth | Get machine-readable seat change history for an order |
 | GET | `/orders/:id/tickets` | Auth | List tickets for an order |
 
 ### Tickets

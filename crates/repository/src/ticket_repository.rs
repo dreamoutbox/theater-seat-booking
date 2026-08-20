@@ -244,6 +244,20 @@ impl TicketRepository {
         .await
     }
 
+    pub async fn find_by_seat_booking_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        seat_booking_id: Uuid,
+    ) -> Result<Option<Ticket>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT id, code, order_id, seat_booking_id, user_id, event_id, showtime_id, attendee_name, attendee_phone, status, used_at, used_by, refunded_at, refunded_by, created_at
+             FROM tickets
+             WHERE seat_booking_id = $1",
+        )
+        .bind(seat_booking_id)
+        .fetch_optional(executor)
+        .await
+    }
+
     pub async fn mark_used<'e, E: PgExecutor<'e>>(
         executor: E,
         ticket_id: Uuid,

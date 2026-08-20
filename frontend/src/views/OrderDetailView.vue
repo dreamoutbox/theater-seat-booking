@@ -214,6 +214,135 @@
         </v-table>
       </div>
 
+      <!-- Refund Records / History Section -->
+      <div v-if="refunds.length > 0" class="mb-6">
+        <div class="d-flex justify-space-between align-center mb-3">
+          <div class="d-flex align-center gap-2">
+            <v-icon icon="mdi-cash-refund" color="red-accent-2" size="20"></v-icon>
+            <h2 class="text-h6 font-weight-bold text-white mb-0">
+              Refund Records ({{ refunds.length }})
+            </h2>
+          </div>
+          <span class="text-caption text-red-accent-2 font-weight-mono font-weight-bold">
+            Total Refunded: ${{ (order.refunded_amount_cents / 100).toFixed(2) }}
+          </span>
+        </div>
+
+        <div class="d-flex flex-column gap-3">
+          <v-card
+            v-for="r in refunds"
+            :key="r.id"
+            variant="outlined"
+            class="pa-4 rounded-lg border bg-surface-variant"
+          >
+            <div class="d-flex flex-wrap justify-space-between align-start gap-2 mb-2">
+              <div>
+                <div class="d-flex align-center gap-2 flex-wrap mb-1">
+                  <span class="text-caption text-grey font-weight-mono text-uppercase">Refund ID</span>
+                  <span class="text-caption font-weight-mono text-red-accent-2 font-weight-bold">#{{ r.id }}</span>
+                  <v-chip size="x-small" color="red-accent-2" variant="tonal" class="font-weight-bold">
+                    -${{ (r.amount_cents / 100).toFixed(2) }}
+                  </v-chip>
+                </div>
+                <div class="text-caption text-grey">
+                  Processed on <strong class="text-white">{{ formatDate(r.created_at) }}</strong>
+                  <span v-if="r.refunded_by_email"> by <strong class="text-white">{{ r.refunded_by_email }}</strong></span>
+                </div>
+              </div>
+
+              <div class="text-right">
+                <div v-if="r.stripe_refund_id" class="text-caption font-weight-mono text-grey-lighten-2">
+                  Gateway Ref: {{ r.stripe_refund_id }}
+                </div>
+                <div v-if="r.reason" class="text-caption text-amber-darken-1 font-italic mt-1">
+                  Reason: {{ r.reason }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Refunded Tickets List -->
+            <div v-if="r.items && r.items.length > 0" class="pt-2 border-top">
+              <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Refunded Tickets:</div>
+              <div class="d-flex flex-wrap gap-2">
+                <v-chip
+                  v-for="item in r.items"
+                  :key="item.ticket_id"
+                  size="small"
+                  color="red-accent-2"
+                  variant="outlined"
+                  class="font-weight-bold"
+                >
+                  <v-icon icon="mdi-ticket-outline" start size="14"></v-icon>
+                  Row {{ item.row_label }}, Seat {{ item.seat_number }} ({{ item.zone_name }})
+                  <span v-if="item.ticket_code" class="font-weight-mono ml-1 text-grey-lighten-1">[{{ item.ticket_code }}]</span>
+                  <span class="ml-1 text-white font-weight-mono">${{ (item.price_cents / 100).toFixed(2) }}</span>
+                </v-chip>
+              </div>
+            </div>
+          </v-card>
+        </div>
+      </div>
+
+      <!-- Seat Change History Section -->
+      <div v-if="seatChanges.length > 0" class="mb-6">
+        <div class="d-flex justify-space-between align-center mb-3">
+          <div class="d-flex align-center gap-2">
+            <v-icon icon="mdi-swap-horizontal-bold" color="amber-darken-1" size="20"></v-icon>
+            <h2 class="text-h6 font-weight-bold text-white mb-0">
+              Seat Change History ({{ seatChanges.length }})
+            </h2>
+          </div>
+        </div>
+
+        <div class="d-flex flex-column gap-3">
+          <v-card
+            v-for="sc in seatChanges"
+            :key="sc.id"
+            variant="outlined"
+            class="pa-4 rounded-lg border bg-surface-variant"
+          >
+            <div class="d-flex flex-wrap justify-space-between align-center gap-3">
+              <div class="d-flex align-center gap-3 flex-wrap">
+                <!-- From seat -->
+                <div class="d-flex align-center gap-2">
+                  <v-chip size="small" color="grey-darken-1" variant="flat" class="font-weight-bold">
+                    {{ sc.old_row_label }}{{ sc.old_seat_number }}
+                  </v-chip>
+                  <span class="text-body-2 text-grey-lighten-1">
+                    Row {{ sc.old_row_label }}, Seat {{ sc.old_seat_number }} ({{ sc.old_zone_name }})
+                  </span>
+                </div>
+
+                <v-icon icon="mdi-arrow-right" color="amber-darken-1" size="18"></v-icon>
+
+                <!-- To seat -->
+                <div class="d-flex align-center gap-2">
+                  <v-chip size="small" color="amber-darken-1" variant="flat" class="font-weight-bold">
+                    {{ sc.new_row_label }}{{ sc.new_seat_number }}
+                  </v-chip>
+                  <span class="text-body-2 font-weight-bold text-white">
+                    Row {{ sc.new_row_label }}, Seat {{ sc.new_seat_number }} ({{ sc.new_zone_name }})
+                  </span>
+                </div>
+              </div>
+
+              <div class="text-right">
+                <div class="text-caption text-grey">
+                  {{ formatDate(sc.created_at) }}
+                  <span v-if="sc.changed_by_email"> by {{ sc.changed_by_email }}</span>
+                </div>
+                <div v-if="sc.ticket_code" class="text-caption font-weight-mono text-amber-darken-1">
+                  Ticket: {{ sc.ticket_code }}
+                </div>
+              </div>
+            </div>
+            <div v-if="sc.reason" class="text-caption text-grey mt-2">
+              <strong>Reason:</strong> {{ sc.reason }}
+            </div>
+          </v-card>
+        </div>
+      </div>
+
       <v-divider class="mb-6"></v-divider>
 
       <!-- Financial Summary -->
@@ -581,6 +710,8 @@ const route = useRoute();
 const authStore = useAuthStore();
 const order = ref(null);
 const tickets = ref([]);
+const refunds = ref([]);
+const seatChanges = ref([]);
 const loading = ref(true);
 const error = ref(null);
 const paying = ref(false);
@@ -747,7 +878,11 @@ async function fetchOrderDetail() {
     order.value = res.data;
 
     if (['paid', 'partially_refunded', 'refunded'].includes(order.value.status)) {
-      await fetchTickets(orderId);
+      await Promise.all([
+        fetchTickets(orderId),
+        fetchRefunds(orderId),
+        fetchSeatChanges(orderId),
+      ]);
     }
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load order details';
@@ -762,6 +897,24 @@ async function fetchTickets(orderId) {
     tickets.value = res.data || [];
   } catch (err) {
     console.error('Failed to load tickets', err);
+  }
+}
+
+async function fetchRefunds(orderId) {
+  try {
+    const res = await api.get(`/orders/${orderId}/refunds`);
+    refunds.value = res.data || [];
+  } catch (err) {
+    console.error('Failed to load refunds', err);
+  }
+}
+
+async function fetchSeatChanges(orderId) {
+  try {
+    const res = await api.get(`/orders/${orderId}/seat-changes`);
+    seatChanges.value = res.data || [];
+  } catch (err) {
+    console.error('Failed to load seat changes', err);
   }
 }
 
@@ -922,10 +1075,7 @@ async function handleConfirmChangeSeat() {
 
     showToast(`Seat changed to Row ${changeSeatDialog.value.newSeat.row_label}, Seat ${changeSeatDialog.value.newSeat.seat_number} successfully!`, 'success');
     changeSeatDialog.value.show = false;
-    order.value = res.data;
-    if (['paid', 'partially_refunded', 'refunded'].includes(order.value.status)) {
-      await fetchTickets(order.value.id);
-    }
+    await fetchOrderDetail();
   } catch (err) {
     showToast(err.response?.data?.error || 'Failed to change seat', 'error');
   } finally {

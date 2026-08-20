@@ -205,6 +205,21 @@ impl SeatRepository {
         .await
     }
 
+    pub async fn find_seat_with_zone_by_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        id: Uuid,
+    ) -> Result<Option<crate::models::SeatWithZoneInfo>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT s.id, s.theater_id, s.zone_id, s.row_label, s.seat_number, z.name AS zone_name, z.price_cents
+             FROM seats s
+             JOIN zones z ON z.id = s.zone_id
+             WHERE s.id = $1",
+        )
+        .bind(id)
+        .fetch_optional(executor)
+        .await
+    }
+
     pub async fn delete_by_id<'e, E: PgExecutor<'e>>(
         executor: E,
         id: Uuid,

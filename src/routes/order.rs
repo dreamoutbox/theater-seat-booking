@@ -4,8 +4,8 @@ use axum::{
     http::StatusCode,
 };
 use repository::{
-    OrderDetail, OrderRepository, RefundRepository, SeatBookingRepository, SeatRepository,
-    TicketRepository, UserRole, ZoneRepository,
+    OrderDetail, OrderRepository, RefundDetail, RefundRepository, SeatBookingRepository,
+    SeatChangeRepository, SeatRepository, TicketRepository, TicketSeatChangeDetail, UserRole,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -653,10 +653,58 @@ pub async fn refund_order(
     }))
 }
 
+pub async fn get_order_refunds(
+    Path(id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<RefundDetail>>, (StatusCode, Json<serde_json::Value>)> {
+    let order_opt = OrderRepository::find_order_detail_by_id(&state.pool, id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let o = match order_opt {
+        Some(row) => row,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Order not found" })),
+            ));
+        }
+    };
+
+    let is_elevated = auth_user.role == UserRole::Admin
+        || auth_user.role == UserRole::Staff
+        || auth_user.role == UserRole::EventOrganizer;
+
+    if !is_elevated && o.user_id != auth_user.id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Access denied to this order" })),
+        ));
+    }
+
+    let refunds = RefundRepository::find_by_order_id(&state.pool, id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    Ok(Json(refunds))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ChangeSeatRequest {
     pub old_seat_booking_id: Uuid,
     pub new_seat_id: Uuid,
+    pub reason: Option<String>,
 }
 
 pub async fn change_seat(
@@ -754,7 +802,45 @@ pub async fn change_seat(
         ));
     }
 
-    // 6. Update seat_id on seat_booking
+    // 6. Fetch new seat details
+    let new_seat = SeatRepository::find_seat_with_zone_by_id(&mut *tx, payload.new_seat_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::BAD_REQUEST,
+                Json(serde_json::json!({ "error": "Target new seat was not found in theater layout" })),
+            )
+        })?;
+
+    // 7. Fetch old seat details
+    let old_seat_opt = SeatRepository::find_seat_with_zone_by_id(&mut *tx, booking.seat_id)
+        .await
+        .unwrap_or(None);
+
+    let (old_row_label, old_seat_number, old_zone_name, old_price_cents) = if let Some(os) = old_seat_opt {
+        (os.row_label, os.seat_number, os.zone_name, os.price_cents)
+    } else {
+        let os_list = OrderRepository::find_order_seats_by_order_id(&mut *tx, order_id).await.unwrap_or_default();
+        let matched = os_list.into_iter().find(|s| s.seat_booking_id == payload.old_seat_booking_id);
+        if let Some(m) = matched {
+            (m.row_label, m.seat_number, m.zone_name, m.price_cents)
+        } else {
+            ("—".to_string(), 0, "Standard".to_string(), 0)
+        }
+    };
+
+    // 8. Find associated ticket if one exists
+    let ticket_opt = TicketRepository::find_by_seat_booking_id(&mut *tx, payload.old_seat_booking_id)
+        .await
+        .unwrap_or(None);
+
+    // 9. Update seat_id on seat_booking
     SeatBookingRepository::update_seat_id(&mut *tx, payload.old_seat_booking_id, payload.new_seat_id)
         .await
         .map_err(|e| {
@@ -764,14 +850,62 @@ pub async fn change_seat(
             )
         })?;
 
-    // 7. Update new zone price on order_seats if applicable
-    if let Some(zone_id) = SeatRepository::find_zone_id_by_id(&mut *tx, payload.new_seat_id).await.unwrap_or(None) {
-        if let Some(zone) = ZoneRepository::find_by_id(&mut *tx, zone_id).await.unwrap_or(None) {
-            OrderRepository::update_order_seat_price(&mut *tx, order_id, payload.old_seat_booking_id, zone.price_cents)
-                .await
-                .ok();
-        }
-    }
+    // 10. Update snapshot on order_seats
+    OrderRepository::update_order_seat_full(
+        &mut *tx,
+        order_id,
+        payload.old_seat_booking_id,
+        &new_seat.row_label,
+        new_seat.seat_number,
+        &new_seat.zone_name,
+        new_seat.price_cents,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": format!("Failed to update order seat record: {e}") })),
+        )
+    })?;
+
+    // 11. Record seat change log entry
+    let change_log_id = Uuid::new_v4();
+    let metadata = serde_json::json!({
+        "old_zone_name": old_zone_name,
+        "new_zone_name": new_seat.zone_name,
+        "price_difference_cents": new_seat.price_cents - old_price_cents,
+        "changed_by_role": auth_user.role.as_str(),
+        "ticket_code": ticket_opt.as_ref().map(|t| t.code.clone()),
+    });
+
+    SeatChangeRepository::save(
+        &mut *tx,
+        change_log_id,
+        order_id,
+        ticket_opt.map(|t| t.id),
+        Some(payload.old_seat_booking_id),
+        booking.showtime_id,
+        Some(booking.seat_id),
+        Some(payload.new_seat_id),
+        &old_row_label,
+        old_seat_number,
+        &old_zone_name,
+        old_price_cents,
+        &new_seat.row_label,
+        new_seat.seat_number,
+        &new_seat.zone_name,
+        new_seat.price_cents,
+        Some(auth_user.id),
+        payload.reason.as_deref(),
+        Some(metadata),
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": format!("Failed to record seat change log: {e}") })),
+        )
+    })?;
 
     tx.commit().await.map_err(|e| {
         (
@@ -832,4 +966,51 @@ pub async fn change_seat(
         created_at: order_detail.created_at,
         seats,
     }))
+}
+
+pub async fn get_order_seat_changes(
+    Path(id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<TicketSeatChangeDetail>>, (StatusCode, Json<serde_json::Value>)> {
+    let order_opt = OrderRepository::find_order_detail_by_id(&state.pool, id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let o = match order_opt {
+        Some(row) => row,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Order not found" })),
+            ));
+        }
+    };
+
+    let is_elevated = auth_user.role == UserRole::Admin
+        || auth_user.role == UserRole::Staff
+        || auth_user.role == UserRole::EventOrganizer;
+
+    if !is_elevated && o.user_id != auth_user.id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Access denied to this order" })),
+        ));
+    }
+
+    let changes = SeatChangeRepository::find_by_order_id(&state.pool, id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    Ok(Json(changes))
 }

@@ -1,7 +1,7 @@
 use sqlx::PgExecutor;
 use uuid::Uuid;
 
-use crate::models::{Refund, RefundDetail};
+use crate::models::{Refund, RefundDetail, RefundTicketItem};
 
 pub struct RefundRepository;
 
@@ -62,14 +62,36 @@ impl RefundRepository {
             refunded_by_email: Option<String>,
             reason: Option<String>,
             created_at: chrono::DateTime<chrono::Utc>,
+            items: sqlx::types::Json<Vec<RefundTicketItem>>,
         }
 
         let refunds: Vec<RefundRow> = sqlx::query_as(
-            "SELECT r.id, r.order_id, r.amount_cents, r.stripe_refund_id, r.refunded_by,
-                    u.email AS refunded_by_email, r.reason, r.created_at
+            "SELECT 
+                r.id, r.order_id, r.amount_cents, r.stripe_refund_id, r.refunded_by,
+                u.email AS refunded_by_email, r.reason, r.created_at,
+                COALESCE(
+                    json_agg(
+                        json_build_object(
+                            'ticket_id', rt.ticket_id,
+                            'ticket_code', t.code,
+                            'price_cents', rt.price_cents,
+                            'row_label', COALESCE(s.row_label, os.row_label, '—'),
+                            'seat_number', COALESCE(s.seat_number, os.seat_number, 0),
+                            'zone_name', COALESCE(z.name, os.zone_name, 'Standard')
+                        ) ORDER BY COALESCE(s.row_label, os.row_label, '—') ASC, COALESCE(s.seat_number, os.seat_number, 0) ASC
+                    ) FILTER (WHERE rt.ticket_id IS NOT NULL),
+                    '[]'::json
+                ) AS items
              FROM refunds r
              LEFT JOIN users u ON u.id = r.refunded_by
+             LEFT JOIN refund_tickets rt ON rt.refund_id = r.id
+             LEFT JOIN tickets t ON t.id = rt.ticket_id
+             LEFT JOIN seat_bookings sb ON sb.id = t.seat_booking_id
+             LEFT JOIN seats s ON s.id = sb.seat_id
+             LEFT JOIN zones z ON z.id = s.zone_id
+             LEFT JOIN order_seats os ON os.seat_booking_id = t.seat_booking_id
              WHERE r.order_id = $1
+             GROUP BY r.id, r.order_id, r.amount_cents, r.stripe_refund_id, r.refunded_by, u.email, r.reason, r.created_at
              ORDER BY r.created_at DESC",
         )
         .bind(order_id)
@@ -78,6 +100,8 @@ impl RefundRepository {
 
         let mut details = Vec::with_capacity(refunds.len());
         for r in refunds {
+            let items = r.items.0;
+            let ticket_ids = items.iter().map(|it| it.ticket_id).collect();
             details.push(RefundDetail {
                 id: r.id,
                 order_id: r.order_id,
@@ -87,7 +111,8 @@ impl RefundRepository {
                 refunded_by_email: r.refunded_by_email,
                 reason: r.reason,
                 created_at: r.created_at,
-                ticket_ids: vec![],
+                ticket_ids,
+                items,
             });
         }
 

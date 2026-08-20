@@ -98,7 +98,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/orders/{id}", get(order::get_order))
         .route("/orders/{id}/confirm-mock", post(order::confirm_mock_order))
         .route("/orders/{id}/refund", post(order::refund_order))
+        .route("/orders/{id}/refunds", get(order::get_order_refunds))
         .route("/orders/{id}/change-seat", post(order::change_seat))
+        .route("/orders/{id}/seat-changes", get(order::get_order_seat_changes))
         .route("/orders/{id}/tickets", get(ticket::list_order_tickets))
         // Tickets & Scanning
         .route("/tickets/scan", post(ticket::scan_ticket))
