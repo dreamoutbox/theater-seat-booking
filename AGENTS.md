@@ -43,6 +43,7 @@ A **theater seat booking system** (POC/production-ready) with:
 | Database | PostgreSQL 18 |
 | Auth | JWT (jsonwebtoken) + Argon2 password hashing, sent via HttpOnly cookie + Bearer fallback |
 | Payment | Stripe API via `reqwest` |
+| Email Delivery | `lettre` 0.11 (async SMTP via Tokio & Rustls) |
 | Object Storage | MinIO S3 via `aws-sdk-s3` |
 | PDF Generation | `lopdf` (binary generation for financial statements & order receipts) |
 | Frontend | Vue 3 (Composition API, `<script setup>`) |
@@ -182,6 +183,16 @@ All read from `.env` (loaded by `dotenvy`) with safe defaults for local dev:
 | `STRIPE_SECRET_KEY` | `sk_test_mock_key_for_poc` | Stripe API key |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_mock_key_for_poc` | Stripe webhook signing secret |
 | `RUST_LOG` | `info,theater_seat_booking=debug` | Tracing filter |
+| `S3_ENDPOINT` | `http://127.0.0.1:9000` | MinIO S3 endpoint |
+| `S3_ACCESS_KEY` | `miniominio` | S3 Access Key |
+| `S3_SECRET_KEY` | `miniominio` | S3 Secret Key |
+| `S3_BUCKET` | `theater-documents` | S3 bucket name |
+| `S3_REGION` | `us-east-1` | S3 region |
+| `SMTP_HOST` | `smtp.ethereal.email` | SMTP relay host (optional) |
+| `SMTP_PORT` | `587` | SMTP port (587 STARTTLS / 465 TLS) |
+| `SMTP_USERNAME` | `""` | SMTP authentication username |
+| `SMTP_PASSWORD` | `""` | SMTP authentication password |
+| `SMTP_FROM_EMAIL` | `"Theater Booking <noreply@theaterbooking.local>"` | Outgoing sender email address |
 
 ---
 
@@ -482,6 +493,7 @@ All routes are prefixed with `/api`.
 19. **lopdf Binary PDF Generation** — Server-side A4 PDF document generator for Financial Statements & Order Receipt digital ticket passes
 20. **Financial & Tax Report Snapshotting** — Snapshot API endpoints (`/events/:id/reports` & `/events/:id/reports/generate`) with role-based cooldowns (0s for Admin/Staff, 5m for Event Organizers) and S3 PDF uploads
 21. **Event Organizer Order Scoping** — `GET /orders` & `GET /orders/:id` strictly scoped by event ownership for `event_organizer` role and added `?event_id=...` query filtering
+22. **Email Delivery with PDF Pass Attachments** — Asynchronous SMTP order confirmation emails powered by `lettre` with rich HTML + plaintext receipts and attached PDF ticket passes sent upon mock and Stripe payments
 
 ### Frontend
 

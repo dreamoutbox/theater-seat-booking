@@ -15,6 +15,11 @@ pub struct AppConfig {
     pub s3_secret_key: String,
     pub s3_bucket: String,
     pub s3_region: String,
+    pub smtp_host: Option<String>,
+    pub smtp_port: u16,
+    pub smtp_username: Option<String>,
+    pub smtp_password: Option<String>,
+    pub smtp_from_email: String,
 }
 
 impl AppConfig {
@@ -57,6 +62,24 @@ impl AppConfig {
                 .unwrap_or_else(|_| "theater-documents".to_string()),
             s3_region: env::var("S3_REGION")
                 .unwrap_or_else(|_| "us-east-1".to_string()),
+            smtp_host: env::var("SMTP_HOST")
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty()),
+            smtp_port: env::var("SMTP_PORT")
+                .ok()
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(587),
+            smtp_username: env::var("SMTP_USERNAME")
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty()),
+            smtp_password: env::var("SMTP_PASSWORD")
+                .ok()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty()),
+            smtp_from_email: env::var("SMTP_FROM_EMAIL")
+                .unwrap_or_else(|_| "Theater Booking <noreply@theaterbooking.local>".to_string()),
         }
     }
 }

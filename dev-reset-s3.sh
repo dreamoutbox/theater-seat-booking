@@ -10,7 +10,9 @@ echo "=========================================="
 
 # Load environment variables if .env exists
 if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs -d '\n')
+    set -a
+    source .env
+    set +a
 fi
 
 S3_ENDPOINT="${S3_ENDPOINT:-http://127.0.0.1:9000}"

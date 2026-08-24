@@ -21,7 +21,9 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use crate::{config::AppConfig, s3::S3Service, stripe::StripeService};
+use crate::{
+    config::AppConfig, email::EmailService, s3::S3Service, stripe::StripeService,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -29,6 +31,7 @@ pub struct AppState {
     pub config: AppConfig,
     pub stripe: Arc<StripeService>,
     pub s3: Arc<S3Service>,
+    pub email: Arc<EmailService>,
 }
 
 pub fn create_router(state: AppState) -> Router {

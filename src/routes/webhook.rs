@@ -159,5 +159,27 @@ pub async fn stripe_webhook(
         )
     })?;
 
+    if event_type == "payment_intent.succeeded" {
+        if let Some(oid) = order_id {
+            let post_pay_state = state.clone();
+            tokio::spawn(async move {
+                match crate::routes::order::generate_and_upload_order_pdf(&post_pay_state, oid).await {
+                    Ok(pdf_bytes) => {
+                        if let Err(e) = post_pay_state
+                            .email
+                            .send_order_confirmation(&post_pay_state.pool, oid, pdf_bytes)
+                            .await
+                        {
+                            tracing::warn!("Failed to send order confirmation email via webhook: {e}");
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to generate/upload order receipt PDF via webhook: {e}");
+                    }
+                }
+            });
+        }
+    }
+
     Ok(Json(serde_json::json!({ "status": "processed" })))
 }

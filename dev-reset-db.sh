@@ -10,7 +10,9 @@ echo "=========================================="
 
 # Load environment variables if .env exists
 if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs -d '\n')
+    set -a
+    source .env
+    set +a
 fi
 
 DATABASE_URL="${DATABASE_URL:-postgres://postgres:example@localhost:5432/postgres}"

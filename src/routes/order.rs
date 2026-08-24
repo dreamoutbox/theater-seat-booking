@@ -462,11 +462,22 @@ pub async fn confirm_mock_order(
 
     tracing::info!(order_id = %order_id, "Order confirmed via mock payment");
 
-    // Generate Order Receipt PDF and upload to S3
-    let s3_state = state.clone();
+    // Generate Order Receipt PDF, upload to S3, and send confirmation email
+    let post_pay_state = state.clone();
     tokio::spawn(async move {
-        if let Err(e) = generate_and_upload_order_pdf(&s3_state, order_id).await {
-            tracing::warn!("Failed to upload order receipt PDF to S3: {e}");
+        match generate_and_upload_order_pdf(&post_pay_state, order_id).await {
+            Ok(pdf_bytes) => {
+                if let Err(e) = post_pay_state
+                    .email
+                    .send_order_confirmation(&post_pay_state.pool, order_id, pdf_bytes)
+                    .await
+                {
+                    tracing::warn!("Failed to send order confirmation email: {e}");
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Failed to generate/upload order receipt PDF: {e}");
+            }
         }
     });
 

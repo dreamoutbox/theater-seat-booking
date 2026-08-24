@@ -2,6 +2,7 @@ use std::sync::Arc;
 use theater_seat_booking::{
     config::AppConfig,
     db::{create_pool, run_migrations},
+    email::EmailService,
     routes::{AppState, create_router},
     s3::S3Service,
     stripe::StripeService,
@@ -33,6 +34,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let stripe = Arc::new(StripeService::new(config.stripe_secret_key.clone()));
     let s3 = Arc::new(S3Service::new(&config).await);
+    let email = Arc::new(EmailService::new(&config));
 
     // Auto-create S3 bucket if not exists
     if let Err(e) = s3.ensure_bucket_exists().await {
@@ -44,6 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config: config.clone(),
         stripe,
         s3,
+        email,
     };
 
     // Optionally spawn queue worker & sweeper (enabled by default unless explicitly disabled)
