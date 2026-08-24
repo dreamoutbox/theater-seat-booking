@@ -3,6 +3,7 @@ use theater_seat_booking::{
     config::AppConfig,
     db::{create_pool, run_migrations},
     routes::{AppState, create_router},
+    s3::S3Service,
     stripe::StripeService,
     worker::{run_sweeper_loop, run_worker_loop},
 };
@@ -31,11 +32,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Database schema migrations verified and up to date.");
 
     let stripe = Arc::new(StripeService::new(config.stripe_secret_key.clone()));
+    let s3 = Arc::new(S3Service::new(&config).await);
+
+    // Auto-create S3 bucket if not exists
+    if let Err(e) = s3.ensure_bucket_exists().await {
+        tracing::warn!("Warning: S3 bucket initialization notice: {e}");
+    }
 
     let state = AppState {
         pool: pool.clone(),
         config: config.clone(),
         stripe,
+        s3,
     };
 
     // Optionally spawn queue worker & sweeper (enabled by default unless explicitly disabled)

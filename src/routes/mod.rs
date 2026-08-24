@@ -3,6 +3,7 @@ pub mod auth;
 pub mod booking;
 pub mod gatekeeper;
 pub mod order;
+pub mod report;
 pub mod theater;
 pub mod ticket;
 pub mod webhook;
@@ -20,13 +21,14 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use crate::{config::AppConfig, stripe::StripeService};
+use crate::{config::AppConfig, s3::S3Service, stripe::StripeService};
 
 #[derive(Clone)]
 pub struct AppState {
     pub pool: PgPool,
     pub config: AppConfig,
     pub stripe: Arc<StripeService>,
+    pub s3: Arc<S3Service>,
 }
 
 pub fn create_router(state: AppState) -> Router {
@@ -102,11 +104,20 @@ pub fn create_router(state: AppState) -> Router {
         .route("/orders/{id}/change-seat", post(order::change_seat))
         .route("/orders/{id}/seat-changes", get(order::get_order_seat_changes))
         .route("/orders/{id}/tickets", get(ticket::list_order_tickets))
+        .route("/orders/{id}/pdf", get(order::download_order_pdf))
         // Tickets & Scanning
         .route("/tickets/scan", post(ticket::scan_ticket))
         .route("/tickets/{code}", get(ticket::get_ticket_by_code))
         // Analytics
         .route("/analytics/dashboard", get(analytics::get_dashboard_data))
+        // Reports
+        .route("/events/{id}/reports", get(report::list_event_reports))
+        .route(
+            "/events/{id}/reports/generate",
+            post(report::generate_event_report),
+        )
+        .route("/reports/{id}", get(report::get_report_by_id))
+        .route("/reports/{id}/pdf", get(report::download_report_pdf))
         // Gatekeepers
         .route(
             "/events/{id}/gatekeepers",

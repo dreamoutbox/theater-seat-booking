@@ -4,10 +4,10 @@
     <div class="d-flex flex-wrap justify-space-between align-center gap-4 mb-4">
       <div>
         <h2 class="text-h6 font-weight-bold text-white mb-1">
-          {{ scope === 'all' ? 'All System Orders (Admin/Staff)' : 'Your Booking History' }}
+          {{ tableHeaderTitle }}
         </h2>
         <span class="text-caption text-grey">
-          {{ scope === 'all' ? 'Monitoring real-time transactions & seat status' : 'Track and view receipt details for your reserved seats' }}
+          {{ tableHeaderSubtitle }}
         </span>
       </div>
       <div class="d-flex align-center gap-2">
@@ -289,7 +289,8 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
 import api from '../api/client';
 
 const props = defineProps({
@@ -297,9 +298,46 @@ const props = defineProps({
     type: String,
     default: 'own', // 'own' | 'all'
   },
+  eventId: {
+    type: String,
+    default: null,
+  },
+  eventTitle: {
+    type: String,
+    default: '',
+  },
 });
 
+const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
+
+const tableHeaderTitle = computed(() => {
+  if (props.eventTitle) {
+    return `Orders for ${props.eventTitle}`;
+  }
+  if (authStore.role === 'event_organizer') {
+    return 'Event Orders (Organizer)';
+  }
+  if (props.scope === 'all') {
+    return 'All System Orders (Admin/Staff)';
+  }
+  return 'Your Booking History';
+});
+
+const tableHeaderSubtitle = computed(() => {
+  if (props.eventTitle || props.eventId || route.query.event_id) {
+    return 'Viewing customer orders and ticket passes for this event';
+  }
+  if (authStore.role === 'event_organizer') {
+    return 'Monitoring customer orders for your owned events';
+  }
+  if (props.scope === 'all') {
+    return 'Monitoring real-time transactions & seat status across all venues';
+  }
+  return 'Track and view receipt details for your reserved seats';
+});
+
 const orders = ref([]);
 const loading = ref(false);
 const payingOrderId = ref(null);
@@ -408,10 +446,22 @@ watch([searchQuery, selectedStatus, itemsPerPage], () => {
   page.value = 1;
 });
 
+watch(
+  () => [props.eventId, route.query.event_id],
+  () => {
+    fetchOrders();
+  }
+);
+
 async function fetchOrders() {
   try {
     loading.value = true;
-    const res = await api.get('/orders');
+    const params = {};
+    const targetEventId = props.eventId || route.query.event_id;
+    if (targetEventId) {
+      params.event_id = targetEventId;
+    }
+    const res = await api.get('/orders', { params });
     orders.value = res.data;
   } catch (err) {
     console.error('Failed to fetch orders', err);

@@ -43,6 +43,8 @@ A **theater seat booking system** (POC/production-ready) with:
 | Database | PostgreSQL 18 |
 | Auth | JWT (jsonwebtoken) + Argon2 password hashing, sent via HttpOnly cookie + Bearer fallback |
 | Payment | Stripe API via `reqwest` |
+| Object Storage | MinIO S3 via `aws-sdk-s3` |
+| PDF Generation | `lopdf` (binary generation for financial statements & order receipts) |
 | Frontend | Vue 3 (Composition API, `<script setup>`) |
 | UI Library | Vuetify 4 |
 | Frontend state | Pinia |
@@ -50,7 +52,7 @@ A **theater seat booking system** (POC/production-ready) with:
 | HTTP client | Axios (proxied through Vite dev server to `/api`) |
 | QR codes | `qrcode.vue` (client-side) |
 | Build tool | Vite 8 |
-| Dev DB | Docker Compose (Postgres 18 + Adminer) |
+| Dev DB | Docker Compose (Postgres 18 + Adminer + MinIO) |
 
 ---
 
@@ -152,6 +154,7 @@ theater-seat-booking/
 |---|---|
 | `docker compose up -d` | Start Postgres + Adminer (port 8081) |
 | `./dev-reset-db.sh` | **Full reset**: drop schema → re-apply all migrations → seed demo data |
+| `./dev-reset-s3.sh` | **Reset S3**: wipe and recreate `theater-documents` bucket in MinIO |
 | `./dev-backend.sh` | Start Rust API on port 3000 (hot-reloads with `cargo-watch` if installed) |
 | `./dev-queue-worker.sh` | Start the booking queue worker (polls every 1s, processes holds) |
 | `./dev-frontend.sh` | Start Vite dev server on port 5173 (proxies `/api` to backend) |
@@ -416,6 +419,15 @@ All routes are prefixed with `/api`.
 | POST | `/orders/:id/change-seat` | Auth | Change seat for a booked ticket and log change |
 | GET | `/orders/:id/seat-changes` | Auth | Get machine-readable seat change history for an order |
 | GET | `/orders/:id/tickets` | Auth | List tickets for an order |
+| GET | `/orders/:id/pdf` | Auth | Stream/download Order Receipt PDF from S3 |
+
+### Financial Reports
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| GET | `/events/:id/reports` | Elevated | List historical financial & tax report snapshots with cooldown status |
+| POST | `/events/:id/reports/generate` | Elevated | Generate snapshot report & upload PDF to S3 (30-min cooldown) |
+| GET | `/reports/:id` | Elevated | Get report snapshot details |
+| GET | `/reports/:id/pdf` | Elevated | Stream/download Statement PDF from S3 |
 
 ### Tickets
 | Method | Path | Auth | Description |
@@ -466,6 +478,10 @@ All routes are prefixed with `/api`.
 15. **Ticket scan endpoint** — `POST /tickets/scan {code}` marks ticket as `used` with timestamp and `used_by`; scoped to gatekeeper's assigned events
 16. **Ticket refund endpoint & inventory release** — `POST /orders/:id/refund` refunds single/multiple active tickets, calls Stripe refund, updates `orders.status` to `partially_refunded`/`refunded`, logs to `refunds` & `refund_tickets`, and releases seat bookings back to inventory
 17. **Analytics API** — `GET /analytics/dashboard` returns gross revenue, refunds, net profit, tickets scanned, attendance rate %, and showtimes breakdown with role scoping
+18. **MinIO S3 Integration & Auto-Bucket Creation** — S3 client configured for MinIO with automatic `theater-documents` bucket creation on startup and `./dev-reset-s3.sh` reset script
+19. **lopdf Binary PDF Generation** — Server-side A4 PDF document generator for Financial Statements & Order Receipt digital ticket passes
+20. **Financial & Tax Report Snapshotting** — Snapshot API endpoints (`/events/:id/reports` & `/events/:id/reports/generate`) with role-based cooldowns (0s for Admin/Staff, 5m for Event Organizers) and S3 PDF uploads
+21. **Event Organizer Order Scoping** — `GET /orders` & `GET /orders/:id` strictly scoped by event ownership for `event_organizer` role and added `?event_id=...` query filtering
 
 ### Frontend
 
@@ -483,6 +499,9 @@ All routes are prefixed with `/api`.
 12. **Order items QR column** — Embedded QR code and ticket code inside the Order Items table
 13. **Ticket refund flow** — Modal dialog with ticket selection checkboxes + per-row refund trigger + refunded badges & financial summary
 14. **Event Analytics Dashboard** (`/manage/dashboard`) — Full KPI summary cards, event selector dropdown, and showtime-by-showtime attendance and financial performance table
+15. **Event Management Sidebar** (`EventSidebar.vue`) — Compact navigation sidebar across Event Overview, Gatekeepers, Settings, Financial Reports, and Orders
+16. **Event Financial Reports List View** (`/manage/events/:id/financial-reports`) — Historical snapshot list, live KPI snapshot cards, inline button cooldown timer, and direct PDF streaming links
+17. **Event Settings & Tax Info View** (`/manage/events/:id/settings`) — Configurable seat limits and business tax entity profile for customer receipts & tax statements
 
 ---
 

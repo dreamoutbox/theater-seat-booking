@@ -1,16 +1,22 @@
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
 };
 use repository::{
-    OrderDetail, OrderRepository, RefundDetail, RefundRepository, SeatBookingRepository,
-    SeatChangeRepository, SeatRepository, TicketRepository, TicketSeatChangeDetail, UserRole,
+    EventRepository, OrderDetail, OrderRepository, RefundDetail, RefundRepository,
+    SeatBookingRepository, SeatChangeRepository, SeatRepository, TicketRepository,
+    TicketSeatChangeDetail, UserRole,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::{auth::AuthenticatedUser, routes::AppState};
+
+#[derive(Debug, Deserialize, Default)]
+pub struct ListOrdersQuery {
+    pub event_id: Option<Uuid>,
+}
 
 #[derive(Debug, Deserialize)]
 pub struct CreateOrderSeatItem {
@@ -193,15 +199,37 @@ pub async fn create_order(
 pub async fn list_orders(
     auth_user: AuthenticatedUser,
     State(state): State<AppState>,
+    Query(query): Query<ListOrdersQuery>,
 ) -> Result<Json<Vec<OrderDetail>>, (StatusCode, Json<serde_json::Value>)> {
-    let is_elevated = auth_user.role == UserRole::Admin
-        || auth_user.role == UserRole::Staff
-        || auth_user.role == UserRole::EventOrganizer;
-
-    let order_rows = if is_elevated {
-        OrderRepository::find_all_order_details(&state.pool).await
-    } else {
-        OrderRepository::find_order_details_by_user_id(&state.pool, auth_user.id).await
+    let order_rows = match auth_user.role {
+        UserRole::Admin | UserRole::Staff => {
+            if let Some(event_id) = query.event_id {
+                OrderRepository::find_order_details_by_event_id(&state.pool, event_id).await
+            } else {
+                OrderRepository::find_all_order_details(&state.pool).await
+            }
+        }
+        UserRole::EventOrganizer => {
+            if let Some(event_id) = query.event_id {
+                let event = EventRepository::find_by_id(&state.pool, event_id)
+                    .await
+                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+                if let Some(ev) = event {
+                    if ev.owner_id != Some(auth_user.id) {
+                        return Err((
+                            StatusCode::FORBIDDEN,
+                            Json(serde_json::json!({ "error": "Access denied to event orders" })),
+                        ));
+                    }
+                }
+                OrderRepository::find_order_details_by_event_id(&state.pool, event_id).await
+            } else {
+                OrderRepository::find_order_details_by_owner_id(&state.pool, auth_user.id).await
+            }
+        }
+        UserRole::Customer | UserRole::Gatekeeper => {
+            OrderRepository::find_order_details_by_user_id(&state.pool, auth_user.id).await
+        }
     }
     .map_err(|e| {
         (
@@ -271,15 +299,33 @@ pub async fn get_order(
         }
     };
 
-    let is_elevated = auth_user.role == UserRole::Admin
-        || auth_user.role == UserRole::Staff
-        || auth_user.role == UserRole::EventOrganizer;
+    let is_admin_or_staff = auth_user.role == UserRole::Admin || auth_user.role == UserRole::Staff;
 
-    if !is_elevated && o.user_id != auth_user.id {
-        return Err((
-            StatusCode::FORBIDDEN,
-            Json(serde_json::json!({ "error": "Access denied to this order" })),
-        ));
+    if !is_admin_or_staff {
+        if auth_user.role == UserRole::EventOrganizer {
+            let event = EventRepository::find_by_id(&state.pool, o.event_id)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({ "error": e.to_string() })),
+                    )
+                })?;
+
+            if let Some(ev) = event {
+                if ev.owner_id != Some(auth_user.id) {
+                    return Err((
+                        StatusCode::FORBIDDEN,
+                        Json(serde_json::json!({ "error": "Access denied to this order" })),
+                    ));
+                }
+            }
+        } else if o.user_id != auth_user.id {
+            return Err((
+                StatusCode::FORBIDDEN,
+                Json(serde_json::json!({ "error": "Access denied to this order" })),
+            ));
+        }
     }
 
     let seats = OrderRepository::find_order_seats_by_order_id(&state.pool, o.id)
@@ -415,6 +461,14 @@ pub async fn confirm_mock_order(
     })?;
 
     tracing::info!(order_id = %order_id, "Order confirmed via mock payment");
+
+    // Generate Order Receipt PDF and upload to S3
+    let s3_state = state.clone();
+    tokio::spawn(async move {
+        if let Err(e) = generate_and_upload_order_pdf(&s3_state, order_id).await {
+            tracing::warn!("Failed to upload order receipt PDF to S3: {e}");
+        }
+    });
 
     Ok(Json(serde_json::json!({
         "success": true,
@@ -1041,3 +1095,118 @@ pub async fn get_order_seat_changes(
 
     Ok(Json(changes))
 }
+
+pub async fn generate_and_upload_order_pdf(
+    state: &AppState,
+    order_id: Uuid,
+) -> Result<Vec<u8>, String> {
+    let order = OrderRepository::find_order_detail_by_id(&state.pool, order_id)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "Order not found".to_string())?;
+
+    let seats = OrderRepository::find_order_seats_by_order_id(&state.pool, order_id)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let tickets = TicketRepository::find_by_order_id(&state.pool, order_id)
+        .await
+        .unwrap_or_default();
+
+    let seat_items: Vec<crate::pdf::OrderSeatReceiptItem> = seats
+        .iter()
+        .map(|s| {
+            let t_code = tickets
+                .iter()
+                .find(|t| t.seat_booking_id == s.seat_booking_id)
+                .map(|t| t.code.clone());
+            crate::pdf::OrderSeatReceiptItem {
+                seat_label: format!("Row {} - Seat {}", s.row_label, s.seat_number),
+                zone_name: s.zone_name.clone(),
+                ticket_code: t_code,
+                price_cents: s.price_cents,
+            }
+        })
+        .collect();
+
+    let pdf_bytes = crate::pdf::PdfService::generate_order_receipt_pdf(
+        order.id,
+        &order.event_title,
+        &order.starts_at.format("%Y-%m-%d %H:%M").to_string(),
+        &order.theater_name,
+        order.user_email.as_deref().unwrap_or("Customer"),
+        order.total_amount_cents,
+        &order.status,
+        &seat_items,
+    )?;
+
+    let s3_key = format!("orders/{}/receipt.pdf", order_id);
+    let _ = state.s3.upload_file(&s3_key, pdf_bytes.clone(), "application/pdf").await;
+
+    Ok(pdf_bytes)
+}
+
+/// GET /api/orders/:id/pdf
+pub async fn download_order_pdf(
+    Path(order_id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<axum::response::Response, (StatusCode, Json<serde_json::Value>)> {
+    let order_opt = OrderRepository::find_order_detail_by_id(&state.pool, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let o = match order_opt {
+        Some(row) => row,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Order not found" })),
+            ));
+        }
+    };
+
+    let is_elevated = auth_user.role == UserRole::Admin
+        || auth_user.role == UserRole::Staff
+        || auth_user.role == UserRole::EventOrganizer;
+
+    if !is_elevated && o.user_id != auth_user.id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Access denied to this order" })),
+        ));
+    }
+
+    let pdf_bytes = generate_and_upload_order_pdf(&state, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({
+                    "error": format!("Failed to generate order receipt PDF: {e}")
+                })),
+            )
+        })?;
+
+    use axum::http::header;
+    use axum::response::IntoResponse;
+
+    let disposition = format!("inline; filename=\"receipt_{}.pdf\"", order_id);
+    let response = (
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/pdf"),
+            (header::CONTENT_DISPOSITION, &disposition),
+        ],
+        pdf_bytes,
+    )
+        .into_response();
+
+    Ok(response)
+}
+

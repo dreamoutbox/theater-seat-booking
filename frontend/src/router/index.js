@@ -6,6 +6,7 @@ import OrderDetailView from '../views/OrderDetailView.vue';
 import ManageEventsView from '../views/ManageEventsView.vue';
 import ManageEventDetailView from '../views/ManageEventDetailView.vue';
 import ManageEventGatekeepersView from '../views/ManageEventGatekeepersView.vue';
+import EventFinancialReportsListView from '../views/EventFinancialReportsListView.vue';
 import EventFinancialReportView from '../views/EventFinancialReportView.vue';
 import ManageEventSettingsView from '../views/ManageEventSettingsView.vue';
 import CheckoutView from '../views/CheckoutView.vue';
@@ -89,8 +90,17 @@ const routes = [
     meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
   },
   {
-    path: '/manage/events/:id/financial-report',
-    name: 'EventFinancialReport',
+    path: '/manage/events/:id/financial-reports',
+    alias: '/manage/events/:id/financial-report',
+    name: 'EventFinancialReportsList',
+    component: EventFinancialReportsListView,
+    props: true,
+    meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
+  },
+  {
+    path: '/manage/events/:id/financial-reports/:reportId',
+    alias: '/manage/events/:id/financial-report/:reportId',
+    name: 'EventFinancialReportDetail',
     component: EventFinancialReportView,
     props: true,
     meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
@@ -99,6 +109,13 @@ const routes = [
     path: '/manage/events/:id/settings',
     name: 'ManageEventSettings',
     component: ManageEventSettingsView,
+    props: true,
+    meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
+  },
+  {
+    path: '/manage/events/:id/orders',
+    name: 'ManageEventOrders',
+    component: OrdersView,
     props: true,
     meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
   },

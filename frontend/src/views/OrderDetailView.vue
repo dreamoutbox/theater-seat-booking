@@ -7,29 +7,15 @@
       </v-btn>
 
       <div class="d-flex align-center gap-2">
-        <!-- Print Tax Receipt Action -->
-        <v-btn
-          v-if="hasTickets"
-          variant="outlined"
-          color="teal-accent-3"
-          size="small"
-          prepend-icon="mdi-printer"
-          class="text-none font-weight-bold"
-          @click="printReceipt"
-        >
-          Print Tax Receipt
+        <!-- Download S3 PDF Receipt -->
+        <v-btn v-if="hasTickets" variant="outlined" color="amber-darken-1" size="small" prepend-icon="mdi-file-pdf-box"
+          class="text-none font-weight-bold" :href="`/api/orders/${order?.id}/pdf`" target="_blank">
+          PDF Receipt
         </v-btn>
 
         <!-- Elevated Refund Action -->
-        <v-btn
-          v-if="canRefundOrder"
-          color="red-accent-2"
-          variant="tonal"
-          size="small"
-          prepend-icon="mdi-cash-refund"
-          class="text-none font-weight-bold"
-          @click="openRefundDialog()"
-        >
+        <v-btn v-if="canRefundOrder" color="red-accent-2" variant="tonal" size="small" prepend-icon="mdi-cash-refund"
+          class="text-none font-weight-bold" @click="openRefundDialog()">
           Refund Tickets ({{ activeTickets.length }})
         </v-btn>
       </div>
@@ -95,7 +81,8 @@
             </div>
           </v-col>
           <v-col cols="12" sm="6">
-            <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Event Organizer & Tax Identity</div>
+            <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Event Organizer & Tax Identity
+            </div>
             <div class="text-body-2 font-weight-bold text-white">
               {{ order.organizer_tax_business_name || 'DreamCinema Live Productions Ltd.' }}
             </div>
@@ -141,29 +128,21 @@
                   <span>Row {{ s.row_label }}, Seat {{ s.seat_number }}</span>
                   <v-btn
                     v-if="['paid', 'partially_refunded'].includes(order.status) && (!hasTickets || getTicket(s.seat_booking_id)?.status === 'active')"
-                    size="x-small"
-                    color="amber-darken-1"
-                    variant="tonal"
-                    prepend-icon="mdi-swap-horizontal"
-                    class="text-none font-weight-bold ml-1"
-                    @click="openChangeSeatModal(s)"
-                  >
+                    size="x-small" color="amber-darken-1" variant="tonal" prepend-icon="mdi-swap-horizontal"
+                    class="text-none font-weight-bold ml-1" @click="openChangeSeatModal(s)">
                     Change Seat
                   </v-btn>
                 </div>
                 <!-- Upgrade / Seat Change Origin Badge -->
                 <div v-if="getLatestSeatChange(s.seat_booking_id)" class="d-flex align-center gap-1 mt-1 flex-wrap">
-                  <v-chip
-                    size="x-small"
-                    :color="getSeatChangeColor(getLatestSeatChange(s.seat_booking_id))"
-                    variant="tonal"
-                    class="font-weight-bold"
-                    :prepend-icon="getSeatChangeIcon(getLatestSeatChange(s.seat_booking_id))"
-                  >
+                  <v-chip size="x-small" :color="getSeatChangeColor(getLatestSeatChange(s.seat_booking_id))"
+                    variant="tonal" class="font-weight-bold"
+                    :prepend-icon="getSeatChangeIcon(getLatestSeatChange(s.seat_booking_id))">
                     {{ getSeatChangeLabel(getLatestSeatChange(s.seat_booking_id)) }}
                   </v-chip>
                 </div>
-                <div v-if="s.attendee_name || s.attendee_phone" class="text-caption text-grey-lighten-1 font-weight-regular mt-1">
+                <div v-if="s.attendee_name || s.attendee_phone"
+                  class="text-caption text-grey-lighten-1 font-weight-regular mt-1">
                   <span v-if="s.attendee_name">👤 {{ s.attendee_name }}</span>
                   <span v-if="s.attendee_phone" class="ml-2">📞 {{ s.attendee_phone }}</span>
                 </div>
@@ -174,41 +153,35 @@
               <td v-if="hasTickets" class="py-3 align-middle">
                 <div v-if="getTicket(s.seat_booking_id)" class="d-flex align-center gap-3">
                   <!-- QR wrapper -->
-                  <div
-                    class="qr-cell-wrapper pa-1 rounded bg-white elevation-2 d-flex align-center justify-center"
-                    :class="{ 'opacity-40': getTicket(s.seat_booking_id).status === 'refunded' }"
-                  >
+                  <div class="qr-cell-wrapper pa-1 rounded bg-white elevation-2 d-flex align-center justify-center"
+                    :class="{ 'opacity-40': getTicket(s.seat_booking_id).status === 'refunded' }">
                     <qrcode-vue :value="getTicket(s.seat_booking_id).code" :size="64" level="H" />
                   </div>
                   <div class="d-flex flex-column flex-grow-1">
                     <div class="d-flex align-center gap-2 mb-1">
                       <span class="text-caption text-grey text-uppercase font-weight-bold">Code</span>
-                      <span
-                        class="text-subtitle-2 font-weight-black font-weight-mono letter-spacing-code"
-                        :class="getTicket(s.seat_booking_id).status === 'refunded' ? 'text-grey text-decoration-line-through' : 'text-amber-darken-1'"
-                      >
+                      <span class="text-subtitle-2 font-weight-black font-weight-mono letter-spacing-code"
+                        :class="getTicket(s.seat_booking_id).status === 'refunded' ? 'text-grey text-decoration-line-through' : 'text-amber-darken-1'">
                         {{ getTicket(s.seat_booking_id).code }}
                       </span>
                     </div>
                     <div class="d-flex align-center gap-2 flex-wrap">
-                      <v-chip size="x-small" :color="getTicketStatusColor(getTicket(s.seat_booking_id).status)" variant="flat" class="font-weight-bold text-uppercase">
+                      <v-chip size="x-small" :color="getTicketStatusColor(getTicket(s.seat_booking_id).status)"
+                        variant="flat" class="font-weight-bold text-uppercase">
                         {{ getTicket(s.seat_booking_id).status }}
                       </v-chip>
-                      <span v-if="getTicket(s.seat_booking_id).status === 'used'" class="text-caption text-grey text-truncate">
+                      <span v-if="getTicket(s.seat_booking_id).status === 'used'"
+                        class="text-caption text-grey text-truncate">
                         Scanned {{ formatDate(getTicket(s.seat_booking_id).used_at) }}
                       </span>
-                      <span v-else-if="getTicket(s.seat_booking_id).status === 'refunded'" class="text-caption text-red-accent-2 text-truncate">
+                      <span v-else-if="getTicket(s.seat_booking_id).status === 'refunded'"
+                        class="text-caption text-red-accent-2 text-truncate">
                         Refunded {{ formatDate(getTicket(s.seat_booking_id).refunded_at) }}
                       </span>
                       <!-- Individual ticket refund button for staff/organizers -->
-                      <v-btn
-                        v-else-if="canRefundOrder && getTicket(s.seat_booking_id).status === 'active'"
-                        size="x-small"
-                        color="red-accent-2"
-                        variant="text"
-                        class="text-none font-weight-bold px-1"
-                        @click="openRefundDialog(getTicket(s.seat_booking_id).id)"
-                      >
+                      <v-btn v-else-if="canRefundOrder && getTicket(s.seat_booking_id).status === 'active'"
+                        size="x-small" color="red-accent-2" variant="text" class="text-none font-weight-bold px-1"
+                        @click="openRefundDialog(getTicket(s.seat_booking_id).id)">
                         Refund
                       </v-btn>
                     </div>
@@ -217,21 +190,17 @@
                 <span v-else class="text-caption text-grey">Generating ticket...</span>
               </td>
               <td class="text-right font-weight-mono font-weight-bold text-white align-middle">
-                <div :class="{ 'text-decoration-line-through text-grey': getTicket(s.seat_booking_id)?.status === 'refunded' }">
+                <div
+                  :class="{ 'text-decoration-line-through text-grey': getTicket(s.seat_booking_id)?.status === 'refunded' }">
                   ${{ (s.price_cents / 100).toFixed(2) }}
                 </div>
-                <div
-                  v-if="getLatestSeatChange(s.seat_booking_id)?.metadata?.is_free_upgrade"
-                  class="text-caption text-purple-accent-2 font-weight-bold"
-                  title="Complimentary Upgrade"
-                >
+                <div v-if="getLatestSeatChange(s.seat_booking_id)?.metadata?.is_free_upgrade"
+                  class="text-caption text-purple-accent-2 font-weight-bold" title="Complimentary Upgrade">
                   <span>Free Upgrade</span>
                 </div>
-                <div
-                  v-else-if="s.original_price_cents && s.original_price_cents !== s.price_cents"
+                <div v-else-if="s.original_price_cents && s.original_price_cents !== s.price_cents"
                   class="text-caption text-grey font-weight-regular font-mono"
-                  title="Original purchase price before seat change"
-                >
+                  title="Original purchase price before seat change">
                   <span class="text-grey-lighten-1">Orig: ${{ (s.original_price_cents / 100).toFixed(2) }}</span>
                 </div>
               </td>
@@ -281,16 +250,11 @@
               </td>
               <td class="py-3 align-middle">
                 <div v-if="r.items && r.items.length > 0" class="d-flex flex-wrap gap-1">
-                  <v-chip
-                    v-for="item in r.items"
-                    :key="item.ticket_id"
-                    size="x-small"
-                    color="red-accent-2"
-                    variant="tonal"
-                    class="font-weight-bold"
-                  >
+                  <v-chip v-for="item in r.items" :key="item.ticket_id" size="x-small" color="red-accent-2"
+                    variant="tonal" class="font-weight-bold">
                     Row {{ item.row_label }}{{ item.seat_number }}
-                    <span v-if="item.ticket_code" class="font-weight-mono ml-1 text-grey-lighten-1">[{{ item.ticket_code }}]</span>
+                    <span v-if="item.ticket_code" class="font-weight-mono ml-1 text-grey-lighten-1">[{{ item.ticket_code
+                    }}]</span>
                     <span class="ml-1 font-weight-mono">(${{ (item.price_cents / 100).toFixed(2) }})</span>
                   </v-chip>
                 </div>
@@ -383,13 +347,8 @@
               </td>
               <td class="py-3 align-middle">
                 <div class="d-flex align-center gap-1 flex-wrap mb-1">
-                  <v-chip
-                    size="x-small"
-                    :color="getSeatChangeColor(sc)"
-                    variant="tonal"
-                    class="font-weight-bold"
-                    :prepend-icon="getSeatChangeIcon(sc)"
-                  >
+                  <v-chip size="x-small" :color="getSeatChangeColor(sc)" variant="tonal" class="font-weight-bold"
+                    :prepend-icon="getSeatChangeIcon(sc)">
                     {{ getSeatChangeLabel(sc) }}
                   </v-chip>
                 </div>
@@ -410,7 +369,8 @@
           <span>Seats Subtotal:</span>
           <span class="font-weight-mono text-white">${{ (order.total_amount_cents / 100).toFixed(2) }}</span>
         </div>
-        <div v-if="order.refunded_amount_cents > 0" class="d-flex justify-space-between text-body-2 text-red-accent-2 font-weight-bold">
+        <div v-if="order.refunded_amount_cents > 0"
+          class="d-flex justify-space-between text-body-2 text-red-accent-2 font-weight-bold">
           <span>Total Refunded:</span>
           <span class="font-weight-mono">-${{ (order.refunded_amount_cents / 100).toFixed(2) }}</span>
         </div>
@@ -450,7 +410,8 @@
           </v-avatar>
           <div>
             <h3 class="text-h6 font-weight-bold text-white">Refund Tickets</h3>
-            <span class="text-caption text-grey">Select the active tickets to refund and release back to inventory.</span>
+            <span class="text-caption text-grey">Select the active tickets to refund and release back to
+              inventory.</span>
           </div>
         </div>
 
@@ -460,28 +421,19 @@
         <div class="mb-4">
           <div class="text-caption text-grey font-weight-bold text-uppercase mb-2">Select Tickets to Refund</div>
           <div class="d-flex flex-column gap-2 max-h-60 overflow-y-auto">
-            <v-card
-              v-for="t in activeTickets"
-              :key="t.id"
-              variant="outlined"
-              class="pa-3 rounded-lg border bg-surface-variant cursor-pointer"
-              @click="toggleTicketSelection(t.id)"
-            >
+            <v-card v-for="t in activeTickets" :key="t.id" variant="outlined"
+              class="pa-3 rounded-lg border bg-surface-variant cursor-pointer" @click="toggleTicketSelection(t.id)">
               <div class="d-flex justify-space-between align-center">
                 <div class="d-flex align-center gap-3">
-                  <v-checkbox-btn
-                    :model-value="refundDialog.selectedTicketIds.includes(t.id)"
-                    color="red-accent-2"
-                    hide-details
-                    density="compact"
-                    @click.stop="toggleTicketSelection(t.id)"
-                  ></v-checkbox-btn>
+                  <v-checkbox-btn :model-value="refundDialog.selectedTicketIds.includes(t.id)" color="red-accent-2"
+                    hide-details density="compact" @click.stop="toggleTicketSelection(t.id)"></v-checkbox-btn>
                   <div>
                     <div class="font-weight-bold text-white text-body-2">
                       Row {{ t.row_label }}, Seat {{ t.seat_number }}
                     </div>
                     <div class="text-caption text-grey">
-                      Code: <strong class="font-weight-mono text-amber-darken-1">{{ t.code }}</strong> • {{ t.zone_name }}
+                      Code: <strong class="font-weight-mono text-amber-darken-1">{{ t.code }}</strong> • {{ t.zone_name
+                      }}
                     </div>
                   </div>
                 </div>
@@ -494,15 +446,9 @@
         </div>
 
         <!-- Refund Reason -->
-        <v-text-field
-          v-model="refundDialog.reason"
-          label="Refund Reason (Optional)"
-          placeholder="e.g., Customer requested cancellation"
-          variant="outlined"
-          density="compact"
-          class="mb-4"
-          hide-details
-        ></v-text-field>
+        <v-text-field v-model="refundDialog.reason" label="Refund Reason (Optional)"
+          placeholder="e.g., Customer requested cancellation" variant="outlined" density="compact" class="mb-4"
+          hide-details></v-text-field>
 
         <!-- Calculated Refund Total -->
         <div class="pa-4 rounded-lg bg-surface-variant border mb-6 d-flex justify-space-between align-center">
@@ -513,17 +459,13 @@
         </div>
 
         <div class="d-flex justify-end gap-3">
-          <v-btn variant="text" class="text-none font-weight-bold" :disabled="refundDialog.submitting" @click="refundDialog.show = false">
+          <v-btn variant="text" class="text-none font-weight-bold" :disabled="refundDialog.submitting"
+            @click="refundDialog.show = false">
             Cancel
           </v-btn>
-          <v-btn
-            color="red-accent-2"
-            variant="flat"
-            class="text-none font-weight-bold px-6"
-            :loading="refundDialog.submitting"
-            :disabled="refundDialog.selectedTicketIds.length === 0"
-            @click="handleRefundSubmit"
-          >
+          <v-btn color="red-accent-2" variant="flat" class="text-none font-weight-bold px-6"
+            :loading="refundDialog.submitting" :disabled="refundDialog.selectedTicketIds.length === 0"
+            @click="handleRefundSubmit">
             Confirm Refund ({{ refundDialog.selectedTicketIds.length }})
           </v-btn>
         </div>
@@ -575,7 +517,8 @@
                 <span class="text-body-2 font-weight-bold text-amber-darken-1">
                   Row {{ changeSeatDialog.newSeat.row_label }}, Seat {{ changeSeatDialog.newSeat.seat_number }}
                 </span>
-                <span class="text-caption text-grey">({{ changeSeatDialog.newSeat.zone_name }} - ${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2) }})</span>
+                <span class="text-caption text-grey">({{ changeSeatDialog.newSeat.zone_name }} - ${{
+                  (changeSeatDialog.newSeat.price_cents / 100).toFixed(2) }})</span>
               </div>
               <div v-else class="text-caption text-grey-lighten-1 font-italic">
                 Click any available (colored) seat below to select
@@ -602,34 +545,18 @@
               <div class="d-flex align-center gap-1">
                 <template v-for="slot in row.slots" :key="`${row.label}-${slot.seatNumber}`">
                   <!-- Seat exists -->
-                  <button
-                    v-if="slot.seat"
-                    type="button"
-                    class="picker-seat-node"
-                    :class="{
-                      'picker-seat-selected': changeSeatDialog.newSeat?.id === slot.seat.id,
-                      'picker-seat-current': slot.seat.id === changeSeatDialog.oldSeat?.seat_id,
-                      'picker-seat-unavailable': isSeatUnavailableInPicker(slot.seat),
-                    }"
-                    :disabled="isSeatUnavailableInPicker(slot.seat)"
-                    :style="getPickerSeatStyle(slot.seat)"
+                  <button v-if="slot.seat" type="button" class="picker-seat-node" :class="{
+                    'picker-seat-selected': changeSeatDialog.newSeat?.id === slot.seat.id,
+                    'picker-seat-current': slot.seat.id === changeSeatDialog.oldSeat?.seat_id,
+                    'picker-seat-unavailable': isSeatUnavailableInPicker(slot.seat),
+                  }" :disabled="isSeatUnavailableInPicker(slot.seat)" :style="getPickerSeatStyle(slot.seat)"
                     :title="`Row ${slot.seat.row_label}, Seat ${slot.seat.seat_number} (${slot.seat.zone_name}) - ${slot.seat.status === 'available' ? 'Available' : 'Unavailable'}`"
-                    @click="selectNewSeat(slot.seat)"
-                  >
+                    @click="selectNewSeat(slot.seat)">
                     <span class="picker-seat-label">{{ slot.seat.seat_number }}</span>
-                    <v-icon
-                      v-if="changeSeatDialog.newSeat?.id === slot.seat.id"
-                      icon="mdi-check"
-                      size="10"
-                      color="white"
-                      class="picker-check"
-                    ></v-icon>
-                    <v-icon
-                      v-else-if="isSeatUnavailableInPicker(slot.seat)"
-                      icon="mdi-lock"
-                      size="10"
-                      color="grey"
-                    ></v-icon>
+                    <v-icon v-if="changeSeatDialog.newSeat?.id === slot.seat.id" icon="mdi-check" size="10"
+                      color="white" class="picker-check"></v-icon>
+                    <v-icon v-else-if="isSeatUnavailableInPicker(slot.seat)" icon="mdi-lock" size="10"
+                      color="grey"></v-icon>
                   </button>
                   <!-- Empty walkway slot -->
                   <div v-else class="picker-empty-slot"></div>
@@ -644,58 +571,46 @@
         <div v-if="changeSeatDialog.newSeat" class="mb-4">
           <div
             v-if="authStore.isElevated && changeSeatDialog.newSeat.price_cents > (changeSeatDialog.oldSeat?.price_cents || 0)"
-            class="pa-3 rounded-lg border bg-surface-variant mb-3"
-          >
+            class="pa-3 rounded-lg border bg-surface-variant mb-3">
             <div class="d-flex align-center justify-space-between flex-wrap gap-2">
               <div>
                 <div class="d-flex align-center gap-2">
-                  <v-icon
-                    :icon="changeSeatDialog.isFreeUpgrade ? 'mdi-gift-outline' : 'mdi-currency-usd'"
-                    :color="changeSeatDialog.isFreeUpgrade ? 'purple-accent-2' : 'amber-darken-1'"
-                  ></v-icon>
+                  <v-icon :icon="changeSeatDialog.isFreeUpgrade ? 'mdi-gift-outline' : 'mdi-currency-usd'"
+                    :color="changeSeatDialog.isFreeUpgrade ? 'purple-accent-2' : 'amber-darken-1'"></v-icon>
                   <span class="font-weight-bold text-white text-body-2">Free Upgrade / Complimentary Move</span>
                 </div>
                 <div class="text-caption text-grey mt-1">
                   <span v-if="changeSeatDialog.isFreeUpgrade">
-                    Order total remains <strong>${{ ((changeSeatDialog.oldSeat?.price_cents || 0) / 100).toFixed(2) }}</strong>. No extra charge will be billed to the customer.
+                    Order total remains <strong>${{ ((changeSeatDialog.oldSeat?.price_cents || 0) / 100).toFixed(2)
+                    }}</strong>.
+                    No extra charge will be billed to the customer.
                   </span>
                   <span v-else>
-                    Order total will be updated to <strong>${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2) }}</strong> (+${{ (((changeSeatDialog.newSeat.price_cents || 0) - (changeSeatDialog.oldSeat?.price_cents || 0)) / 100).toFixed(2) }} price difference).
+                    Order total will be updated to <strong>${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2)
+                    }}</strong> (+${{ (((changeSeatDialog.newSeat.price_cents || 0) -
+                        (changeSeatDialog.oldSeat?.price_cents
+                          || 0)) / 100).toFixed(2) }} price difference).
                   </span>
                 </div>
               </div>
-              <v-switch
-                v-model="changeSeatDialog.isFreeUpgrade"
-                color="purple-accent-2"
-                hide-details
-                density="compact"
-                inset
-              ></v-switch>
+              <v-switch v-model="changeSeatDialog.isFreeUpgrade" color="purple-accent-2" hide-details density="compact"
+                inset></v-switch>
             </div>
           </div>
 
-          <v-text-field
-            v-model="changeSeatDialog.reason"
-            label="Reason for Seat Change (Optional)"
-            placeholder="e.g. Complimentary VIP upgrade, Operational reseating, Customer request"
-            density="compact"
-            variant="outlined"
-            hide-details
-          ></v-text-field>
+          <v-text-field v-model="changeSeatDialog.reason" label="Reason for Seat Change (Optional)"
+            placeholder="e.g. Complimentary VIP upgrade, Operational reseating, Customer request" density="compact"
+            variant="outlined" hide-details></v-text-field>
         </div>
 
         <div class="d-flex justify-end gap-3">
-          <v-btn variant="text" class="text-none font-weight-bold" :disabled="changeSeatDialog.submitting" @click="changeSeatDialog.show = false">
+          <v-btn variant="text" class="text-none font-weight-bold" :disabled="changeSeatDialog.submitting"
+            @click="changeSeatDialog.show = false">
             Cancel
           </v-btn>
-          <v-btn
-            color="amber-darken-1"
-            variant="flat"
-            class="text-none font-weight-bold px-6"
-            :loading="changeSeatDialog.submitting"
-            :disabled="!changeSeatDialog.newSeat"
-            @click="handleConfirmChangeSeat"
-          >
+          <v-btn color="amber-darken-1" variant="flat" class="text-none font-weight-bold px-6"
+            :loading="changeSeatDialog.submitting" :disabled="!changeSeatDialog.newSeat"
+            @click="handleConfirmChangeSeat">
             Confirm Change to Row {{ changeSeatDialog.newSeat?.row_label }}{{ changeSeatDialog.newSeat?.seat_number }}
           </v-btn>
         </div>
@@ -733,7 +648,9 @@
         <tbody>
           <tr>
             <th style="width: 25%;" class="bg-light-gray text-left">Billed To (Customer):</th>
-            <td style="width: 25%;" class="font-bold">{{ order.billing_name || order.user_email || 'Direct Admissions' }}</td>
+            <td style="width: 25%;" class="font-bold">{{ order.billing_name || order.user_email || 'Direct Admissions'
+            }}
+            </td>
             <th style="width: 25%;" class="bg-light-gray text-left">Customer Tax ID / VAT:</th>
             <td style="width: 25%;" class="font-mono">{{ order.tax_id || 'N/A' }}</td>
           </tr>
@@ -760,7 +677,8 @@
           <tr v-for="s in order.seats" :key="s.seat_booking_id">
             <td class="font-bold">
               Row {{ s.row_label }}, Seat {{ s.seat_number }} ({{ s.zone_name }})
-              <div v-if="getLatestSeatChange(s.seat_booking_id)" class="text-muted" style="font-size: 11px; font-weight: normal;">
+              <div v-if="getLatestSeatChange(s.seat_booking_id)" class="text-muted"
+                style="font-size: 11px; font-weight: normal;">
                 ↳ {{ getSeatChangeLabel(getLatestSeatChange(s.seat_booking_id)) }}
               </div>
             </td>
@@ -771,7 +689,8 @@
             <td class="text-center font-mono font-bold">{{ getTicket(s.seat_booking_id)?.code || '—' }}</td>
             <td class="text-right font-mono font-bold">
               <div>${{ (s.price_cents / 100).toFixed(2) }}</div>
-              <div v-if="s.original_price_cents && s.original_price_cents !== s.price_cents" style="font-size: 10px; font-weight: normal; color: #666;">
+              <div v-if="s.original_price_cents && s.original_price_cents !== s.price_cents"
+                style="font-size: 10px; font-weight: normal; color: #666;">
                 (Orig: ${{ (s.original_price_cents / 100).toFixed(2) }})
               </div>
             </td>
@@ -784,7 +703,9 @@
           </tr>
           <tr v-if="order.refunded_amount_cents > 0">
             <td colspan="3" class="text-right font-bold text-danger">Refunds Deducted:</td>
-            <td class="text-right font-mono font-bold text-danger">-${{ (order.refunded_amount_cents / 100).toFixed(2) }}</td>
+            <td class="text-right font-mono font-bold text-danger">-${{ (order.refunded_amount_cents / 100).toFixed(2)
+            }}
+            </td>
           </tr>
           <tr class="row-total">
             <td colspan="3" class="text-right font-bold text-large">TOTAL PAID:</td>
@@ -1422,7 +1343,11 @@ onMounted(() => {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   }
 
-  .v-card, .v-btn, .v-table, .v-divider, .row-info {
+  .v-card,
+  .v-btn,
+  .v-table,
+  .v-divider,
+  .row-info {
     display: none !important;
   }
 
@@ -1457,7 +1382,8 @@ onMounted(() => {
     font-size: 9.5pt;
   }
 
-  .receipt-table th, .receipt-table td {
+  .receipt-table th,
+  .receipt-table td {
     border: 1px solid #cbd5e1;
     padding: 6px 10px;
   }

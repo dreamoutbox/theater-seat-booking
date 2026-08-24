@@ -4,36 +4,24 @@
     <v-container class="no-print mb-4 max-w-5xl">
       <div class="d-flex justify-space-between align-center flex-wrap gap-3">
         <div class="d-flex align-center gap-2">
-          <v-btn
-            variant="text"
-            prepend-icon="mdi-arrow-left"
-            :to="`/manage/events/${props.id || route.params.id}`"
-            class="text-none font-weight-bold"
-          >
-            Back to Event Details
+          <v-btn variant="text" prepend-icon="mdi-arrow-left" :to="`/manage/events/${eventId}/financial-reports`"
+            class="text-none font-weight-bold">
+            Back to Report Archive
           </v-btn>
         </div>
 
         <div class="d-flex align-center gap-3">
-          <v-btn
-            variant="outlined"
-            prepend-icon="mdi-refresh"
-            size="small"
-            :loading="loading"
-            @click="loadReportData"
-            class="text-none font-weight-bold"
-          >
+          <v-btn variant="outlined" prepend-icon="mdi-refresh" size="small" :loading="loading" @click="loadReportData"
+            class="text-none font-weight-bold">
             Refresh
           </v-btn>
-          <v-btn
-            color="amber-darken-1"
-            variant="flat"
-            prepend-icon="mdi-printer"
-            size="small"
-            class="text-none font-weight-bold"
-            @click="printReport"
-          >
-            Print / Save as PDF (A4)
+          <v-btn color="amber-darken-1" variant="flat" prepend-icon="mdi-printer" size="small"
+            class="text-none font-weight-bold" @click="printReport">
+            Print (A4)
+          </v-btn>
+          <v-btn v-if="reportIdParam" color="red-lighten-2" variant="tonal" prepend-icon="mdi-file-pdf-box" size="small"
+            class="text-none font-weight-bold" :href="`/api/reports/${reportIdParam}/pdf`" target="_blank">
+            Download PDF
           </v-btn>
         </div>
       </div>
@@ -42,7 +30,7 @@
     <!-- Loading State -->
     <v-container v-if="loading" class="no-print max-w-5xl text-center py-12">
       <v-progress-circular indeterminate color="amber-darken-1" size="56"></v-progress-circular>
-      <div class="text-body-1 text-grey mt-4">Generating Financial Statement & Tax Report...</div>
+      <div class="text-body-1 text-grey mt-4">Loading Financial Statement & Tax Report Snapshot...</div>
     </v-container>
 
     <!-- Error State -->
@@ -118,111 +106,121 @@
             </tr>
             <tr class="row-danger">
               <td>
-                <span class="font-bold text-danger">Less: Ticket Returns & Refunds</span>
-                <div class="text-small text-muted">Refunded transactions reversed back to customers</div>
+                <span class="font-bold text-danger">Less: Customer Refunds & Inventory Releases</span>
+                <div class="text-small text-muted">Returned seat bookings and reversed charges</div>
               </td>
-              <td class="text-center font-mono text-danger">{{ metrics.refunded_tickets || 0 }} Refunded</td>
-              <td class="text-right font-mono font-bold text-danger">-${{ ((metrics.total_refunds_cents || 0) / 100).toFixed(2) }}</td>
+              <td class="text-center font-mono text-danger">{{ metrics.refunded_tickets || 0 }} Tickets Refunded</td>
+              <td class="text-right font-mono font-bold text-danger">-${{ ((metrics.total_refunds_cents || 0) /
+                100).toFixed(2) }}</td>
             </tr>
-            <tr class="row-highlight">
+            <tr class="row-highlight bg-light-gray">
               <td>
-                <span class="font-bold">Net Gross Ticket Sales (Taxable Base Revenue)</span>
-                <div class="text-small text-muted">Gross sales revenue after deducting all refunds</div>
+                <span class="font-bold">Net Operating Ticket Profit (Before Tax)</span>
+                <div class="text-small text-muted">Gross sales revenue minus refunded transactions</div>
               </td>
-              <td class="text-center font-mono font-bold">{{ (metrics.active_tickets || 0) + (metrics.used_tickets || 0) }} Net Valid</td>
-              <td class="text-right font-mono font-bold text-large">${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}</td>
+              <td class="text-center font-mono">{{ metrics.active_tickets || 0 }} Active Tickets</td>
+              <td class="text-right font-mono font-bold">${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}</td>
             </tr>
             <tr>
               <td>
-                <span>Payment Processing & Merchant Gateway Fees</span>
-                <div class="text-small text-muted">Stripe card transaction processing (Included / Absorbed)</div>
+                <span class="font-bold text-muted">Statutory Tax Withholding (10.0%)</span>
+                <div class="text-small text-muted">Estimated entertainment & business transaction tax liability</div>
               </td>
-              <td class="text-center font-mono">—</td>
-              <td class="text-right font-mono text-muted">$0.00</td>
+              <td class="text-center font-mono text-muted">Standard Rate</td>
+              <td class="text-right font-mono font-bold text-muted">-${{ (((metrics.net_profit_cents || 0) * 0.10) /
+                100).toFixed(2) }}</td>
             </tr>
             <tr class="row-total">
-              <td>
-                <span class="font-bold">NET ORGANIZER SETTLEMENT AMOUNT</span>
-                <div class="text-small text-muted">Final net payable amount for tax reporting and bank disbursement</div>
+              <td class="font-bold text-large">
+                FINAL SETTLEMENT PAYOUT
+                <div class="text-small text-muted font-normal">Disbursable funds after statutory withholding</div>
               </td>
-              <td class="text-center font-mono font-bold">100% Settled</td>
-              <td class="text-right font-mono font-bold text-large text-primary">
-                ${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}
+              <td class="text-center font-mono text-large font-bold">100% Cleared</td>
+              <td class="text-right font-mono text-large font-bold text-primary">
+                ${{ (((metrics.net_profit_cents || 0) * 0.90) / 100).toFixed(2) }}
               </td>
             </tr>
           </tbody>
         </table>
 
-        <!-- Showtime-by-Showtime Financial Breakdown -->
-        <div class="section-title mb-2">2. SHOWTIME SESSION BREAKDOWN & ATTENDANCE AUDIT</div>
-        <table class="report-table mb-6">
+        <!-- Showtime & Hall Attendance Section -->
+        <div class="section-title mb-2">2. SHOWTIME SESSIONS & ATTENDANCE AUDIT</div>
+        <table class="report-table mb-5">
           <thead>
             <tr>
-              <th class="text-left">Session Date & Venue</th>
-              <th class="text-center">Capacity</th>
-              <th class="text-center">Sold</th>
-              <th class="text-center">Checked-In</th>
-              <th class="text-center">Refunded</th>
-              <th class="text-right">Gross Sales</th>
-              <th class="text-right">Refunds</th>
-              <th class="text-right">Net Revenue</th>
+              <th class="text-left">Session ID & Starts At</th>
+              <th class="text-left">Theater Hall</th>
+              <th class="text-center" style="width: 100px;">Total Seats</th>
+              <th class="text-center" style="width: 100px;">Sold</th>
+              <th class="text-center" style="width: 100px;">Scanned</th>
+              <th class="text-right" style="width: 130px;">Net Revenue</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-if="showtimes.length === 0">
-              <td colspan="8" class="text-center py-3 text-muted">No sessions recorded for this event.</td>
-            </tr>
             <tr v-for="st in showtimes" :key="st.showtime_id">
               <td>
                 <div class="font-bold">{{ formatDate(st.starts_at) }}</div>
-                <div class="text-small text-muted">{{ st.theater_name }}</div>
+                <div class="text-small font-mono text-muted">#{{ st.showtime_id.substring(0, 8) }}</div>
               </td>
-              <td class="text-center font-mono">{{ st.total_seats }}</td>
-              <td class="text-center font-mono font-bold">{{ st.sold_seats }}</td>
-              <td class="text-center font-mono">
-                {{ st.used_tickets }}
-                <span class="text-small text-muted">({{ st.sold_seats > 0 ? Math.round((st.used_tickets / st.sold_seats) * 100) : 0 }}%)</span>
+              <td>
+                <div>{{ st.theater_name }}</div>
+                <div class="text-small text-muted">Grand Horizon Hall</div>
               </td>
-              <td class="text-center font-mono" :class="{ 'text-danger font-bold': st.refunded_tickets > 0 }">
-                {{ st.refunded_tickets }}
-              </td>
-              <td class="text-right font-mono">${{ (st.gross_cents / 100).toFixed(2) }}</td>
-              <td class="text-right font-mono" :class="{ 'text-danger': st.refunded_cents > 0 }">
-                {{ st.refunded_cents > 0 ? `-$${(st.refunded_cents / 100).toFixed(2)}` : '$0.00' }}
-              </td>
-              <td class="text-right font-mono font-bold">${{ (st.net_cents / 100).toFixed(2) }}</td>
+              <td class="text-center font-mono">{{ st.total_seats || 0 }}</td>
+              <td class="text-center font-mono font-bold">{{ st.sold_seats || 0 }}</td>
+              <td class="text-center font-mono text-success">{{ st.used_tickets || 0 }}</td>
+              <td class="text-right font-mono font-bold">${{ ((st.net_cents || 0) / 100).toFixed(2) }}</td>
+            </tr>
+            <tr v-if="showtimes.length === 0">
+              <td colspan="6" class="text-center text-muted py-3">No showtimes recorded for this event.</td>
             </tr>
           </tbody>
-          <tfoot>
-            <tr class="table-summary-footer">
-              <td class="font-bold">TOTALS</td>
-              <td class="text-center font-mono font-bold">{{ totalCapacity }}</td>
-              <td class="text-center font-mono font-bold">{{ (metrics.active_tickets || 0) + (metrics.used_tickets || 0) }}</td>
-              <td class="text-center font-mono font-bold">{{ metrics.used_tickets || 0 }} ({{ metrics.attendance_rate_percent || 0 }}%)</td>
-              <td class="text-center font-mono font-bold text-danger">{{ metrics.refunded_tickets || 0 }}</td>
-              <td class="text-right font-mono font-bold">${{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}</td>
-              <td class="text-right font-mono font-bold text-danger">-${{ ((metrics.total_refunds_cents || 0) / 100).toFixed(2) }}</td>
-              <td class="text-right font-mono font-bold text-primary">${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}</td>
+          <tfoot v-if="showtimes.length > 0">
+            <tr class="bg-light-gray font-bold">
+              <td colspan="2">Consolidated Totals</td>
+              <td class="text-center font-mono">{{ totalCapacity }}</td>
+              <td class="text-center font-mono">{{ metrics.active_tickets || 0 }}</td>
+              <td class="text-center font-mono text-success">{{ metrics.used_tickets || 0 }}</td>
+              <td class="text-right font-mono">${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}</td>
             </tr>
           </tfoot>
         </table>
 
-        <!-- Signature & Verification Footer -->
-        <div class="report-signatures pt-4 border-top">
-          <div class="d-flex justify-space-between align-end">
-            <div class="sign-box text-center">
-              <div class="sign-line mb-1"></div>
-              <div class="text-small font-bold">Event Organizer / Tax Filer</div>
-              <div class="text-small text-muted">Authorized Signature & Date</div>
+        <!-- Admission Performance Metrics -->
+        <div class="section-title mb-2">3. GATE ENTRY & ADMISSION VERIFICATION</div>
+        <table class="report-table mb-5">
+          <tbody>
+            <tr>
+              <th class="text-left bg-light-gray" style="width: 25%;">Total Tickets Issued:</th>
+              <td style="width: 25%;" class="font-mono font-bold">{{ metrics.total_tickets_created || 0 }}</td>
+              <th class="text-left bg-light-gray" style="width: 25%;">Active Valid Passes:</th>
+              <td style="width: 25%;" class="font-mono font-bold">{{ metrics.active_tickets || 0 }}</td>
+            </tr>
+            <tr>
+              <th class="text-left bg-light-gray">Gate Checked-In (Scanned):</th>
+              <td class="font-mono font-bold">{{ metrics.used_tickets || 0 }}</td>
+              <th class="text-left bg-light-gray">Overall Attendance Rate:</th>
+              <td class="font-mono font-bold">{{ metrics.attendance_rate_percent || 0 }}%</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Certification & Sign-off -->
+        <div class="report-footer mt-6 pt-4 border-top">
+          <div class="row d-flex justify-space-between">
+            <div style="width: 45%;">
+              <div class="text-small text-muted mb-4">Authorized By Platform Custodian:</div>
+              <div class="signature-line pb-1 mb-1">
+                <span class="signature-text">DreamCinema Digital Settlement System</span>
+              </div>
+              <div class="text-small text-muted">Automated Financial Audit Seal • ID: DC-TSB-SYS</div>
             </div>
-            <div class="qr-verify text-center">
-              <div class="text-small font-bold text-muted">DreamCinema Automated Clearance</div>
-              <div class="text-small text-muted">System Verified & Reconciled</div>
-            </div>
-            <div class="sign-box text-center">
-              <div class="sign-line mb-1"></div>
-              <div class="text-small font-bold">Cinema Financial Auditor</div>
-              <div class="text-small text-muted">Official Verification & Stamp</div>
+            <div style="width: 45%;" class="text-right">
+              <div class="text-small text-muted mb-4">Event Organizer / Tax Filer Verification:</div>
+              <div class="signature-line pb-1 mb-1 text-right">
+                <span class="signature-text">{{ organizerEmail || 'Event Authorized Representative' }}</span>
+              </div>
+              <div class="text-small text-muted">Confirmed on behalf of Event Production Entity</div>
             </div>
           </div>
         </div>
@@ -238,15 +236,20 @@ import api from '../api/client';
 
 const props = defineProps({
   id: { type: String, required: true },
+  reportId: { type: String, default: null },
 });
 
 const route = useRoute();
+const eventId = computed(() => props.id || route.params.id);
+const reportIdParam = computed(() => props.reportId || route.params.reportId);
+
 const loading = ref(true);
 const error = ref(null);
 const event = ref(null);
 const showtimes = ref([]);
 const organizerEmail = ref('');
 const reportGeneratedAt = ref(new Date());
+const rawStatementRef = ref('');
 
 const metrics = ref({
   gross_sales_cents: 0,
@@ -278,7 +281,8 @@ function formatDate(isoStr) {
 }
 
 function formatFullDate(date) {
-  return date.toLocaleString(undefined, {
+  const d = date instanceof Date ? date : new Date(date);
+  return d.toLocaleString(undefined, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -294,6 +298,7 @@ const totalCapacity = computed(() => {
 });
 
 const statementRef = computed(() => {
+  if (rawStatementRef.value) return rawStatementRef.value;
   const d = reportGeneratedAt.value || new Date();
   const yyyy = d.getFullYear();
   const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -310,25 +315,61 @@ const eventDateRange = computed(() => {
 });
 
 async function loadReportData() {
-  const eventId = props.id || route.params.id;
   loading.value = true;
   error.value = null;
-  reportGeneratedAt.value = new Date();
 
   try {
-    const [eventsRes, analyticsRes] = await Promise.all([
-      api.get('/events'),
-      api.get('/analytics/dashboard', { params: { event_id: eventId } }),
-    ]);
+    if (reportIdParam.value) {
+      // Load immutable saved snapshot report
+      const repRes = await api.get(`/reports/${reportIdParam.value}`);
+      const rep = repRes.data;
+      rawStatementRef.value = rep.statement_ref;
+      reportGeneratedAt.value = new Date(rep.generated_at);
 
-    const found = eventsRes.data.find((e) => e.id === eventId);
-    if (!found) {
-      error.value = 'Event not found';
-      return;
+      const snap = rep.report_data || {};
+      event.value = snap.event || { id: rep.event_id, title: 'Event' };
+      organizerEmail.value = snap.organizer_email || rep.generated_by_email || '';
+      metrics.value = snap.metrics || {
+        gross_sales_cents: rep.gross_sales_cents,
+        total_refunds_cents: rep.total_refunds_cents,
+        net_profit_cents: rep.net_profit_cents,
+        total_tickets_created: rep.tickets_issued,
+        active_tickets: rep.tickets_issued - rep.tickets_refunded,
+        used_tickets: rep.tickets_scanned,
+        refunded_tickets: rep.tickets_refunded,
+        attendance_rate_percent: rep.attendance_rate_percent,
+      };
+      showtimes.value = snap.showtimes || [];
+    } else {
+      // Fallback: load latest report for event or live data
+      const reportsRes = await api.get(`/events/${eventId.value}/reports`);
+      if (reportsRes.data.reports && reportsRes.data.reports.length > 0) {
+        const latest = reportsRes.data.reports[0];
+        rawStatementRef.value = latest.statement_ref;
+        reportGeneratedAt.value = new Date(latest.generated_at);
+        const snap = latest.report_data || {};
+        event.value = snap.event || { id: latest.event_id, title: 'Event' };
+        organizerEmail.value = snap.organizer_email || latest.generated_by_email || '';
+        metrics.value = snap.metrics || {};
+        showtimes.value = snap.showtimes || [];
+      } else {
+        // If no reports exist yet, load live data
+        const [eventsRes, analyticsRes] = await Promise.all([
+          api.get('/events'),
+          api.get('/analytics/dashboard', { params: { event_id: eventId.value } }),
+        ]);
+
+        const found = eventsRes.data.find((e) => e.id === eventId.value);
+        if (!found) {
+          error.value = 'Event not found';
+          return;
+        }
+        event.value = found;
+        metrics.value = analyticsRes.data.metrics || {};
+        showtimes.value = analyticsRes.data.showtimes || [];
+        reportGeneratedAt.value = new Date();
+      }
     }
-    event.value = found;
-    metrics.value = analyticsRes.data.metrics || {};
-    showtimes.value = analyticsRes.data.showtimes || [];
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to generate financial statement';
   } finally {

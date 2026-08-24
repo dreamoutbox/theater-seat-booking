@@ -10,6 +10,11 @@ pub struct AppConfig {
     pub max_bookings_per_user: i64,
     pub stripe_secret_key: String,
     pub stripe_webhook_secret: String,
+    pub s3_endpoint: String,
+    pub s3_access_key: String,
+    pub s3_secret_key: String,
+    pub s3_bucket: String,
+    pub s3_region: String,
 }
 
 impl AppConfig {
@@ -42,6 +47,16 @@ impl AppConfig {
                 .unwrap_or_else(|_| "sk_test_mock_key_for_poc".to_string()),
             stripe_webhook_secret: env::var("STRIPE_WEBHOOK_SECRET")
                 .unwrap_or_else(|_| "whsec_mock_key_for_poc".to_string()),
+            s3_endpoint: env::var("S3_ENDPOINT")
+                .unwrap_or_else(|_| "http://127.0.0.1:9000".to_string()),
+            s3_access_key: env::var("S3_ACCESS_KEY")
+                .unwrap_or_else(|_| "miniominio".to_string()),
+            s3_secret_key: env::var("S3_SECRET_KEY")
+                .unwrap_or_else(|_| "miniominio".to_string()),
+            s3_bucket: env::var("S3_BUCKET")
+                .unwrap_or_else(|_| "theater-documents".to_string()),
+            s3_region: env::var("S3_REGION")
+                .unwrap_or_else(|_| "us-east-1".to_string()),
         }
     }
 }

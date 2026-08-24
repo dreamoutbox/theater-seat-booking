@@ -1,21 +1,12 @@
 <template>
-  <v-container class="py-8" style="max-width: 900px;">
+  <v-container fluid class="py-6 px-4 px-md-6 px-lg-8">
     <!-- Top Bar with Back Link -->
-    <div class="d-flex align-center justify-space-between mb-6">
+    <div class="d-flex align-center justify-space-between mb-4">
       <div class="d-flex align-center gap-3">
-        <v-btn
-          icon="mdi-arrow-left"
-          variant="text"
-          color="amber-darken-1"
-          :to="`/manage/events/${eventId}`"
-          title="Back to Event Detail"
-        ></v-btn>
-        <div>
-          <h1 class="text-h4 font-weight-black text-white">Event Settings & Tax Info</h1>
-          <p class="text-subtitle-2 text-grey mb-0">
-            Configure event policy limits and business tax identity for invoicing & reporting
-          </p>
-        </div>
+        <v-btn variant="text" prepend-icon="mdi-arrow-left" :to="`/manage/events/${eventId}`"
+          class="text-none font-weight-bold">
+          Back to Event Details
+        </v-btn>
       </div>
     </div>
 
@@ -30,151 +21,122 @@
       {{ error }}
     </v-alert>
 
-    <v-form v-else @submit.prevent="saveSettings">
-      <!-- Section 1: General Event Settings -->
-      <v-card theme="dark" class="rounded-xl border pa-6 mb-6 bg-surface">
-        <div class="d-flex align-center gap-2 mb-4">
-          <v-icon icon="mdi-tune" color="amber-darken-1"></v-icon>
-          <span class="text-h6 font-weight-bold text-white">General Event Configuration</span>
+    <v-row v-else-if="event" class="mt-1">
+      <!-- Sidebar Column (Left) -->
+      <v-col cols="12" md="3" xl="2">
+        <div class="sticky-sidebar">
+          <EventSidebar :event="event" active-item="settings" @add-showtime="goToEventDetails"
+            @open-seat-map="goToEventDetails" @delete-event="goToEventDetails" />
         </div>
+      </v-col>
 
-        <v-text-field
-          v-model="form.title"
-          label="Event Title *"
-          variant="outlined"
-          density="comfortable"
-          required
-          :rules="[v => !!v || 'Event title is required']"
-          class="mb-3"
-        ></v-text-field>
+      <!-- Main Content Column (Right) -->
+      <v-col cols="12" md="9" xl="10">
+        <v-form @submit.prevent="saveSettings">
+          <!-- Page Header Card -->
+          <v-card theme="dark" class="rounded-xl pa-6 border bg-surface mb-6" elevation="3">
+            <div class="d-flex align-start gap-4">
+              <v-avatar color="blue-grey-darken-3" size="52" rounded="lg">
+                <v-icon icon="mdi-cog-outline" color="white" size="30"></v-icon>
+              </v-avatar>
+              <div>
+                <div class="d-flex align-center gap-2 mb-1">
+                  <span class="text-caption text-grey font-weight-mono text-uppercase">EVENT SETTINGS & TAX
+                    CONFIGURATION</span>
+                  <span class="text-caption font-weight-mono text-amber-darken-1 font-weight-bold">#{{ event.id
+                    }}</span>
+                </div>
+                <h1 class="text-h4 font-weight-bold text-white mb-1">
+                  {{ form.title || event.title }}
+                </h1>
+                <p class="text-caption text-grey mb-0">
+                  Configure event policy limits and business tax identity for invoicing & reporting
+                </p>
+              </div>
+            </div>
+          </v-card>
 
-        <v-row dense>
-          <v-col cols="12" sm="6">
-            <v-text-field
-              v-model.number="form.max_seats_per_booking"
-              label="Max Seats Per Order / Checkout *"
-              type="number"
-              min="1"
-              max="50"
-              variant="outlined"
-              density="comfortable"
-              hint="Max seats held and purchased in a single checkout (Default: 6)"
-              persistent-hint
-              class="mb-3"
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-text-field
-              v-model.number="form.max_seats_per_user"
-              label="Max Seats Per Customer / Account *"
-              type="number"
-              min="1"
-              max="100"
-              variant="outlined"
-              density="comfortable"
-              hint="Total cumulative seats a customer can book for this event (Default: 10)"
-              persistent-hint
-              class="mb-3"
-            ></v-text-field>
-          </v-col>
-        </v-row>
-      </v-card>
+          <!-- Section 1: General Event Settings -->
+          <v-card theme="dark" class="rounded-xl border pa-6 mb-6 bg-surface">
+            <div class="d-flex align-center gap-2 mb-4">
+              <v-icon icon="mdi-tune" color="amber-darken-1"></v-icon>
+              <span class="text-h6 font-weight-bold text-white">General Event Configuration</span>
+            </div>
 
-      <!-- Section 2: Organizer Tax & Invoicing Identity -->
-      <v-card theme="dark" class="rounded-xl border pa-6 mb-6 bg-surface">
-        <div class="d-flex align-center gap-2 mb-2">
-          <v-icon icon="mdi-domain" color="teal-accent-3"></v-icon>
-          <span class="text-h6 font-weight-bold text-white">Organizer Tax & Billing Identity</span>
-        </div>
-        <p class="text-caption text-grey mb-4">
-          These details are displayed on customer tax invoices, digital receipts, and A4 financial settlement reports.
-        </p>
+            <v-text-field v-model="form.title" label="Event Title *" variant="outlined" density="comfortable" required
+              :rules="[v => !!v || 'Event title is required']" class="mb-3"></v-text-field>
 
-        <v-row dense>
-          <v-col cols="12" sm="8">
-            <v-text-field
-              v-model="form.tax_business_name"
-              label="Legal Business / Company Name"
-              placeholder="e.g. DreamCinema Live Productions Ltd."
-              variant="outlined"
-              density="comfortable"
-              prepend-inner-icon="mdi-office-building"
-              class="mb-3"
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12" sm="4">
-            <v-text-field
-              v-model="form.tax_id"
-              label="Tax ID / VAT Registration Number"
-              placeholder="e.g. TAX-8842-TSB-2026"
-              variant="outlined"
-              density="comfortable"
-              prepend-inner-icon="mdi-card-account-details-outline"
-              class="mb-3"
-            ></v-text-field>
-          </v-col>
-        </v-row>
+            <v-row dense>
+              <v-col cols="12" sm="6">
+                <v-text-field v-model.number="form.max_seats_per_booking" label="Max Seats Per Order / Checkout *"
+                  type="number" min="1" max="50" variant="outlined" density="comfortable"
+                  hint="Limit how many tickets one order transaction can contain" persistent-hint
+                  class="mb-3"></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="6">
+                <v-text-field v-model.number="form.max_seats_per_user" label="Max Total Seats Per User Account *"
+                  type="number" min="1" max="100" variant="outlined" density="comfortable"
+                  hint="Global cap on active tickets owned by single customer across event" persistent-hint
+                  class="mb-3"></v-text-field>
+              </v-col>
+            </v-row>
+          </v-card>
 
-        <v-textarea
-          v-model="form.tax_address"
-          label="Registered Tax / Corporate Address"
-          placeholder="e.g. 100 Theater Way, Suite 400, Los Angeles, CA 90028"
-          variant="outlined"
-          density="comfortable"
-          rows="2"
-          prepend-inner-icon="mdi-map-marker-outline"
-          class="mb-3"
-        ></v-textarea>
+          <!-- Section 2: Organizer Tax Identity -->
+          <v-card theme="dark" class="rounded-xl border pa-6 mb-6 bg-surface">
+            <div class="d-flex align-center gap-2 mb-2">
+              <v-icon icon="mdi-domain" color="teal-accent-3"></v-icon>
+              <span class="text-h6 font-weight-bold text-white">Organizer Tax & Business Invoicing Identity</span>
+            </div>
+            <p class="text-caption text-grey mb-4">
+              This tax information will appear on official tax receipts given to customers and on financial settlement
+              statements generated for tax filings.
+            </p>
 
-        <v-row dense>
-          <v-col cols="12" sm="6">
-            <v-text-field
-              v-model="form.tax_email"
-              label="Tax & Billing Contact Email"
-              placeholder="billing@dreamcinema.com"
-              type="email"
-              variant="outlined"
-              density="comfortable"
-              prepend-inner-icon="mdi-email-outline"
-              class="mb-3"
-            ></v-text-field>
-          </v-col>
-          <v-col cols="12" sm="6">
-            <v-text-field
-              v-model="form.tax_phone"
-              label="Tax & Billing Contact Phone"
-              placeholder="+1 (555) 019-2834"
-              variant="outlined"
-              density="comfortable"
-              prepend-inner-icon="mdi-phone-outline"
-              class="mb-3"
-            ></v-text-field>
-          </v-col>
-        </v-row>
-      </v-card>
+            <v-row dense>
+              <v-col cols="12" sm="6">
+                <v-text-field v-model="form.tax_business_name" label="Legal Business / Entity Name"
+                  placeholder="e.g. DreamCinema Live Productions Ltd." variant="outlined" density="comfortable"
+                  class="mb-3"></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="6">
+                <v-text-field v-model="form.tax_id" label="Tax ID / VAT / GST Registration Number"
+                  placeholder="e.g. TAX-8842-TSB-2026 / US-EIN-991823" variant="outlined" density="comfortable"
+                  class="mb-3"></v-text-field>
+              </v-col>
+            </v-row>
 
-      <!-- Bottom Save Action -->
-      <div class="d-flex justify-end gap-3">
-        <v-btn
-          variant="outlined"
-          color="grey"
-          class="text-none font-weight-bold px-6"
-          :to="`/manage/events/${eventId}`"
-        >
-          Cancel
-        </v-btn>
-        <v-btn
-          color="amber-darken-1"
-          variant="flat"
-          type="submit"
-          class="text-none font-weight-bold px-8"
-          :loading="saving"
-          prepend-icon="mdi-content-save"
-        >
-          Save Settings & Tax Info
-        </v-btn>
-      </div>
-    </v-form>
+            <v-textarea v-model="form.tax_address" label="Registered Tax / Billing Address"
+              placeholder="e.g. 742 Evergreen Terrace, Suite 400, Springfield, OR 97477" rows="2" variant="outlined"
+              density="comfortable" class="mb-3"></v-textarea>
+
+            <v-row dense>
+              <v-col cols="12" sm="6">
+                <v-text-field v-model="form.tax_email" label="Tax / Financial Inquiries Email"
+                  placeholder="e.g. billing@dreamcinema.com" variant="outlined" density="comfortable"
+                  class="mb-3"></v-text-field>
+              </v-col>
+              <v-col cols="12" sm="6">
+                <v-text-field v-model="form.tax_phone" label="Tax / Business Phone" placeholder="e.g. +1 (555) 019-2834"
+                  variant="outlined" density="comfortable" class="mb-3"></v-text-field>
+              </v-col>
+            </v-row>
+          </v-card>
+
+          <!-- Save Actions -->
+          <div class="d-flex justify-end gap-3 pb-8">
+            <v-btn variant="outlined" color="grey" size="large" :to="`/manage/events/${eventId}`"
+              class="text-none font-weight-bold px-6">
+              Cancel
+            </v-btn>
+            <v-btn color="amber-darken-1" variant="flat" size="large" type="submit"
+              class="text-none font-weight-bold px-8" :loading="saving" prepend-icon="mdi-content-save">
+              Save Settings & Tax Info
+            </v-btn>
+          </div>
+        </v-form>
+      </v-col>
+    </v-row>
 
     <!-- Global Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500" location="bottom right">
@@ -190,6 +152,7 @@
 import { ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../api/client';
+import EventSidebar from '../components/EventSidebar.vue';
 
 const props = defineProps({
   id: { type: String, required: false },
@@ -199,6 +162,7 @@ const route = useRoute();
 const router = useRouter();
 const eventId = props.id || route.params.id;
 
+const event = ref(null);
 const loading = ref(true);
 const saving = ref(false);
 const error = ref(null);
@@ -224,6 +188,10 @@ function showToast(text, color = 'info') {
   snackbar.value = { show: true, text, color };
 }
 
+function goToEventDetails() {
+  router.push(`/manage/events/${eventId}`);
+}
+
 async function loadEvent() {
   loading.value = true;
   error.value = null;
@@ -234,6 +202,7 @@ async function loadEvent() {
       error.value = 'Event not found';
       return;
     }
+    event.value = found;
     form.value = {
       title: found.title || '',
       max_seats_per_booking: found.max_seats_per_booking || 6,
@@ -284,3 +253,32 @@ onMounted(() => {
   loadEvent();
 });
 </script>
+
+<style scoped>
+.sticky-sidebar {
+  position: sticky;
+  top: 80px;
+  z-index: 10;
+}
+
+.bg-surface {
+  background: #181c27 !important;
+  border-color: #2a3142 !important;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.gap-3 {
+  gap: 12px;
+}
+
+.gap-4 {
+  gap: 16px;
+}
+
+.gap-6 {
+  gap: 24px;
+}
+</style>

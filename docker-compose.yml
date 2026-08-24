@@ -1,5 +1,6 @@
 volumes:
   db_data:
+  minio_data:
 
 networks:
   theater_net:
@@ -87,5 +88,30 @@ services:
       nproc:
         soft: 1024
         hard: 1024
+    networks:
+      - theater_net
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      TZ: Asia/Bangkok
+      MINIO_ROOT_USER: miniominio
+      MINIO_ROOT_PASSWORD: miniominio
+    volumes:
+      - minio_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+          pids: 1024
+        reservations:
+          cpus: "0.5"
+          memory: 512m
     networks:
       - theater_net

@@ -488,3 +488,43 @@ pub struct BookedSeatInfo {
     pub status: String,
     pub user_email: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct EventFinancialReport {
+    pub id: Uuid,
+    pub event_id: Uuid,
+    pub statement_ref: String,
+    pub generated_by: Uuid,
+    pub generated_at: DateTime<Utc>,
+    pub gross_sales_cents: i64,
+    pub total_refunds_cents: i64,
+    pub net_profit_cents: i64,
+    pub tax_withholding_cents: i64,
+    pub net_settlement_cents: i64,
+    pub tickets_issued: i32,
+    pub tickets_scanned: i32,
+    pub tickets_refunded: i32,
+    pub attendance_rate_percent: i32,
+    pub report_data: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct EventFinancialReportDetail {
+    pub id: Uuid,
+    pub event_id: Uuid,
+    pub statement_ref: String,
+    pub generated_by: Uuid,
+    pub generated_by_email: Option<String>,
+    pub generated_at: DateTime<Utc>,
+    pub gross_sales_cents: i64,
+    pub total_refunds_cents: i64,
+    pub net_profit_cents: i64,
+    pub tax_withholding_cents: i64,
+    pub net_settlement_cents: i64,
+    pub tickets_issued: i32,
+    pub tickets_scanned: i32,
+    pub tickets_refunded: i32,
+    pub attendance_rate_percent: i32,
+    pub report_data: serde_json::Value,
+}
+

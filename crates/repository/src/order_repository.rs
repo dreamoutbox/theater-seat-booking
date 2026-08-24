@@ -107,6 +107,56 @@ impl OrderRepository {
         .await
     }
 
+    pub async fn find_order_details_by_owner_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        owner_id: Uuid,
+    ) -> Result<Vec<OrderDetailRow>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT o.id, o.user_id, u.email as user_email, o.showtime_id, e.id as event_id,
+                    e.title as event_title, t.name as theater_name, s.starts_at,
+                    o.total_amount_cents, o.refunded_amount_cents, o.status, o.stripe_payment_intent_id,
+                    o.billing_name, o.tax_id, o.billing_address,
+                    e.tax_business_name as organizer_tax_business_name, e.tax_id as organizer_tax_id,
+                    e.tax_address as organizer_tax_address, e.tax_email as organizer_tax_email,
+                    e.tax_phone as organizer_tax_phone, o.created_at
+             FROM orders o
+             JOIN users u ON u.id = o.user_id
+             JOIN showtimes s ON s.id = o.showtime_id
+             JOIN events e ON e.id = s.event_id
+             JOIN theaters t ON t.id = s.theater_id
+             WHERE e.owner_id = $1
+             ORDER BY o.created_at DESC",
+        )
+        .bind(owner_id)
+        .fetch_all(executor)
+        .await
+    }
+
+    pub async fn find_order_details_by_event_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        event_id: Uuid,
+    ) -> Result<Vec<OrderDetailRow>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT o.id, o.user_id, u.email as user_email, o.showtime_id, e.id as event_id,
+                    e.title as event_title, t.name as theater_name, s.starts_at,
+                    o.total_amount_cents, o.refunded_amount_cents, o.status, o.stripe_payment_intent_id,
+                    o.billing_name, o.tax_id, o.billing_address,
+                    e.tax_business_name as organizer_tax_business_name, e.tax_id as organizer_tax_id,
+                    e.tax_address as organizer_tax_address, e.tax_email as organizer_tax_email,
+                    e.tax_phone as organizer_tax_phone, o.created_at
+             FROM orders o
+             JOIN users u ON u.id = o.user_id
+             JOIN showtimes s ON s.id = o.showtime_id
+             JOIN events e ON e.id = s.event_id
+             JOIN theaters t ON t.id = s.theater_id
+             WHERE e.id = $1
+             ORDER BY o.created_at DESC",
+        )
+        .bind(event_id)
+        .fetch_all(executor)
+        .await
+    }
+
     pub async fn find_order_detail_by_id<'e, E: PgExecutor<'e>>(
         executor: E,
         id: Uuid,

@@ -2,6 +2,8 @@ pub mod auth;
 pub mod config;
 pub mod db;
 pub mod models;
+pub mod pdf;
 pub mod routes;
+pub mod s3;
 pub mod stripe;
 pub mod worker;

@@ -1,400 +1,273 @@
 <template>
-  <v-container class="py-8 max-w-6xl">
+  <v-container fluid class="py-6 px-4 px-md-6 px-lg-8">
     <!-- Back Navigation -->
     <div class="mb-4">
-      <v-btn
-        variant="text"
-        prepend-icon="mdi-arrow-left"
-        to="/manage/events"
-        class="text-none font-weight-bold"
-      >
+      <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/manage/events" class="text-none font-weight-bold">
         Back to Events
       </v-btn>
     </div>
 
     <!-- Loading Skeleton -->
-    <v-skeleton-loader
-      v-if="loading"
-      type="article, table, actions"
-      theme="dark"
-      class="rounded-xl"
-    ></v-skeleton-loader>
+    <v-skeleton-loader v-if="loading" type="article, table, actions" theme="dark"
+      class="rounded-xl"></v-skeleton-loader>
 
     <!-- Error State -->
-    <v-alert
-      v-else-if="error"
-      type="error"
-      variant="tonal"
-      class="rounded-xl mb-6"
-    >
+    <v-alert v-else-if="error" type="error" variant="tonal" class="rounded-xl mb-6">
       {{ error }}
     </v-alert>
 
-    <div v-else-if="event" class="d-flex flex-column gap-6">
-      <!-- Event Header Card -->
-      <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
-        <div class="d-flex flex-wrap justify-space-between align-start gap-4 mb-4">
-          <div class="d-flex align-start gap-3">
-            <v-avatar color="amber-darken-3" size="48" rounded="lg">
-              <v-icon icon="mdi-filmstrip" color="white" size="28"></v-icon>
-            </v-avatar>
-            <div>
-              <div class="d-flex align-center gap-2 mb-1">
-                <span class="text-caption text-grey font-weight-mono text-uppercase">EVENT REFERENCE</span>
-                <span class="text-caption font-weight-mono text-amber-darken-1 font-weight-bold">#{{ event.id }}</span>
-              </div>
-              <h1 class="text-h4 font-weight-bold text-white mb-1">
-                {{ event.title }}
-              </h1>
-              <div class="d-flex align-center gap-2 flex-wrap mt-2">
-                <v-chip size="small" color="indigo-lighten-2" variant="tonal" class="font-weight-bold">
-                  <v-icon start icon="mdi-ticket-percent-outline" size="14"></v-icon>
-                  Limit: {{ event.max_seats_per_booking || 6 }} seats / order
-                </v-chip>
-                <v-chip size="small" color="teal-lighten-2" variant="tonal" class="font-weight-bold">
-                  <v-icon start icon="mdi-account-lock-outline" size="14"></v-icon>
-                  Personal Limit: {{ event.max_seats_per_user || 10 }} seats / customer
-                </v-chip>
-                <span class="text-caption text-grey ml-2">
-                  {{ eventShowtimes.length }} {{ eventShowtimes.length === 1 ? 'Showtime session' : 'Showtime sessions' }}
-                </span>
+    <v-row v-else-if="event" class="mt-1">
+      <!-- Sidebar Column (Left) -->
+      <v-col cols="12" md="3" xl="2">
+        <div class="sticky-sidebar">
+          <EventSidebar :event="event" active-item="overview" @add-showtime="openAddShowtimeDialog"
+            @open-seat-map="openTheaterSeatMapSelector" @delete-event="openDeleteEventDialog" />
+        </div>
+      </v-col>
+
+      <!-- Main Content Column (Right) -->
+      <v-col cols="12" md="9" xl="10">
+        <div class="d-flex flex-column gap-6">
+          <!-- Event Header Card -->
+          <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
+            <div class="d-flex align-start gap-4">
+              <v-avatar color="amber-darken-3" size="52" rounded="lg">
+                <v-icon icon="mdi-filmstrip" color="white" size="30"></v-icon>
+              </v-avatar>
+              <div>
+                <div class="d-flex align-center gap-2 mb-1">
+                  <span class="text-caption text-grey font-weight-mono text-uppercase">EVENT REFERENCE</span>
+                  <span class="text-caption font-weight-mono text-amber-darken-1 font-weight-bold">#{{ event.id
+                  }}</span>
+                </div>
+                <h1 class="text-h4 font-weight-bold text-white mb-2">
+                  {{ event.title }}
+                </h1>
+                <div class="d-flex align-center gap-2 flex-wrap">
+                  <v-chip size="small" color="indigo-lighten-2" variant="tonal" class="font-weight-bold">
+                    <v-icon start icon="mdi-ticket-percent-outline" size="14"></v-icon>
+                    Limit: {{ event.max_seats_per_booking || 6 }} seats / order
+                  </v-chip>
+                  <v-chip size="small" color="teal-lighten-2" variant="tonal" class="font-weight-bold">
+                    <v-icon start icon="mdi-account-lock-outline" size="14"></v-icon>
+                    Personal Limit: {{ event.max_seats_per_user || 10 }} seats / customer
+                  </v-chip>
+                  <span class="text-caption text-grey ml-2">
+                    {{ eventShowtimes.length }} {{ eventShowtimes.length === 1 ? 'Showtime session' : 'Showtime sessions' }}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          </v-card>
 
-          <!-- Header Action Buttons -->
-          <div class="d-flex align-center gap-2 flex-wrap">
-            <!-- Manage Orders -->
-            <v-btn
-              variant="outlined"
-              color="amber-lighten-2"
-              size="small"
-              prepend-icon="mdi-ticket-confirmation"
-              class="text-none font-weight-bold"
-              to="/orders"
-            >
-              Manage Orders
-            </v-btn>
-
-            <!-- Gatekeepers Staff Page Button -->
-            <v-btn
-              variant="outlined"
-              color="teal-accent-3"
-              size="small"
-              prepend-icon="mdi-shield-account"
-              class="text-none font-weight-bold"
-              :to="`/manage/events/${event.id}/gatekeepers`"
-            >
-              Gatekeepers (Scanner Staff)
-            </v-btn>
-
-            <!-- Financial Report (A4 Print / Tax Statement) -->
-            <v-btn
-              variant="outlined"
-              color="amber-darken-1"
-              size="small"
-              prepend-icon="mdi-file-document-outline"
-              class="text-none font-weight-bold"
-              :to="`/manage/events/${event.id}/financial-report`"
-            >
-              Financial & Tax Report
-            </v-btn>
-
-            <!-- Event Settings & Tax Info Page -->
-            <v-btn
-              variant="outlined"
-              color="blue-grey-lighten-2"
-              size="small"
-              prepend-icon="mdi-cog-outline"
-              class="text-none font-weight-bold"
-              :to="`/manage/events/${event.id}/settings`"
-            >
-              Settings & Tax Info
-            </v-btn>
-
-            <!-- Delete Event -->
-            <v-btn
-              variant="outlined"
-              color="red-lighten-2"
-              size="small"
-              prepend-icon="mdi-delete-outline"
-              class="text-none font-weight-bold"
-              @click="openDeleteEventDialog"
-            >
-              Delete Event
-            </v-btn>
-
-            <!-- Seat Map Editor -->
-            <v-btn
-              color="indigo-darken-1"
-              variant="flat"
-              size="small"
-              prepend-icon="mdi-seat-passenger"
-              class="text-none font-weight-bold"
-              @click="openTheaterSeatMapSelector"
-            >
-              Seat Map Editor
-            </v-btn>
-
-            <!-- Add Showtime -->
-            <v-btn
-              color="amber-darken-1"
-              variant="flat"
-              size="small"
-              prepend-icon="mdi-calendar-plus"
-              class="text-none font-weight-bold"
-              @click="openAddShowtimeDialog"
-            >
-              Add Showtime
-            </v-btn>
-          </div>
-        </div>
-      </v-card>
-
-      <!-- Embedded Event Analytics Dashboard Section -->
-      <div>
-        <div class="d-flex justify-space-between align-center mb-3">
-          <h2 class="text-h6 font-weight-bold text-white d-flex align-center gap-2">
-            <v-icon icon="mdi-chart-box-outline" color="amber-darken-1" size="24"></v-icon>
-            Event Analytics & Financial Performance
-          </h2>
-          <v-btn
-            prepend-icon="mdi-refresh"
-            variant="text"
-            size="small"
-            color="grey-lighten-1"
-            :loading="loadingMetrics"
-            @click="fetchEventMetrics"
-          >
-            Refresh Metrics
-          </v-btn>
-        </div>
-
-        <!-- Metric KPI Cards Grid -->
-        <v-row dense class="mb-2">
-          <!-- 1. Gross Revenue -->
-          <v-col cols="12" sm="6" md="4" class="pa-2">
-            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
-              <div class="d-flex justify-space-between align-center mb-2">
-                <span class="text-caption text-grey font-weight-bold text-uppercase">Gross Revenue</span>
-                <v-avatar color="indigo-darken-2" variant="tonal" size="32">
-                  <v-icon icon="mdi-cash-multiple" size="18"></v-icon>
-                </v-avatar>
-              </div>
-              <div class="text-h5 font-weight-black text-white font-weight-mono">
-                ${{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}
-              </div>
-              <div class="text-caption text-grey mt-1">Total ticket sales revenue</div>
-            </v-card>
-          </v-col>
-
-          <!-- 2. Total Refunds -->
-          <v-col cols="12" sm="6" md="4" class="pa-2">
-            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
-              <div class="d-flex justify-space-between align-center mb-2">
-                <span class="text-caption text-grey font-weight-bold text-uppercase">Total Refunded</span>
-                <v-avatar color="red-darken-3" variant="tonal" size="32">
-                  <v-icon icon="mdi-cash-refund" size="18"></v-icon>
-                </v-avatar>
-              </div>
-              <div class="text-h5 font-weight-black text-red-accent-2 font-weight-mono">
-                ${{ ((metrics.total_refunds_cents || 0) / 100).toFixed(2) }}
-              </div>
-              <div class="text-caption text-grey mt-1">
-                {{ metrics.refunded_tickets || 0 }} {{ (metrics.refunded_tickets === 1) ? 'ticket' : 'tickets' }} refunded
-              </div>
-            </v-card>
-          </v-col>
-
-          <!-- 3. Net Profit -->
-          <v-col cols="12" sm="6" md="4" class="pa-2">
-            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100 highlight-card">
-              <div class="d-flex justify-space-between align-center mb-2">
-                <span class="text-caption text-amber-lighten-2 font-weight-bold text-uppercase">Net Profit</span>
-                <v-avatar color="amber-darken-1" variant="tonal" size="32">
-                  <v-icon icon="mdi-trending-up" size="18"></v-icon>
-                </v-avatar>
-              </div>
-              <div class="text-h5 font-weight-black text-amber-darken-1 font-weight-mono">
-                ${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}
-              </div>
-              <div class="text-caption text-grey mt-1">Gross sales minus refunds</div>
-            </v-card>
-          </v-col>
-
-          <!-- 4. Total Tickets Created -->
-          <v-col cols="12" sm="6" md="4" class="pa-2">
-            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
-              <div class="d-flex justify-space-between align-center mb-2">
-                <span class="text-caption text-grey font-weight-bold text-uppercase">Tickets Issued</span>
-                <v-avatar color="teal-darken-2" variant="tonal" size="32">
-                  <v-icon icon="mdi-ticket-confirmation" size="18"></v-icon>
-                </v-avatar>
-              </div>
-              <div class="text-h5 font-weight-black text-white font-weight-mono">
-                {{ metrics.total_tickets_created || 0 }}
-              </div>
-              <div class="text-caption text-grey mt-1">
-                <span class="text-success font-weight-bold">{{ metrics.active_tickets || 0 }} active</span> •
-                <span class="text-grey">{{ metrics.used_tickets || 0 }} scanned</span>
-              </div>
-            </v-card>
-          </v-col>
-
-          <!-- 5. Checked-In Passes -->
-          <v-col cols="12" sm="6" md="4" class="pa-2">
-            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
-              <div class="d-flex justify-space-between align-center mb-2">
-                <span class="text-caption text-grey font-weight-bold text-uppercase">Checked-In</span>
-                <v-avatar color="blue-darken-2" variant="tonal" size="32">
-                  <v-icon icon="mdi-qrcode-scan" size="18"></v-icon>
-                </v-avatar>
-              </div>
-              <div class="text-h5 font-weight-black text-white font-weight-mono">
-                {{ metrics.used_tickets || 0 }}
-              </div>
-              <div class="text-caption text-grey mt-1">Scanned at gate entrance</div>
-            </v-card>
-          </v-col>
-
-          <!-- 6. Attendance Rate -->
-          <v-col cols="12" sm="6" md="4" class="pa-2">
-            <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
-              <div class="d-flex justify-space-between align-center mb-2">
-                <span class="text-caption text-grey font-weight-bold text-uppercase">Attendance Rate</span>
-                <v-avatar color="purple-darken-2" variant="tonal" size="32">
-                  <v-icon icon="mdi-account-check-outline" size="18"></v-icon>
-                </v-avatar>
-              </div>
-              <div class="text-h5 font-weight-black text-white font-weight-mono">
-                {{ metrics.attendance_rate_percent || 0 }}%
-              </div>
-              <v-progress-linear
-                :model-value="metrics.attendance_rate_percent || 0"
-                color="amber-darken-1"
-                bg-color="grey-darken-3"
-                height="6"
-                rounded
-                class="mt-2"
-              ></v-progress-linear>
-            </v-card>
-          </v-col>
-        </v-row>
-      </div>
-
-      <!-- Scheduled Showtimes Card -->
-      <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
-        <div class="d-flex justify-space-between align-center mb-4">
+          <!-- Embedded Event Analytics Dashboard Section -->
           <div>
-            <h2 class="text-h6 font-weight-bold text-white mb-1">Scheduled Showtimes</h2>
-            <span class="text-caption text-grey">Manage sessions, customer seat maps, and hall layouts</span>
+            <div class="d-flex justify-space-between align-center mb-3">
+              <h2 class="text-h6 font-weight-bold text-white d-flex align-center gap-2">
+                <v-icon icon="mdi-chart-box-outline" color="amber-darken-1" size="24"></v-icon>
+                Event Analytics & Financial Performance
+              </h2>
+              <v-btn prepend-icon="mdi-refresh" variant="text" size="small" color="grey-lighten-1"
+                :loading="loadingMetrics" @click="fetchEventMetrics">
+                Refresh Metrics
+              </v-btn>
+            </div>
+
+            <!-- Metric KPI Cards Grid -->
+            <v-row dense class="mb-2">
+              <!-- 1. Gross Revenue -->
+              <v-col cols="12" sm="6" md="4" class="pa-2">
+                <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+                  <div class="d-flex justify-space-between align-center mb-2">
+                    <span class="text-caption text-grey font-weight-bold text-uppercase">Gross Revenue</span>
+                    <v-avatar color="indigo-darken-2" variant="tonal" size="32">
+                      <v-icon icon="mdi-cash-multiple" size="18"></v-icon>
+                    </v-avatar>
+                  </div>
+                  <div class="text-h5 font-weight-black text-white font-weight-mono">
+                    ${{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}
+                  </div>
+                  <div class="text-caption text-grey mt-1">Total ticket sales revenue</div>
+                </v-card>
+              </v-col>
+
+              <!-- 2. Total Refunds -->
+              <v-col cols="12" sm="6" md="4" class="pa-2">
+                <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+                  <div class="d-flex justify-space-between align-center mb-2">
+                    <span class="text-caption text-grey font-weight-bold text-uppercase">Total Refunded</span>
+                    <v-avatar color="red-darken-3" variant="tonal" size="32">
+                      <v-icon icon="mdi-cash-refund" size="18"></v-icon>
+                    </v-avatar>
+                  </div>
+                  <div class="text-h5 font-weight-black text-red-accent-2 font-weight-mono">
+                    ${{ ((metrics.total_refunds_cents || 0) / 100).toFixed(2) }}
+                  </div>
+                  <div class="text-caption text-grey mt-1">
+                    {{ metrics.refunded_tickets || 0 }} {{ (metrics.refunded_tickets === 1) ? 'ticket' : 'tickets' }}
+                    refunded
+                  </div>
+                </v-card>
+              </v-col>
+
+              <!-- 3. Net Profit -->
+              <v-col cols="12" sm="6" md="4" class="pa-2">
+                <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100 highlight-card">
+                  <div class="d-flex justify-space-between align-center mb-2">
+                    <span class="text-caption text-amber-lighten-2 font-weight-bold text-uppercase">Net Profit</span>
+                    <v-avatar color="amber-darken-1" variant="tonal" size="32">
+                      <v-icon icon="mdi-trending-up" size="18"></v-icon>
+                    </v-avatar>
+                  </div>
+                  <div class="text-h5 font-weight-black text-amber-darken-1 font-weight-mono">
+                    ${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}
+                  </div>
+                  <div class="text-caption text-grey mt-1">Gross sales minus refunds</div>
+                </v-card>
+              </v-col>
+
+              <!-- 4. Total Tickets Created -->
+              <v-col cols="12" sm="6" md="4" class="pa-2">
+                <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+                  <div class="d-flex justify-space-between align-center mb-2">
+                    <span class="text-caption text-grey font-weight-bold text-uppercase">Tickets Issued</span>
+                    <v-avatar color="teal-darken-2" variant="tonal" size="32">
+                      <v-icon icon="mdi-ticket-confirmation" size="18"></v-icon>
+                    </v-avatar>
+                  </div>
+                  <div class="text-h5 font-weight-black text-white font-weight-mono">
+                    {{ metrics.total_tickets_created || 0 }}
+                  </div>
+                  <div class="text-caption text-grey mt-1">
+                    <span class="text-success font-weight-bold">{{ metrics.active_tickets || 0 }} active</span> •
+                    <span class="text-grey">{{ metrics.used_tickets || 0 }} scanned</span>
+                  </div>
+                </v-card>
+              </v-col>
+
+              <!-- 5. Checked-In Passes -->
+              <v-col cols="12" sm="6" md="4" class="pa-2">
+                <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+                  <div class="d-flex justify-space-between align-center mb-2">
+                    <span class="text-caption text-grey font-weight-bold text-uppercase">Checked-In</span>
+                    <v-avatar color="blue-darken-2" variant="tonal" size="32">
+                      <v-icon icon="mdi-qrcode-scan" size="18"></v-icon>
+                    </v-avatar>
+                  </div>
+                  <div class="text-h5 font-weight-black text-white font-weight-mono">
+                    {{ metrics.used_tickets || 0 }}
+                  </div>
+                  <div class="text-caption text-grey mt-1">Scanned at gate entrance</div>
+                </v-card>
+              </v-col>
+
+              <!-- 6. Attendance Rate -->
+              <v-col cols="12" sm="6" md="4" class="pa-2">
+                <v-card theme="dark" class="kpi-card pa-4 rounded-xl border bg-surface h-100">
+                  <div class="d-flex justify-space-between align-center mb-2">
+                    <span class="text-caption text-grey font-weight-bold text-uppercase">Attendance Rate</span>
+                    <v-avatar color="purple-darken-2" variant="tonal" size="32">
+                      <v-icon icon="mdi-account-check-outline" size="18"></v-icon>
+                    </v-avatar>
+                  </div>
+                  <div class="text-h5 font-weight-black text-white font-weight-mono">
+                    {{ metrics.attendance_rate_percent || 0 }}%
+                  </div>
+                  <v-progress-linear :model-value="metrics.attendance_rate_percent || 0" color="amber-darken-1"
+                    bg-color="grey-darken-3" height="6" rounded class="mt-2"></v-progress-linear>
+                </v-card>
+              </v-col>
+            </v-row>
           </div>
-          <v-btn
-            prepend-icon="mdi-plus"
-            color="amber-darken-1"
-            variant="tonal"
-            size="small"
-            class="text-none font-weight-bold"
-            @click="openAddShowtimeDialog"
-          >
-            New Session
-          </v-btn>
+
+          <!-- Scheduled Showtimes Card -->
+          <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
+            <div class="d-flex justify-space-between align-center mb-4">
+              <div>
+                <h2 class="text-h6 font-weight-bold text-white mb-1">Scheduled Showtimes</h2>
+                <span class="text-caption text-grey">Manage sessions, customer seat maps, and hall layouts</span>
+              </div>
+              <v-btn prepend-icon="mdi-plus" color="amber-darken-1" variant="tonal" size="small"
+                class="text-none font-weight-bold" @click="openAddShowtimeDialog">
+                New Session
+              </v-btn>
+            </div>
+
+            <!-- Empty State -->
+            <div v-if="eventShowtimes.length === 0"
+              class="text-center pa-8 rounded-lg bg-surface-variant border border-dashed">
+              <v-icon icon="mdi-calendar-clock" size="48" color="grey" class="mb-2"></v-icon>
+              <div class="text-body-1 text-grey font-weight-medium">No showtimes scheduled for this event</div>
+              <div class="text-caption text-grey-darken-1 mt-1">Add your first showtime session to open ticket booking
+                for users.</div>
+              <v-btn color="amber-darken-1" variant="flat" prepend-icon="mdi-plus"
+                class="mt-4 text-none font-weight-bold" @click="openAddShowtimeDialog">
+                Add Showtime
+              </v-btn>
+            </div>
+
+            <!-- Showtimes Table -->
+            <v-table v-else class="showtimes-table rounded-lg border">
+              <thead>
+                <tr>
+                  <th class="text-left font-weight-bold">Date & Time</th>
+                  <th class="text-left font-weight-bold">Theater Location</th>
+                  <th class="text-left font-weight-bold">Session ID</th>
+                  <th class="text-right font-weight-bold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="show in eventShowtimes" :key="show.id">
+                  <!-- Starts at -->
+                  <td class="py-3 font-weight-bold text-white">
+                    <v-icon icon="mdi-calendar-clock" size="16" color="amber-darken-1" class="mr-2"></v-icon>
+                    {{ formatDate(show.starts_at) }}
+                  </td>
+
+                  <!-- Theater name -->
+                  <td>
+                    <div class="font-weight-medium text-white">{{ show.theater_name }}</div>
+                    <div class="text-caption text-grey font-weight-mono">Grand Horizon Hall</div>
+                  </td>
+
+                  <!-- Session ID -->
+                  <td>
+                    <span class="font-weight-mono text-caption text-grey">#{{ show.id.substring(0, 8) }}</span>
+                  </td>
+
+                  <!-- Actions -->
+                  <td class="text-right">
+                    <div class="d-flex align-center justify-end gap-1">
+                      <!-- Seat Map Editor for Theater -->
+                      <v-btn variant="tonal" size="small" color="indigo-lighten-2" prepend-icon="mdi-seat-passenger"
+                        class="text-none font-weight-bold" title="Open Seat Map Editor for this Theater"
+                        :to="`/manage/theaters/${show.theater_id}/seat-map`">
+                        Edit Layout
+                      </v-btn>
+
+                      <!-- Customer Booking View -->
+                      <v-btn variant="text" size="small" color="amber-darken-1" prepend-icon="mdi-seat"
+                        class="text-none font-weight-bold" title="View Customer Booking Seat Map"
+                        :to="`/booking/${show.id}`">
+                        Seat Map
+                      </v-btn>
+
+                      <!-- Edit Showtime -->
+                      <v-btn icon="mdi-pencil" size="small" variant="text" color="grey" title="Edit Showtime Session"
+                        @click="openEditShowtimeDialog(show)"></v-btn>
+
+                      <!-- Delete Showtime -->
+                      <v-btn icon="mdi-delete" size="small" variant="text" color="red-lighten-2"
+                        title="Delete Showtime Session" @click="openDeleteShowtimeDialog(show)"></v-btn>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </v-table>
+          </v-card>
         </div>
-
-        <!-- Empty State -->
-        <div v-if="eventShowtimes.length === 0" class="text-center pa-8 rounded-lg bg-surface-variant border border-dashed">
-          <v-icon icon="mdi-calendar-clock" size="48" color="grey" class="mb-2"></v-icon>
-          <div class="text-body-1 text-grey font-weight-medium">No showtimes scheduled for this event</div>
-          <div class="text-caption text-grey-darken-1 mt-1">Add your first showtime session to open ticket booking for users.</div>
-          <v-btn color="amber-darken-1" variant="flat" prepend-icon="mdi-plus" class="mt-4 text-none font-weight-bold" @click="openAddShowtimeDialog">
-            Add Showtime
-          </v-btn>
-        </div>
-
-        <!-- Showtimes Table -->
-        <v-table v-else class="showtimes-table rounded-lg border">
-          <thead>
-            <tr>
-              <th class="text-left font-weight-bold">Date & Time</th>
-              <th class="text-left font-weight-bold">Theater Location</th>
-              <th class="text-left font-weight-bold">Session ID</th>
-              <th class="text-right font-weight-bold">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="show in eventShowtimes" :key="show.id">
-              <!-- Starts at -->
-              <td class="py-3 font-weight-bold text-white">
-                <v-icon icon="mdi-calendar-clock" size="16" color="amber-darken-1" class="mr-2"></v-icon>
-                {{ formatDate(show.starts_at) }}
-              </td>
-
-              <!-- Theater name -->
-              <td>
-                <div class="font-weight-medium text-white">{{ show.theater_name }}</div>
-                <div class="text-caption text-grey font-weight-mono">Grand Horizon Hall</div>
-              </td>
-
-              <!-- Session ID -->
-              <td>
-                <span class="font-weight-mono text-caption text-grey">#{{ show.id.substring(0, 8) }}</span>
-              </td>
-
-              <!-- Actions -->
-              <td class="text-right">
-                <div class="d-flex align-center justify-end gap-1">
-                  <!-- Seat Map Editor for Theater -->
-                  <v-btn
-                    variant="tonal"
-                    size="small"
-                    color="indigo-lighten-2"
-                    prepend-icon="mdi-seat-passenger"
-                    class="text-none font-weight-bold"
-                    title="Open Seat Map Editor for this Theater"
-                    :to="`/manage/theaters/${show.theater_id}/seat-map`"
-                  >
-                    Edit Layout
-                  </v-btn>
-
-                  <!-- Customer Booking View -->
-                  <v-btn
-                    variant="text"
-                    size="small"
-                    color="amber-darken-1"
-                    prepend-icon="mdi-seat"
-                    class="text-none font-weight-bold"
-                    title="View Customer Booking Seat Map"
-                    :to="`/booking/${show.id}`"
-                  >
-                    Seat Map
-                  </v-btn>
-
-                  <!-- Edit Showtime -->
-                  <v-btn
-                    icon="mdi-pencil"
-                    size="small"
-                    variant="text"
-                    color="grey"
-                    title="Edit Showtime Session"
-                    @click="openEditShowtimeDialog(show)"
-                  ></v-btn>
-
-                  <!-- Delete Showtime -->
-                  <v-btn
-                    icon="mdi-delete"
-                    size="small"
-                    variant="text"
-                    color="red-lighten-2"
-                    title="Delete Showtime Session"
-                    @click="openDeleteShowtimeDialog(show)"
-                  ></v-btn>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </v-table>
-      </v-card>
-    </div>
+      </v-col>
+    </v-row>
 
     <!-- Showtime Dialog (Add / Edit) -->
     <v-dialog v-model="showtimeDialog.show" max-width="500">
@@ -408,36 +281,19 @@
             <div class="text-body-1 font-weight-bold text-white">{{ event?.title }}</div>
           </div>
 
-          <v-select
-            v-model="showtimeDialog.theaterId"
-            label="Theater Location"
-            :items="theaters"
-            item-title="name"
-            item-value="id"
-            variant="outlined"
-            density="comfortable"
-            class="mb-4"
-          ></v-select>
+          <v-select v-model="showtimeDialog.theaterId" label="Theater Location" :items="theaters" item-title="name"
+            item-value="id" variant="outlined" density="comfortable" class="mb-4"></v-select>
 
           <div>
             <label class="text-caption text-grey mb-1 d-block font-weight-bold">START DATE & TIME (Local Time)</label>
-            <input
-              type="datetime-local"
-              v-model="showtimeDialog.datetimeLocal"
-              class="datetime-input mb-2"
-            />
+            <input type="datetime-local" v-model="showtimeDialog.datetimeLocal" class="datetime-input mb-2" />
           </div>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
           <v-btn variant="text" @click="showtimeDialog.show = false">Cancel</v-btn>
           <v-spacer></v-spacer>
-          <v-btn
-            color="amber-darken-1"
-            variant="flat"
-            class="font-weight-bold text-none"
-            :loading="showtimeDialog.saving"
-            @click="saveShowtime"
-          >
+          <v-btn color="amber-darken-1" variant="flat" class="font-weight-bold text-none"
+            :loading="showtimeDialog.saving" @click="saveShowtime">
             {{ showtimeDialog.isEdit ? 'Save Showtime' : 'Schedule Showtime' }}
           </v-btn>
         </v-card-actions>
@@ -450,26 +306,14 @@
         <v-card-title class="text-h6 font-weight-bold">Select Theater Hall</v-card-title>
         <v-card-text>
           <div class="text-caption text-grey mb-4">Choose a theater to open the interactive Seat Map Editor.</div>
-          <v-select
-            v-model="theaterSelectorDialog.theaterId"
-            label="Theater"
-            :items="theaters"
-            item-title="name"
-            item-value="id"
-            variant="outlined"
-            density="comfortable"
-          ></v-select>
+          <v-select v-model="theaterSelectorDialog.theaterId" label="Theater" :items="theaters" item-title="name"
+            item-value="id" variant="outlined" density="comfortable"></v-select>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
           <v-btn variant="text" @click="theaterSelectorDialog.show = false">Cancel</v-btn>
           <v-spacer></v-spacer>
-          <v-btn
-            color="indigo-darken-1"
-            variant="flat"
-            class="font-weight-bold text-none"
-            :disabled="!theaterSelectorDialog.theaterId"
-            @click="goToSeatMapEditor"
-          >
+          <v-btn color="indigo-darken-1" variant="flat" class="font-weight-bold text-none"
+            :disabled="!theaterSelectorDialog.theaterId" @click="goToSeatMapEditor">
             Open Editor
           </v-btn>
         </v-card-actions>
@@ -487,13 +331,8 @@
         <v-card-actions class="pa-4 pt-0">
           <v-btn variant="text" @click="deleteDialog.show = false">Cancel</v-btn>
           <v-spacer></v-spacer>
-          <v-btn
-            color="red-darken-1"
-            variant="flat"
-            class="font-weight-bold text-none"
-            :loading="deleteDialog.deleting"
-            @click="confirmDelete"
-          >
+          <v-btn color="red-darken-1" variant="flat" class="font-weight-bold text-none" :loading="deleteDialog.deleting"
+            @click="confirmDelete">
             Delete
           </v-btn>
         </v-card-actions>
@@ -511,6 +350,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import api from '../api/client';
+import EventSidebar from '../components/EventSidebar.vue';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -770,8 +610,9 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.max-w-6xl {
-  max-width: 1150px;
+.sticky-sidebar {
+  position: sticky;
+  top: 80px;
 }
 
 .bg-surface {
