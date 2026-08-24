@@ -393,16 +393,15 @@ async function handleCompletePayment() {
 
     const orderId = orderRes.data.order_id;
 
-    // 3. Confirm Mock Payment (POC instant settlement & QR ticket generator)
-    await api.post(`/orders/${orderId}/confirm-mock`);
+    // 3. Create Stripe Checkout Session → redirect to Stripe-hosted payment page
+    const sessionRes = await api.post(`/orders/${orderId}/checkout-session`);
+    const checkoutUrl = sessionRes.data.checkout_url;
 
-    showToast('Payment successful! Redirecting to your tickets...', 'success');
-    setTimeout(() => {
-      router.push(`/orders/${orderId}`);
-    }, 800);
+    showToast('Redirecting to secure payment...', 'info');
+    // Redirect to Stripe Checkout (or mock URL)
+    window.location.href = checkoutUrl;
   } catch (err) {
     showToast(err.response?.data?.error || 'Checkout failed. Please try again.', 'error');
-  } finally {
     paying.value = false;
   }
 }

@@ -51,13 +51,31 @@ pub async fn stripe_webhook(
         return Ok(Json(serde_json::json!({ "status": "already_processed" })));
     }
 
-    // Extract payment intent id from the event object
-    let payment_intent_id = event
+    // For checkout.session.completed, the payment_intent is nested inside the session object
+    let data_object = event
         .get("data")
-        .and_then(|d| d.get("object"))
-        .and_then(|o| o.get("id"))
-        .and_then(|id| id.as_str())
-        .unwrap_or_default();
+        .and_then(|d| d.get("object"));
+
+    // Primary: extract order_id from event metadata (set by us on both PI and checkout session).
+    // This is reliable regardless of which PaymentIntent Stripe creates internally.
+    let metadata_order_id: Option<uuid::Uuid> = data_object
+        .and_then(|o| o.get("metadata"))
+        .and_then(|m| m.get("order_id"))
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse().ok());
+
+    // Fallback: resolve via PI ID lookup (covers old orders created before this change).
+    let pi_id_for_lookup = if event_type == "checkout.session.completed" {
+        data_object
+            .and_then(|o| o.get("payment_intent"))
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+    } else {
+        data_object
+            .and_then(|o| o.get("id"))
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+    };
 
     let mut tx = state.pool.begin().await.map_err(|e| {
         (
@@ -66,9 +84,12 @@ pub async fn stripe_webhook(
         )
     })?;
 
-    // Find the associated order
-    let order_id = if !payment_intent_id.is_empty() {
-        OrderRepository::find_id_by_payment_intent_for_update(&mut *tx, payment_intent_id)
+    // Find the associated order: prefer metadata lookup, fall back to PI ID lookup
+    let order_id: Option<uuid::Uuid> = if let Some(oid) = metadata_order_id {
+        tracing::debug!(order_id = %oid, "Resolved order from event metadata");
+        Some(oid)
+    } else if !pi_id_for_lookup.is_empty() {
+        OrderRepository::find_id_by_payment_intent_for_update(&mut *tx, pi_id_for_lookup)
             .await
             .map_err(|e| {
                 (
@@ -92,9 +113,10 @@ pub async fn stripe_webhook(
 
     // 3. Process status transition based on event type
     match event_type.as_str() {
-        "payment_intent.succeeded" => {
+        "payment_intent.succeeded" | "checkout.session.completed" => {
             if let Some(oid) = order_id {
-                OrderRepository::update_status(&mut *tx, oid, "paid")
+                // Guard: check current status to handle both events firing for the same order
+                let current_status = OrderRepository::find_status_by_id_for_update(&mut *tx, oid)
                     .await
                     .map_err(|e| {
                         (
@@ -103,25 +125,40 @@ pub async fn stripe_webhook(
                         )
                     })?;
 
-                SeatBookingRepository::update_status_by_order_id(&mut *tx, oid, "confirmed")
-                    .await
-                    .map_err(|e| {
-                        (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            Json(serde_json::json!({ "error": e.to_string() })),
-                        )
-                    })?;
+                if current_status.as_deref() == Some("pending_payment") {
+                    OrderRepository::update_status(&mut *tx, oid, "paid")
+                        .await
+                        .map_err(|e| {
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                Json(serde_json::json!({ "error": e.to_string() })),
+                            )
+                        })?;
 
-                TicketRepository::create_tickets_for_paid_order(&mut *tx, oid)
-                    .await
-                    .map_err(|e| {
-                        (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            Json(serde_json::json!({ "error": format!("Failed to generate tickets: {e}") })),
-                        )
-                    })?;
+                    SeatBookingRepository::update_status_by_order_id(&mut *tx, oid, "confirmed")
+                        .await
+                        .map_err(|e| {
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                Json(serde_json::json!({ "error": e.to_string() })),
+                            )
+                        })?;
 
-                tracing::info!(order_id = %oid, "Payment confirmed; seats confirmed and tickets created.");
+                    TicketRepository::create_tickets_for_paid_order(&mut *tx, oid)
+                        .await
+                        .map_err(|e| {
+                            (
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                Json(serde_json::json!({ "error": format!("Failed to generate tickets: {e}") })),
+                            )
+                        })?;
+
+                    tracing::info!(order_id = %oid, event_type = %event_type, "Payment confirmed; seats confirmed and tickets created.");
+                } else {
+                    tracing::info!(order_id = %oid, event_type = %event_type, status = ?current_status, "Order already processed, skipping confirm.");
+                }
+            } else {
+                tracing::warn!(event_type = %event_type, "No order found for payment event; skipping.");
             }
         }
         "payment_intent.payment_failed" | "payment_intent.canceled" => {
@@ -159,7 +196,7 @@ pub async fn stripe_webhook(
         )
     })?;
 
-    if event_type == "payment_intent.succeeded" {
+    if event_type == "payment_intent.succeeded" || event_type == "checkout.session.completed" {
         if let Some(oid) = order_id {
             let post_pay_state = state.clone();
             tokio::spawn(async move {

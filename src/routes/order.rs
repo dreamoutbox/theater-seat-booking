@@ -213,7 +213,12 @@ pub async fn list_orders(
             if let Some(event_id) = query.event_id {
                 let event = EventRepository::find_by_id(&state.pool, event_id)
                     .await
-                    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, Json(serde_json::json!({ "error": e.to_string() }))))?;
+                    .map_err(|e| {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(serde_json::json!({ "error": e.to_string() })),
+                        )
+                    })?;
                 if let Some(ev) = event {
                     if ev.owner_id != Some(auth_user.id) {
                         return Err((
@@ -373,18 +378,15 @@ pub async fn confirm_mock_order(
     })?;
 
     // 1. Fetch order
-    let order_status = OrderRepository::find_status_by_id_and_user_for_update(
-        &mut *tx,
-        order_id,
-        auth_user.id,
-    )
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })?;
+    let order_status =
+        OrderRepository::find_status_by_id_and_user_for_update(&mut *tx, order_id, auth_user.id)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?;
 
     let status = match order_status {
         Some(s) => s,
@@ -488,6 +490,107 @@ pub async fn confirm_mock_order(
     })))
 }
 
+#[derive(Debug, Serialize)]
+pub struct CreateCheckoutSessionResponse {
+    pub checkout_url: String,
+    pub session_id: String,
+}
+
+pub async fn create_checkout_session(
+    Path(order_id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<Json<CreateCheckoutSessionResponse>, (StatusCode, Json<serde_json::Value>)> {
+    // Fetch order to verify ownership and get amount
+    let order_opt = OrderRepository::find_order_detail_by_id(&state.pool, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let order = match order_opt {
+        Some(o) => o,
+        None => {
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Order not found" })),
+            ));
+        }
+    };
+
+    if order.user_id != auth_user.id {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Access denied" })),
+        ));
+    }
+
+    if order.status != "pending_payment" {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(
+                serde_json::json!({ "error": format!("Order cannot be paid (status: {})", order.status) }),
+            ),
+        ));
+    }
+
+    let base_url = "http://localhost:5173";
+    let success_url = format!("{base_url}/orders/{order_id}?payment=success");
+    let cancel_url = format!("{base_url}/showtimes/{}/booking?payment=cancelled&order_id={order_id}", order.showtime_id);
+
+    let session = state
+        .stripe
+        .create_checkout_session(
+            order.total_amount_cents,
+            "usd",
+            &order_id.to_string(),
+            &order.event_title,
+            &success_url,
+            &cancel_url,
+        )
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": format!("Payment provider error: {e}") })),
+            )
+        })?;
+
+    // Update the order's stripe_payment_intent_id with the one Stripe Checkout actually uses.
+    // The PI created by create_order is different from the one the Checkout Session creates,
+    // so without this update the webhook can't look up the order by PI ID.
+    if let Some(ref pi_id) = session.payment_intent {
+        OrderRepository::update_stripe_payment_intent_id(&state.pool, order_id, pi_id)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?;
+        tracing::info!(
+            order_id = %order_id,
+            session_id = %session.id,
+            payment_intent_id = %pi_id,
+            "Stripe Checkout Session created, order PI updated"
+        );
+    } else {
+        tracing::info!(
+            order_id = %order_id,
+            session_id = %session.id,
+            "Stripe Checkout Session created"
+        );
+    }
+
+    Ok(Json(CreateCheckoutSessionResponse {
+        checkout_url: session.url,
+        session_id: session.id,
+    }))
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RefundOrderRequest {
     pub ticket_ids: Vec<Uuid>,
@@ -534,7 +637,14 @@ pub async fn refund_order(
             )
         })?;
 
-    let (_, status, stripe_payment_intent_id, event_owner_id, _total_amount_cents, current_refunded_cents) = match order_info {
+    let (
+        _,
+        status,
+        stripe_payment_intent_id,
+        event_owner_id,
+        _total_amount_cents,
+        current_refunded_cents,
+    ) = match order_info {
         Some(info) => info,
         None => {
             tx.rollback().await.ok();
@@ -547,13 +657,16 @@ pub async fn refund_order(
 
     // 2. Authorization check
     let is_admin_or_staff = auth_user.role == UserRole::Admin || auth_user.role == UserRole::Staff;
-    let is_event_owner = auth_user.role == UserRole::EventOrganizer && event_owner_id == Some(auth_user.id);
+    let is_event_owner =
+        auth_user.role == UserRole::EventOrganizer && event_owner_id == Some(auth_user.id);
 
     if !is_admin_or_staff && !is_event_owner {
         tx.rollback().await.ok();
         return Err((
             StatusCode::FORBIDDEN,
-            Json(serde_json::json!({ "error": "You do not have permission to refund tickets for this order" })),
+            Json(
+                serde_json::json!({ "error": "You do not have permission to refund tickets for this order" }),
+            ),
         ));
     }
 
@@ -562,25 +675,33 @@ pub async fn refund_order(
         tx.rollback().await.ok();
         return Err((
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": format!("Cannot refund order with status '{status}'") })),
+            Json(
+                serde_json::json!({ "error": format!("Cannot refund order with status '{status}'") }),
+            ),
         ));
     }
 
     // 4. Fetch & lock tickets to refund
-    let tickets = TicketRepository::find_by_ids_and_order_id_for_update(&mut *tx, &payload.ticket_ids, order_id)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let tickets = TicketRepository::find_by_ids_and_order_id_for_update(
+        &mut *tx,
+        &payload.ticket_ids,
+        order_id,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
 
     if tickets.len() != payload.ticket_ids.len() {
         tx.rollback().await.ok();
         return Err((
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "One or more selected tickets do not belong to this order" })),
+            Json(
+                serde_json::json!({ "error": "One or more selected tickets do not belong to this order" }),
+            ),
         ));
     }
 
@@ -663,7 +784,9 @@ pub async fn refund_order(
         .map_err(|e| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": format!("Failed to release seat bookings: {e}") })),
+                Json(
+                    serde_json::json!({ "error": format!("Failed to release seat bookings: {e}") }),
+                ),
             )
         })?;
 
@@ -810,7 +933,8 @@ pub async fn change_seat(
     // 2. Authorization check
     let is_owner = auth_user.id == order_user_id;
     let is_admin_or_staff = auth_user.role == UserRole::Admin || auth_user.role == UserRole::Staff;
-    let is_event_organizer = auth_user.role == UserRole::EventOrganizer && event_owner_id == Some(auth_user.id);
+    let is_event_organizer =
+        auth_user.role == UserRole::EventOrganizer && event_owner_id == Some(auth_user.id);
 
     if !is_owner && !is_admin_or_staff && !is_event_organizer {
         tx.rollback().await.ok();
@@ -825,7 +949,9 @@ pub async fn change_seat(
         tx.rollback().await.ok();
         return Err((
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": format!("Cannot change seats on order with status '{status}'") })),
+            Json(
+                serde_json::json!({ "error": format!("Cannot change seats on order with status '{status}'") }),
+            ),
         ));
     }
 
@@ -845,26 +971,34 @@ pub async fn change_seat(
             tx.rollback().await.ok();
             return Err((
                 StatusCode::BAD_REQUEST,
-                Json(serde_json::json!({ "error": "The specified seat booking is not an active confirmed booking" })),
+                Json(
+                    serde_json::json!({ "error": "The specified seat booking is not an active confirmed booking" }),
+                ),
             ));
         }
     };
 
     // 5. Check if new_seat_id is taken
-    let is_taken = SeatBookingRepository::check_seat_is_taken_for_update(&mut *tx, booking.showtime_id, payload.new_seat_id)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let is_taken = SeatBookingRepository::check_seat_is_taken_for_update(
+        &mut *tx,
+        booking.showtime_id,
+        payload.new_seat_id,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
 
     if is_taken {
         tx.rollback().await.ok();
         return Err((
             StatusCode::BAD_REQUEST,
-            Json(serde_json::json!({ "error": "The requested new seat is already booked or held by another customer" })),
+            Json(
+                serde_json::json!({ "error": "The requested new seat is already booked or held by another customer" }),
+            ),
         ));
     }
 
@@ -889,35 +1023,47 @@ pub async fn change_seat(
         .await
         .unwrap_or(None);
 
-    let (old_row_label, old_seat_number, old_zone_name, old_price_cents) = if let Some(os) = old_seat_opt {
-        (os.row_label, os.seat_number, os.zone_name, os.price_cents)
-    } else {
-        let os_list = OrderRepository::find_order_seats_by_order_id(&mut *tx, order_id).await.unwrap_or_default();
-        let matched = os_list.into_iter().find(|s| s.seat_booking_id == payload.old_seat_booking_id);
-        if let Some(m) = matched {
-            (m.row_label, m.seat_number, m.zone_name, m.price_cents)
+    let (old_row_label, old_seat_number, old_zone_name, old_price_cents) =
+        if let Some(os) = old_seat_opt {
+            (os.row_label, os.seat_number, os.zone_name, os.price_cents)
         } else {
-            ("—".to_string(), 0, "Standard".to_string(), 0)
-        }
-    };
+            let os_list = OrderRepository::find_order_seats_by_order_id(&mut *tx, order_id)
+                .await
+                .unwrap_or_default();
+            let matched = os_list
+                .into_iter()
+                .find(|s| s.seat_booking_id == payload.old_seat_booking_id);
+            if let Some(m) = matched {
+                (m.row_label, m.seat_number, m.zone_name, m.price_cents)
+            } else {
+                ("—".to_string(), 0, "Standard".to_string(), 0)
+            }
+        };
 
     // 8. Find associated ticket if one exists
-    let ticket_opt = TicketRepository::find_by_seat_booking_id(&mut *tx, payload.old_seat_booking_id)
-        .await
-        .unwrap_or(None);
+    let ticket_opt =
+        TicketRepository::find_by_seat_booking_id(&mut *tx, payload.old_seat_booking_id)
+            .await
+            .unwrap_or(None);
 
     // 9. Update seat_id on seat_booking
-    SeatBookingRepository::update_seat_id(&mut *tx, payload.old_seat_booking_id, payload.new_seat_id)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": format!("Failed to update seat booking: {e}") })),
-            )
-        })?;
+    SeatBookingRepository::update_seat_id(
+        &mut *tx,
+        payload.old_seat_booking_id,
+        payload.new_seat_id,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": format!("Failed to update seat booking: {e}") })),
+        )
+    })?;
 
     // 10. Determine pricing (Free upgrade vs price update)
-    let is_elevated = auth_user.role == UserRole::Admin || auth_user.role == UserRole::Staff || is_event_organizer;
+    let is_elevated = auth_user.role == UserRole::Admin
+        || auth_user.role == UserRole::Staff
+        || is_event_organizer;
     let is_free_upgrade = payload.is_free_upgrade.unwrap_or(false) && is_elevated;
     let effective_price_cents = if is_free_upgrade {
         old_price_cents
@@ -944,7 +1090,9 @@ pub async fn change_seat(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": format!("Failed to update order seat record: {e}") })),
+            Json(
+                serde_json::json!({ "error": format!("Failed to update order seat record: {e}") }),
+            ),
         )
     })?;
 
@@ -1152,7 +1300,10 @@ pub async fn generate_and_upload_order_pdf(
     )?;
 
     let s3_key = format!("orders/{}/receipt.pdf", order_id);
-    let _ = state.s3.upload_file(&s3_key, pdf_bytes.clone(), "application/pdf").await;
+    let _ = state
+        .s3
+        .upload_file(&s3_key, pdf_bytes.clone(), "application/pdf")
+        .await;
 
     Ok(pdf_bytes)
 }
@@ -1220,4 +1371,3 @@ pub async fn download_order_pdf(
 
     Ok(response)
 }
-

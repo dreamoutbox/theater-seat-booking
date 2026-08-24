@@ -218,6 +218,16 @@ impl OrderRepository {
             .await
     }
 
+    pub async fn find_status_by_id_for_update<'e, E: PgExecutor<'e>>(
+        executor: E,
+        id: Uuid,
+    ) -> Result<Option<String>, sqlx::Error> {
+        sqlx::query_scalar("SELECT status FROM orders WHERE id = $1 FOR UPDATE")
+            .bind(id)
+            .fetch_optional(executor)
+            .await
+    }
+
     pub async fn find_id_by_payment_intent_for_update<'e, E: PgExecutor<'e>>(
         executor: E,
         payment_intent_id: &str,
@@ -235,6 +245,19 @@ impl OrderRepository {
     ) -> Result<bool, sqlx::Error> {
         let res = sqlx::query("UPDATE orders SET status = $1 WHERE id = $2")
             .bind(status)
+            .bind(order_id)
+            .execute(executor)
+            .await?;
+        Ok(res.rows_affected() > 0)
+    }
+
+    pub async fn update_stripe_payment_intent_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        order_id: Uuid,
+        stripe_payment_intent_id: &str,
+    ) -> Result<bool, sqlx::Error> {
+        let res = sqlx::query("UPDATE orders SET stripe_payment_intent_id = $1 WHERE id = $2")
+            .bind(stripe_payment_intent_id)
             .bind(order_id)
             .execute(executor)
             .await?;

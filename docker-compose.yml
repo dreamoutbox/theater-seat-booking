@@ -115,3 +115,17 @@ services:
           memory: 512m
     networks:
       - theater_net
+
+  stripe-cli-dev:
+    build:
+      context: ./docker-stripe-cli
+      dockerfile: Dockerfile
+    container_name: stripe-cli-dev
+    environment:
+      - STRIPE_API_KEY=${STRIPE_SECRET_KEY:-NOT_SET}
+      - FORWARD_TO=http://host.docker.internal:3000/api/webhooks/stripe
+    networks:
+      - theater_net
+    restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

@@ -9,6 +9,13 @@ pub struct StripePaymentIntentResult {
     pub status: String,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StripeCheckoutSessionResult {
+    pub id: String,
+    pub url: String,
+    pub payment_intent: Option<String>,
+}
+
 pub struct StripeService {
     secret_key: String,
     client: Client,
@@ -83,6 +90,75 @@ impl StripeService {
             client_secret: pi.client_secret.unwrap_or_default(),
             amount: pi.amount,
             status: pi.status,
+        })
+    }
+
+    pub async fn create_checkout_session(
+        &self,
+        amount_cents: i64,
+        currency: &str,
+        order_id: &str,
+        event_title: &str,
+        success_url: &str,
+        cancel_url: &str,
+    ) -> Result<StripeCheckoutSessionResult, String> {
+        // Mock mode: return a fake checkout URL pointing back to our mock-confirm endpoint
+        if self.secret_key.is_empty() || self.secret_key.starts_with("sk_test_mock") {
+            let mock_session_id = format!("cs_mock_{}", &order_id[..8.min(order_id.len())]);
+            return Ok(StripeCheckoutSessionResult {
+                id: mock_session_id,
+                url: format!("{cancel_url}?mock_order={order_id}"),
+                payment_intent: None,
+            });
+        }
+
+        let amount_str = amount_cents.to_string();
+        let quantity_str = "1";
+        let params = [
+            ("mode", "payment"),
+            ("line_items[0][price_data][currency]", currency),
+            ("line_items[0][price_data][unit_amount]", &amount_str),
+            ("line_items[0][price_data][product_data][name]", event_title),
+            ("line_items[0][quantity]", quantity_str),
+            ("metadata[order_id]", order_id),
+            ("payment_intent_data[metadata][order_id]", order_id),
+            ("success_url", success_url),
+            ("cancel_url", cancel_url),
+        ];
+
+        let response = self
+            .client
+            .post("https://api.stripe.com/v1/checkout/sessions")
+            .bearer_auth(&self.secret_key)
+            .form(&params)
+            .send()
+            .await
+            .map_err(|e| format!("Failed to send request to Stripe Checkout: {e}"))?;
+
+        if !response.status().is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown Stripe error".to_string());
+            return Err(format!("Stripe Checkout API error: {error_text}"));
+        }
+
+        #[derive(Deserialize)]
+        struct StripeSessionResponse {
+            id: String,
+            url: Option<String>,
+            payment_intent: Option<String>,
+        }
+
+        let session: StripeSessionResponse = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse Stripe Checkout response: {e}"))?;
+
+        Ok(StripeCheckoutSessionResult {
+            id: session.id,
+            url: session.url.unwrap_or_default(),
+            payment_intent: session.payment_intent,
         })
     }
 
