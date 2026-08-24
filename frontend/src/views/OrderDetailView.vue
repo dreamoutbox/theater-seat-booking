@@ -254,7 +254,7 @@
                     variant="tonal" class="font-weight-bold">
                     Row {{ item.row_label }}{{ item.seat_number }}
                     <span v-if="item.ticket_code" class="font-weight-mono ml-1 text-grey-lighten-1">[{{ item.ticket_code
-                    }}]</span>
+                      }}]</span>
                     <span class="ml-1 font-weight-mono">(${{ (item.price_cents / 100).toFixed(2) }})</span>
                   </v-chip>
                 </div>
@@ -582,12 +582,12 @@
                 <div class="text-caption text-grey mt-1">
                   <span v-if="changeSeatDialog.isFreeUpgrade">
                     Order total remains <strong>${{ ((changeSeatDialog.oldSeat?.price_cents || 0) / 100).toFixed(2)
-                    }}</strong>.
+                      }}</strong>.
                     No extra charge will be billed to the customer.
                   </span>
                   <span v-else>
                     Order total will be updated to <strong>${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2)
-                    }}</strong> (+${{ (((changeSeatDialog.newSeat.price_cents || 0) -
+                      }}</strong> (+${{ (((changeSeatDialog.newSeat.price_cents || 0) -
                         (changeSeatDialog.oldSeat?.price_cents
                           || 0)) / 100).toFixed(2) }} price difference).
                   </span>
@@ -629,14 +629,24 @@
             <div class="company-logo-text mb-1">
               DREAM<span class="text-amber">CINEMA</span>
             </div>
-            <div class="text-small font-bold text-dark">{{ order.organizer_tax_business_name || 'DreamCinema Live Productions Ltd.' }}</div>
-            <div class="text-small text-muted">Tax ID / VAT Reg: {{ order.organizer_tax_id || 'TAX-8842-TSB-2026' }}</div>
-            <div v-if="order.organizer_tax_address" class="text-small text-muted">{{ order.organizer_tax_address }}</div>
-            <div v-if="order.organizer_tax_email" class="text-small text-muted">{{ order.organizer_tax_email }} • {{ order.organizer_tax_phone }}</div>
+            <div class="text-small font-bold text-dark">
+              {{ order.organizer_tax_business_name || 'DreamCinema Live Productions Ltd.' }}
+            </div>
+            <div class="text-small text-muted">Tax ID / VAT Reg:
+              {{ order.organizer_tax_id || 'TAX-8842-TSB-2026' }}
+            </div>
+            <div v-if="order.organizer_tax_address" class="text-small text-muted">
+              {{ order.organizer_tax_address }}
+            </div>
+            <div v-if="order.organizer_tax_email" class="text-small text-muted">
+              {{ order.organizer_tax_email }} • {{ order.organizer_tax_phone }}
+            </div>
           </div>
           <div class="text-right">
             <h2 class="receipt-title text-uppercase font-bold text-dark mb-1">OFFICIAL TAX RECEIPT</h2>
-            <div class="font-mono text-small font-bold">Receipt No: REC-{{ order.id.substring(0, 8).toUpperCase() }}-{{ new Date(order.created_at).getFullYear() }}</div>
+            <div class="font-mono text-small font-bold">Receipt No: REC-{{ order.id.substring(0, 8).toUpperCase() }}-{{
+              new
+                Date(order.created_at).getFullYear() }}</div>
             <div class="text-small text-muted">Date: {{ formatDate(order.created_at) }}</div>
             <div class="text-small text-muted">Ref: {{ order.stripe_payment_intent_id || 'PAID' }}</div>
           </div>
@@ -649,7 +659,7 @@
           <tr>
             <th style="width: 25%;" class="bg-light-gray text-left">Billed To (Customer):</th>
             <td style="width: 25%;" class="font-bold">{{ order.billing_name || order.user_email || 'Direct Admissions'
-            }}
+              }}
             </td>
             <th style="width: 25%;" class="bg-light-gray text-left">Customer Tax ID / VAT:</th>
             <td style="width: 25%;" class="font-mono">{{ order.tax_id || 'N/A' }}</td>
@@ -704,7 +714,7 @@
           <tr v-if="order.refunded_amount_cents > 0">
             <td colspan="3" class="text-right font-bold text-danger">Refunds Deducted:</td>
             <td class="text-right font-mono font-bold text-danger">-${{ (order.refunded_amount_cents / 100).toFixed(2)
-            }}
+              }}
             </td>
           </tr>
           <tr class="row-total">
@@ -730,7 +740,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRoute } from 'vue-router';
 import QrcodeVue from 'qrcode.vue';
 import api from '../api/client';
@@ -958,10 +968,52 @@ function getSeatChangeIcon(sc) {
   return 'mdi-swap-horizontal';
 }
 
+let pollTimer = null;
+
+function clearPolling() {
+  if (pollTimer) {
+    clearTimeout(pollTimer);
+    pollTimer = null;
+  }
+}
+
+function startPollingPendingOrder(orderId) {
+  clearPolling();
+  let attempts = 0;
+  const maxAttempts = 20;
+
+  const poll = async () => {
+    if (!order.value || order.value.status !== 'pending_payment' || attempts >= maxAttempts) {
+      return;
+    }
+    attempts++;
+    try {
+      const res = await api.get(`/orders/${orderId}`);
+      order.value = res.data;
+      if (['paid', 'partially_refunded', 'refunded'].includes(order.value.status)) {
+        await Promise.all([
+          fetchTickets(orderId),
+          fetchRefunds(orderId),
+          fetchSeatChanges(orderId),
+        ]);
+        return;
+      }
+    } catch (err) {
+      console.warn('Poll order status error:', err);
+    }
+    if (order.value?.status === 'pending_payment' && attempts < maxAttempts) {
+      pollTimer = setTimeout(poll, 1200);
+    }
+  };
+
+  pollTimer = setTimeout(poll, 1200);
+}
+
 async function fetchOrderDetail() {
   const orderId = props.id || route.params.id;
   loading.value = true;
   error.value = null;
+  clearPolling();
   try {
     const res = await api.get(`/orders/${orderId}`);
     order.value = res.data;
@@ -972,6 +1024,8 @@ async function fetchOrderDetail() {
         fetchRefunds(orderId),
         fetchSeatChanges(orderId),
       ]);
+    } else if (order.value.status === 'pending_payment') {
+      startPollingPendingOrder(orderId);
     }
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load order details';
@@ -1181,6 +1235,10 @@ async function handleConfirmChangeSeat() {
 
 onMounted(() => {
   fetchOrderDetail();
+});
+
+onUnmounted(() => {
+  clearPolling();
 });
 </script>
 

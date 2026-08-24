@@ -98,6 +98,7 @@ impl StripeService {
         amount_cents: i64,
         currency: &str,
         order_id: &str,
+        customer_email: Option<&str>,
         event_title: &str,
         success_url: &str,
         cancel_url: &str,
@@ -114,7 +115,7 @@ impl StripeService {
 
         let amount_str = amount_cents.to_string();
         let quantity_str = "1";
-        let params = [
+        let mut params = vec![
             ("mode", "payment"),
             ("line_items[0][price_data][currency]", currency),
             ("line_items[0][price_data][unit_amount]", &amount_str),
@@ -125,6 +126,12 @@ impl StripeService {
             ("success_url", success_url),
             ("cancel_url", cancel_url),
         ];
+
+        if let Some(email) = customer_email {
+            if !email.is_empty() {
+                params.push(("customer_email", email));
+            }
+        }
 
         let response = self
             .client

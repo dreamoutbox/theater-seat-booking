@@ -558,6 +558,7 @@ pub async fn create_checkout_session(
             order.total_amount_cents,
             "usd",
             &order_id.to_string(),
+            order.user_email.as_deref(),
             &order.event_title,
             &success_url,
             &cancel_url,

@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "=========================================="
-echo "🎬 Starting Theater Seat Booking API..."
+echo "🎬 Starting Theater Seat Booking Backend API..."
 echo "=========================================="
 
 export RUST_LOG="${RUST_LOG:-info,theater_seat_booking=debug}"

@@ -10,6 +10,7 @@ echo "=========================================="
 
 # 1. Reset DB & seed fresh demo data
 ./dev-reset-db.sh
+./dev-reset-s3.sh
 
 # 2. Run Playwright tests in frontend
 echo ""

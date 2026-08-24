@@ -54,13 +54,47 @@ test.describe('Admin Paid Upgrade & Order Seat Change Flow', () => {
     await page.getByLabel(/Tax ID \/ VAT Registration No\./i).fill('US-555666777');
     await page.getByLabel(/Registered Billing Address/i).fill('789 Fifth Ave, New York, NY 10022');
 
-    // 8. Click Pay & Confirm button
+    // 8. Click Pay & Confirm button (redirects to Stripe Checkout)
     const payBtn = page.getByRole('button', { name: /Pay & Confirm/i });
     await expect(payBtn).toBeEnabled();
     await payBtn.click();
 
+    // Complete Payment on Stripe Hosted Checkout Page
+    await page.waitForURL(/checkout\.stripe\.com/, { timeout: 30000 });
+
+    const emailInput = page.locator('#email, input[type="email"], input[name="email"]').first();
+    if (await emailInput.isVisible({ timeout: 10000 }).catch(() => false)) {
+      await emailInput.fill('charlie@customer.local');
+    }
+
+    const cardNumberInput = page.locator('#cardNumber, input[name="cardNumber"], input[autocomplete="cc-number"]').first();
+    await expect(cardNumberInput).toBeVisible({ timeout: 20000 });
+    await cardNumberInput.fill('4242424242424242');
+
+    const cardExpiryInput = page.locator('#cardExpiry, input[name="cardExpiry"], input[autocomplete="cc-exp"]').first();
+    await expect(cardExpiryInput).toBeVisible({ timeout: 10000 });
+    await cardExpiryInput.fill('12/34');
+
+    const cardCvcInput = page.locator('#cardCvc, input[name="cardCvc"], input[autocomplete="cc-csc"]').first();
+    await expect(cardCvcInput).toBeVisible({ timeout: 10000 });
+    await cardCvcInput.fill('123');
+
+    const billingNameInput = page.locator('#billingName, input[name="billingName"], input[autocomplete="cc-name"]').first();
+    if (await billingNameInput.isVisible().catch(() => false)) {
+      await billingNameInput.fill('Charlie Doe');
+    }
+
+    const postalCodeInput = page.locator('#billingPostalCode, input[name="billingPostalCode"], input[autocomplete="postal-code"]').first();
+    if (await postalCodeInput.isVisible().catch(() => false)) {
+      await postalCodeInput.fill('10022');
+    }
+
+    const submitPayBtn = page.locator('button[data-testid="hosted-payment-submit-button"], button[type="submit"], .SubmitButton').first();
+    await expect(submitPayBtn).toBeEnabled({ timeout: 15000 });
+    await submitPayBtn.click();
+
     // 9. Expect redirect to /orders/<ORDER-UUID> and save the URL
-    await page.waitForURL(/\/orders\/[0-9a-fA-F-]+/, { timeout: 15000 });
+    await page.waitForURL(/\/orders\/[0-9a-fA-F-]+/, { timeout: 30000 });
     const orderUrl = page.url();
 
     // -------------------------------------------------------------
