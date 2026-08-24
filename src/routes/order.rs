@@ -366,10 +366,21 @@ pub async fn get_order(
 
 // Mock confirmation endpoint for seamless manual testing & POC demo
 pub async fn confirm_mock_order(
-    Path(order_id): Path<Uuid>,
     auth_user: AuthenticatedUser,
     State(state): State<AppState>,
+    Path(order_id): Path<Uuid>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    if !state.config.stripe_secret_key.is_empty()
+        && !state.config.stripe_secret_key.starts_with("sk_test_mock")
+    {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": "Mock payment confirmation is disabled when a real Stripe key is configured. Please use Stripe Checkout."
+            })),
+        ));
+    }
+
     let mut tx = state.pool.begin().await.map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,

@@ -238,6 +238,42 @@ pub async fn release_hold(
     State(state): State<AppState>,
     Json(payload): Json<ReleaseHoldRequest>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
+    // Check if this seat booking is already attached to a pending order.
+    // If so, reject the release — the seat is locked until payment completes or is cancelled.
+    let in_pending_order: bool = sqlx::query_scalar(
+        "SELECT EXISTS (
+            SELECT 1
+            FROM seat_bookings sb
+            JOIN order_seats os ON os.seat_booking_id = sb.id
+            JOIN orders o ON o.id = os.order_id
+            WHERE sb.user_id = $1
+              AND sb.showtime_id = $2
+              AND sb.seat_id = $3
+              AND sb.status = 'held'
+              AND o.status = 'pending_payment'
+        )",
+    )
+    .bind(auth_user.id)
+    .bind(payload.showtime_id)
+    .bind(payload.seat_id)
+    .fetch_one(&state.pool)
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    if in_pending_order {
+        return Err((
+            StatusCode::CONFLICT,
+            Json(serde_json::json!({
+                "error": "Cannot release this seat — payment is already in progress. Complete or cancel your order first."
+            })),
+        ));
+    }
+
     let released = SeatBookingRepository::release_hold_by_user_and_seat(
         &state.pool,
         auth_user.id,

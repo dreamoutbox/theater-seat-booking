@@ -217,7 +217,7 @@
                   prepend-icon="mdi-credit-card-check"
                   class="text-none font-weight-bold"
                   :loading="payingOrderId === order.id"
-                  @click.stop="handlePayMock(order.id)"
+                  @click.stop="handlePayNow(order.id)"
                 >
                   Pay Now
                 </v-btn>
@@ -471,16 +471,14 @@ async function fetchOrders() {
   }
 }
 
-async function handlePayMock(orderId) {
+async function handlePayNow(orderId) {
   try {
     payingOrderId.value = orderId;
-    await api.post(`/orders/${orderId}/confirm-mock`);
-    showToast('Payment successful! Seats confirmed.', 'success');
-    await fetchOrders();
+    const res = await api.post(`/orders/${orderId}/checkout-session`);
+    window.location.href = res.data.checkout_url;
   } catch (err) {
     const errorMsg = err.response?.data?.error || 'Payment failed';
     showToast(errorMsg, 'error');
-  } finally {
     payingOrderId.value = null;
   }
 }

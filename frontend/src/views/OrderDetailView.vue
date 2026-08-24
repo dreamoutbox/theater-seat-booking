@@ -395,7 +395,7 @@
           <div class="text-caption text-grey">Complete checkout to permanently confirm your reserved seats.</div>
         </div>
         <v-btn color="amber-darken-1" variant="flat" size="large" prepend-icon="mdi-credit-card-check"
-          class="text-none font-weight-bold px-6" :loading="paying" @click="handlePayMock">
+          class="text-none font-weight-bold px-6" :loading="paying" @click="handlePayNow">
           Pay Now (${{ (order.total_amount_cents / 100).toFixed(2) }})
         </v-btn>
       </div>
@@ -1008,17 +1008,17 @@ async function fetchSeatChanges(orderId) {
   }
 }
 
-async function handlePayMock() {
+async function handlePayNow() {
   if (!order.value) return;
   paying.value = true;
   try {
-    await api.post(`/orders/${order.value.id}/confirm-mock`);
-    showToast('Payment successful! Tickets generated.', 'success');
-    await fetchOrderDetail();
+    const res = await api.post(`/orders/${order.value.id}/checkout-session`);
+    const checkoutUrl = res.data.checkout_url;
+    showToast('Redirecting to secure payment...', 'info');
+    window.location.href = checkoutUrl;
   } catch (err) {
     const errMsg = err.response?.data?.error || 'Payment failed';
     showToast(errMsg, 'error');
-  } finally {
     paying.value = false;
   }
 }

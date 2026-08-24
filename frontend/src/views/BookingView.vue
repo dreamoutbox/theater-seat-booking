@@ -88,7 +88,7 @@
                   SELECTED HELD SEATS ({{ myHeldSeats.length }})
                 </span>
                 <v-btn
-                  v-if="myHeldSeats.length > 1"
+                  v-if="myHeldSeats.length > 1 && !pendingOrder"
                   variant="text"
                   color="red-lighten-2"
                   size="x-small"
@@ -109,6 +109,25 @@
 
               <!-- List of Selected Held Seats -->
               <div v-else class="d-flex flex-column gap-2">
+                <!-- Pending order banner -->
+                <v-alert
+                  v-if="pendingOrder"
+                  type="warning"
+                  variant="tonal"
+                  density="compact"
+                  icon="mdi-lock-outline"
+                  class="mb-2 text-caption"
+                >
+                  Payment in progress. Seats are locked.
+                  <v-btn
+                    :to="`/orders/${pendingOrder.id}`"
+                    size="x-small"
+                    variant="text"
+                    color="amber-darken-1"
+                    class="ml-1 text-none font-weight-bold"
+                  >View Order →</v-btn>
+                </v-alert>
+
                 <div
                   v-for="seat in myHeldSeats"
                   :key="seat.id"
@@ -130,8 +149,9 @@
                     <span class="font-weight-mono font-weight-bold text-body-2 text-white">
                       ${{ (seat.price_cents / 100).toFixed(2) }}
                     </span>
-                    <!-- Cancel Booking Button for this seat -->
+                    <!-- Cancel button hidden when order is pending -->
                     <v-btn
+                      v-if="!pendingOrder"
                       icon="mdi-close"
                       size="x-small"
                       color="red-lighten-2"
@@ -140,6 +160,7 @@
                       :loading="cancellingSeatId === seat.id"
                       @click="handleCancelSeat(seat)"
                     ></v-btn>
+                    <v-icon v-else icon="mdi-lock" size="16" color="warning" title="Locked — payment in progress"></v-icon>
                   </div>
                 </div>
               </div>
@@ -171,7 +192,21 @@
 
           <!-- Actions -->
           <div class="mt-4">
+            <!-- When order is pending: show "Complete Payment" button -->
             <v-btn
+              v-if="pendingOrder"
+              color="amber-darken-1"
+              variant="flat"
+              block
+              size="large"
+              class="text-none font-weight-bold"
+              prepend-icon="mdi-credit-card-check"
+              :to="`/orders/${pendingOrder.id}`"
+            >
+              Complete Payment
+            </v-btn>
+            <v-btn
+              v-else
               color="amber-darken-1"
               variant="flat"
               block
@@ -220,6 +255,7 @@ const myHeldSeats = ref([]);
 const countdownSeconds = ref(0);
 const cancellingSeatId = ref(null);
 const processingOrder = ref(false);
+const pendingOrder = ref(null); // non-null when user has a pending_payment order for this showtime
 
 const snackbar = ref({
   show: false,
@@ -287,6 +323,21 @@ async function loadShowtimeData() {
   }
 }
 
+async function checkPendingOrder() {
+  try {
+    const res = await api.get('/orders');
+    const orders = res.data || [];
+    // Find any pending_payment order for this showtime
+    const found = orders.find(
+      (o) => o.showtime_id === props.showtimeId && o.status === 'pending_payment'
+    );
+    pendingOrder.value = found || null;
+  } catch (err) {
+    // Not critical — silently ignore
+    pendingOrder.value = null;
+  }
+}
+
 // Cancel individual held seat
 async function handleCancelSeat(seat) {
   cancellingSeatId.value = seat.id;
@@ -336,10 +387,12 @@ function goToCheckout() {
 
 onMounted(() => {
   loadShowtimeData();
+  checkPendingOrder();
 });
 
 watch(() => props.showtimeId, () => {
   loadShowtimeData();
+  checkPendingOrder();
 });
 </script>
 
