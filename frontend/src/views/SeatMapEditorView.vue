@@ -156,12 +156,35 @@
           <div
             ref="canvasRef"
             class="seat-canvas-container"
-            :class="{ 'cursor-move-active': dragAction.type === 'move' }"
+            :class="{ 'cursor-move-active': dragAction.type === 'move' || dragAction.type === 'locked_move' }"
             @mousedown="handleCanvasMouseDown"
             @mousemove="handleCanvasMouseMove"
             @mouseup="handleCanvasMouseUp"
             @mouseleave="handleCanvasMouseUp"
           >
+            <!-- Floating Ghost Badge for Drag-Moving Locked Seat -->
+            <div
+              v-if="dragAction.type === 'locked_move' && dragAction.clickedSeat"
+              class="locked-drag-ghost"
+              :style="{
+                left: `${dragAction.currentClientX + 16}px`,
+                top: `${dragAction.currentClientY + 16}px`,
+              }"
+            >
+              <div class="d-flex align-center gap-1">
+                <v-icon icon="mdi-lock" size="12" color="amber-darken-1"></v-icon>
+                <span class="font-weight-bold">
+                  Row {{ dragAction.clickedSeat.row_label }}, Seat {{ dragAction.clickedSeat.seat_number }}
+                </span>
+                <span class="text-caption text-grey-lighten-1">
+                  ({{ getBookedSeatInfo(dragAction.clickedSeat)?.event_title || 'Booked' }})
+                </span>
+              </div>
+              <div class="text-caption text-amber-accent-2 mt-0 font-italic" style="font-size: 10px;">
+                Drop on an unbooked seat to reassign
+              </div>
+            </div>
+
             <!-- Marquee Selection Rectangle Overlay -->
             <div
               v-if="marquee.active"
@@ -222,6 +245,9 @@
                         'seat-node-selected': isSeatSelected(slot.rowLabel, slot.seatNumber),
                         'seat-node-move-preview': isSlotInMovePreview(slot.rowLabel, slot.seatNumber),
                         'seat-node-locked': isSeatLocked(slot.seat),
+                        'locked-seat-being-dragged': isSeatBeingDragged(slot.seat),
+                        'locked-target-valid': isSlotLockedMoveTargetValid(slot.rowLabel, slot.seatNumber),
+                        'locked-target-invalid': isSlotLockedMoveTargetInvalid(slot.rowLabel, slot.seatNumber),
                       }"
                       :style="{
                         borderColor: isSeatLocked(slot.seat)
@@ -234,7 +260,7 @@
                             : getZoneBgColorHex(getZoneName(slot.seat.zone_id)),
                       }"
                       :title="isSeatLocked(slot.seat)
-                        ? `🔒 LOCKED: Row ${slot.rowLabel}, Seat ${slot.seatNumber} is booked in '${getBookedSeatInfo(slot.seat)?.event_title || 'Show'}' (${getBookedSeatInfo(slot.seat)?.order_id ? 'Order #' + getBookedSeatInfo(slot.seat).order_id.substring(0,8) : 'Held'}) • Right-click to view order`
+                        ? `🔒 LOCKED: Row ${slot.rowLabel}, Seat ${slot.seatNumber} is booked in '${getBookedSeatInfo(slot.seat)?.event_title || 'Show'}' (${getBookedSeatInfo(slot.seat)?.order_id ? 'Order #' + getBookedSeatInfo(slot.seat).order_id.substring(0,8) : 'Held'}) • Drag to reassign • Right-click to view order`
                         : `Row ${slot.rowLabel}, Seat ${slot.seatNumber} (${getZoneName(slot.seat.zone_id)} - $${(getZonePrice(slot.seat.zone_id) / 100).toFixed(2)}) • Drag to move`"
                       :data-row="slot.rowLabel"
                       :data-seat="slot.seatNumber"
@@ -265,6 +291,8 @@
                       :class="{
                         'hint-slot-active': isSlotInHint(slot.rowLabel, slot.seatNumber),
                         'seat-node-move-target': isSlotInMovePreview(slot.rowLabel, slot.seatNumber),
+                        'locked-target-valid': isSlotLockedMoveTargetValid(slot.rowLabel, slot.seatNumber),
+                        'locked-target-invalid': isSlotLockedMoveTargetInvalid(slot.rowLabel, slot.seatNumber),
                       }"
                       :title="`Empty Slot: Row ${slot.rowLabel}, Seat ${slot.seatNumber} (Click or drag to create seat)`"
                       :data-row="slot.rowLabel"
@@ -311,6 +339,15 @@
             <v-icon icon="mdi-cursor-move" size="14" class="mr-1"></v-icon>
             <strong>Moving {{ selectedSeatKeys.size }} seat(s)...</strong>
             <div class="text-caption" style="font-size: 10px;">Release mouse over destination grid slots</div>
+          </div>
+
+          <!-- Reassign Locked Seat Drag Active Indicator -->
+          <div v-else-if="dragAction.type === 'locked_move'" class="pa-2 rounded-lg bg-teal-darken-4 border mb-2 text-caption">
+            <v-icon icon="mdi-swap-horizontal" size="14" class="mr-1 text-amber-accent-2"></v-icon>
+            <strong class="text-amber-accent-2">Reassigning Seat {{ dragAction.clickedSeat?.row_label }}{{ dragAction.clickedSeat?.seat_number }}...</strong>
+            <div class="text-caption text-grey-lighten-2" style="font-size: 10px;">
+              Release mouse over an unbooked seat to open Change Seat Assignment
+            </div>
           </div>
 
           <!-- Hint Slots creation prompt if empty slots dragged -->
@@ -749,6 +786,191 @@
       </v-card>
     </v-dialog>
 
+    <!-- Change Seat Modal Dialog (from Drag and Drop Locked Seat) -->
+    <v-dialog v-model="changeSeatDialog.show" max-width="880" theme="dark">
+      <v-card theme="dark" class="rounded-xl pa-6 border bg-surface">
+        <div class="d-flex justify-space-between align-center mb-4">
+          <div class="d-flex align-center gap-3">
+            <v-avatar color="amber-darken-1" variant="tonal" size="44">
+              <v-icon icon="mdi-swap-horizontal" size="24"></v-icon>
+            </v-avatar>
+            <div>
+              <h3 class="text-h6 font-weight-bold text-white">Change Seat Assignment</h3>
+              <span class="text-caption text-grey">
+                Reassign booking for <strong>{{ changeSeatDialog.eventTitle }}</strong>
+                <span v-if="changeSeatDialog.userEmail" class="ml-1 text-grey-lighten-1">({{ changeSeatDialog.userEmail }})</span>
+                <span v-if="changeSeatDialog.orderId" class="ml-1 text-amber-accent-2 font-mono">• Order #{{ changeSeatDialog.orderId.substring(0, 8) }}</span>
+              </span>
+            </div>
+          </div>
+          <v-btn icon="mdi-close" variant="text" size="small" @click="changeSeatDialog.show = false"></v-btn>
+        </div>
+
+        <v-divider class="mb-4"></v-divider>
+
+        <!-- Seat Comparison Card -->
+        <div class="pa-4 rounded-xl bg-surface-variant border mb-4">
+          <v-row dense align="center">
+            <v-col cols="12" sm="5">
+              <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">Current Seat</div>
+              <div class="d-flex align-center gap-2">
+                <v-chip size="small" color="grey-darken-1" variant="flat" class="font-weight-bold">
+                  {{ changeSeatDialog.oldSeat?.row_label }}{{ changeSeatDialog.oldSeat?.seat_number }}
+                </v-chip>
+                <span class="text-body-2 font-weight-bold text-white">
+                  Row {{ changeSeatDialog.oldSeat?.row_label }}, Seat {{ changeSeatDialog.oldSeat?.seat_number }}
+                </span>
+                <span class="text-caption text-grey">({{ changeSeatDialog.oldSeat?.zone_name }})</span>
+              </div>
+            </v-col>
+            <v-col cols="12" sm="2" class="text-center">
+              <v-icon icon="mdi-arrow-right-bold" color="amber-darken-1" size="24"></v-icon>
+            </v-col>
+            <v-col cols="12" sm="5">
+              <div class="text-caption text-grey font-weight-bold text-uppercase mb-1">New Selected Seat</div>
+              <div v-if="changeSeatDialog.newSeat" class="d-flex align-center gap-2">
+                <v-chip size="small" color="amber-darken-1" variant="flat" class="font-weight-bold">
+                  {{ changeSeatDialog.newSeat.row_label }}{{ changeSeatDialog.newSeat.seat_number }}
+                </v-chip>
+                <span class="text-body-2 font-weight-bold text-amber-darken-1">
+                  Row {{ changeSeatDialog.newSeat.row_label }}, Seat {{ changeSeatDialog.newSeat.seat_number }}
+                </span>
+                <span class="text-caption text-grey">
+                  ({{ changeSeatDialog.newSeat.zone_name }} - ${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2) }})
+                </span>
+              </div>
+              <div v-else class="text-caption text-grey-lighten-1 font-italic">
+                Click any available (colored) seat below to select
+              </div>
+            </v-col>
+          </v-row>
+        </div>
+
+        <!-- Interactive Visual Seat Map Grid -->
+        <div v-if="changeSeatDialog.loading" class="py-12 text-center">
+          <v-progress-circular indeterminate color="amber-darken-1" size="48"></v-progress-circular>
+          <div class="text-caption text-grey mt-3">Loading showtime seat layout and status...</div>
+        </div>
+        <div v-else class="seat-picker-canvas pa-4 rounded-xl border bg-black mb-4 overflow-x-auto">
+          <!-- Screen Banner -->
+          <div class="picker-screen mb-6 mx-auto">
+            <span class="picker-screen-text">STAGE / SCREEN</span>
+          </div>
+
+          <!-- Seating Grid -->
+          <div class="d-flex flex-column gap-1 align-center">
+            <div v-for="row in changeSeatGridRows" :key="row.label" class="d-flex align-center gap-1">
+              <div class="picker-row-header">{{ row.label }}</div>
+              <div class="d-flex align-center gap-1">
+                <template v-for="slot in row.slots" :key="`${row.label}-${slot.seatNumber}`">
+                  <!-- Seat exists -->
+                  <button
+                    v-if="slot.seat"
+                    type="button"
+                    class="picker-seat-node"
+                    :class="{
+                      'picker-seat-selected': changeSeatDialog.newSeat?.id === slot.seat.id,
+                      'picker-seat-current': slot.seat.id === changeSeatDialog.oldSeat?.seat_id,
+                      'picker-seat-unavailable': isSeatUnavailableInChangeModal(slot.seat),
+                    }"
+                    :disabled="isSeatUnavailableInChangeModal(slot.seat)"
+                    :style="getChangeModalSeatStyle(slot.seat)"
+                    :title="`Row ${slot.seat.row_label}, Seat ${slot.seat.seat_number} (${slot.seat.zone_name}) - ${slot.seat.status === 'available' ? 'Available' : 'Unavailable'}`"
+                    @click="selectNewSeatInModal(slot.seat)"
+                  >
+                    <span class="picker-seat-label">{{ slot.seat.seat_number }}</span>
+                    <v-icon
+                      v-if="changeSeatDialog.newSeat?.id === slot.seat.id"
+                      icon="mdi-check"
+                      size="10"
+                      color="white"
+                      class="picker-check"
+                    ></v-icon>
+                    <v-icon
+                      v-else-if="isSeatUnavailableInChangeModal(slot.seat)"
+                      icon="mdi-lock"
+                      size="10"
+                      color="grey"
+                    ></v-icon>
+                  </button>
+                  <!-- Empty walkway slot -->
+                  <div v-else class="picker-empty-slot"></div>
+                </template>
+              </div>
+              <div class="picker-row-header">{{ row.label }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Free Upgrade Option & Reason Field for Elevated Staff/Admin -->
+        <div v-if="changeSeatDialog.newSeat" class="mb-4">
+          <div
+            v-if="authStore.isElevated && changeSeatDialog.newSeat.price_cents > (changeSeatDialog.oldSeat?.price_cents || 0)"
+            class="pa-3 rounded-lg border bg-surface-variant mb-3"
+          >
+            <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+              <div>
+                <div class="d-flex align-center gap-2">
+                  <v-icon
+                    :icon="changeSeatDialog.isFreeUpgrade ? 'mdi-gift-outline' : 'mdi-currency-usd'"
+                    :color="changeSeatDialog.isFreeUpgrade ? 'purple-accent-2' : 'amber-darken-1'"
+                  ></v-icon>
+                  <span class="font-weight-bold text-white text-body-2">Free Upgrade / Complimentary Move</span>
+                </div>
+                <div class="text-caption text-grey mt-1">
+                  <span v-if="changeSeatDialog.isFreeUpgrade">
+                    Order total remains <strong>${{ ((changeSeatDialog.oldSeat?.price_cents || 0) / 100).toFixed(2) }}</strong>.
+                    No extra charge will be billed to the customer.
+                  </span>
+                  <span v-else>
+                    Order total will be updated to <strong>${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2) }}</strong>
+                    (+${{ (((changeSeatDialog.newSeat.price_cents || 0) - (changeSeatDialog.oldSeat?.price_cents || 0)) / 100).toFixed(2) }} price difference).
+                  </span>
+                </div>
+              </div>
+              <v-switch
+                v-model="changeSeatDialog.isFreeUpgrade"
+                color="purple-accent-2"
+                hide-details
+                density="compact"
+                inset
+              ></v-switch>
+            </div>
+          </div>
+
+          <v-text-field
+            v-model="changeSeatDialog.reason"
+            label="Reason for Seat Change (Optional)"
+            placeholder="e.g. Operational reseating, Customer request, Dragged from seat map"
+            density="compact"
+            variant="outlined"
+            hide-details
+          ></v-text-field>
+        </div>
+
+        <div class="d-flex justify-end gap-3">
+          <v-btn
+            variant="text"
+            class="text-none font-weight-bold"
+            :disabled="changeSeatDialog.submitting"
+            @click="changeSeatDialog.show = false"
+          >
+            Cancel
+          </v-btn>
+          <v-btn
+            color="amber-darken-1"
+            variant="flat"
+            class="text-none font-weight-bold px-6"
+            :loading="changeSeatDialog.submitting"
+            :disabled="!changeSeatDialog.newSeat"
+            @click="handleConfirmChangeSeat"
+          >
+            Confirm Change to Row {{ changeSeatDialog.newSeat?.row_label }}{{ changeSeatDialog.newSeat?.seat_number }}
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
+
     <!-- Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3000">
       {{ snackbar.text }}
@@ -798,9 +1020,11 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, reactive } from 'vue';
 import { useRoute } from 'vue-router';
+import { useAuthStore } from '../stores/auth';
 import api from '../api/client';
 
 const route = useRoute();
+const authStore = useAuthStore();
 
 const theaters = ref([]);
 const selectedTheaterId = ref(null);
@@ -883,20 +1107,126 @@ const marquee = reactive({
   height: 0,
 });
 
-// Drag state for moving selected seats or box selecting
+// Drag state for moving selected seats, marquee box select, or moving locked seats
 const dragAction = reactive({
-  type: 'none', // 'none' | 'pending_move' | 'move' | 'pending_marquee' | 'marquee'
+  type: 'none', // 'none' | 'pending_move' | 'move' | 'pending_marquee' | 'marquee' | 'pending_locked_move' | 'locked_move'
   startClientX: 0,
   startClientY: 0,
+  currentClientX: 0,
+  currentClientY: 0,
   originRow: 0,
   originCol: 0,
   deltaRow: 0,
   deltaCol: 0,
   clickedSeat: null,
   clickedSlot: null,
+  targetHoverSlot: null,
   isShift: false,
   moveTargetSlots: new Set(),
 });
+
+// Change Seat Assignment Dialog state (triggered via Drag & Drop on locked seats)
+const changeSeatDialog = ref({
+  show: false,
+  loading: false,
+  submitting: false,
+  orderId: null,
+  showtimeId: null,
+  eventTitle: '',
+  userEmail: '',
+  oldSeat: null,
+  newSeat: null,
+  seats: [],
+  isFreeUpgrade: true,
+  reason: '',
+});
+
+const changeSeatGridRows = computed(() => {
+  const map = new Map();
+  let maxCol = 1;
+  let maxRowIdx = 0;
+
+  for (const s of changeSeatDialog.value.seats) {
+    map.set(`${s.row_label}-${s.seat_number}`, s);
+    if (s.seat_number > maxCol) maxCol = s.seat_number;
+    const rIdx = rowLabelToIndex(s.row_label);
+    if (rIdx > maxRowIdx) maxRowIdx = rIdx;
+  }
+
+  const rows = [];
+  for (let r = 0; r <= maxRowIdx; r++) {
+    const label = indexToRowLabel(r);
+    const slots = [];
+    for (let c = 1; c <= maxCol; c++) {
+      slots.push({
+        seatNumber: c,
+        seat: map.get(`${label}-${c}`) || null,
+      });
+    }
+    if (slots.some((sl) => sl.seat)) {
+      rows.push({ label, slots });
+    }
+  }
+  return rows;
+});
+
+function isSeatUnavailableInChangeModal(seat) {
+  if (!seat) return true;
+  if (seat.id === changeSeatDialog.value.oldSeat?.seat_id) return true;
+  return seat.status !== 'available';
+}
+
+function getChangeModalSeatStyle(seat) {
+  if (changeSeatDialog.value.newSeat?.id === seat.id) {
+    return {
+      borderColor: '#f59e0b',
+      background: 'rgba(245, 158, 11, 0.4)',
+    };
+  }
+  if (seat.id === changeSeatDialog.value.oldSeat?.seat_id) {
+    return {
+      borderColor: '#6b7280',
+      background: '#374151',
+    };
+  }
+  if (seat.status !== 'available') {
+    return {
+      borderColor: '#374151',
+      background: '#1f2937',
+    };
+  }
+  const color = getZoneColorHex(seat.zone_name || getZoneName(seat.zone_id));
+  return {
+    borderColor: color,
+    background: hexToRgba(color, 0.2),
+  };
+}
+
+function selectNewSeatInModal(seat) {
+  if (isSeatUnavailableInChangeModal(seat)) return;
+  changeSeatDialog.value.newSeat = seat;
+}
+
+function isSlotLockedMoveTargetValid(rowLabel, seatNumber) {
+  if (dragAction.type !== 'locked_move' || !dragAction.targetHoverSlot) return false;
+  if (dragAction.targetHoverSlot.row !== rowLabel || dragAction.targetHoverSlot.col !== seatNumber) return false;
+  const originSeat = dragAction.clickedSeat;
+  if (originSeat && originSeat.row_label === rowLabel && originSeat.seat_number === seatNumber) return false;
+  return !dragAction.targetHoverSlot.isLocked;
+}
+
+function isSlotLockedMoveTargetInvalid(rowLabel, seatNumber) {
+  if (dragAction.type !== 'locked_move' || !dragAction.targetHoverSlot) return false;
+  if (dragAction.targetHoverSlot.row !== rowLabel || dragAction.targetHoverSlot.col !== seatNumber) return false;
+  const originSeat = dragAction.clickedSeat;
+  if (originSeat && originSeat.row_label === rowLabel && originSeat.seat_number === seatNumber) return false;
+  return dragAction.targetHoverSlot.isLocked;
+}
+
+function isSeatBeingDragged(seat) {
+  if (!seat || (dragAction.type !== 'pending_locked_move' && dragAction.type !== 'locked_move')) return false;
+  return dragAction.clickedSeat?.row_label === seat.row_label && dragAction.clickedSeat?.seat_number === seat.seat_number;
+}
 
 // Stores range computed from last drag or selection
 const inferredRange = ref({
@@ -1272,7 +1602,7 @@ function updateInferredRangeFromSelection() {
   }
 }
 
-// Seamless Canvas Drag: Supports starting drag anywhere (empty space or over seats) and Drag-Moving seats
+// Seamless Canvas Drag: Supports starting drag anywhere (empty space or over seats), Drag-Moving seats, and Drag-Reassigning locked seats
 function handleCanvasMouseDown(e) {
   if (e.target.closest('.row-header-btn')) return;
   if (!canvasRef.value) return;
@@ -1282,16 +1612,31 @@ function handleCanvasMouseDown(e) {
 
   dragAction.startClientX = e.clientX;
   dragAction.startClientY = e.clientY;
+  dragAction.currentClientX = e.clientX;
+  dragAction.currentClientY = e.clientY;
   dragAction.isShift = e.shiftKey || e.ctrlKey || e.metaKey;
   dragAction.deltaRow = 0;
   dragAction.deltaCol = 0;
   dragAction.moveTargetSlots.clear();
+  dragAction.targetHoverSlot = null;
 
   if (seatNode) {
     const row = seatNode.getAttribute('data-row');
     const col = parseInt(seatNode.getAttribute('data-seat'), 10);
     const key = `${row}-${col}`;
     const seatObj = draftSeats.value.find(s => s.row_label === row && s.seat_number === col);
+
+    if (isSeatLocked(seatObj)) {
+      if (authStore.isElevated) {
+        dragAction.type = 'pending_locked_move';
+        dragAction.originRow = rowLabelToIndex(row);
+        dragAction.originCol = col;
+        dragAction.clickedSeat = seatObj;
+        dragAction.clickedSlot = null;
+        dragAction.targetHoverSlot = null;
+        return;
+      }
+    }
 
     if (selectedSeatKeys.value.has(key)) {
       // Starting drag on an already selected seat -> prepare to move selected seats
@@ -1330,7 +1675,9 @@ function handleCanvasMouseMove(e) {
   const dist = Math.hypot(e.clientX - dragAction.startClientX, e.clientY - dragAction.startClientY);
 
   // Transition from pending to active drag once past threshold (4px)
-  if (dragAction.type === 'pending_move' && dist > 4) {
+  if (dragAction.type === 'pending_locked_move' && dist > 4) {
+    dragAction.type = 'locked_move';
+  } else if (dragAction.type === 'pending_move' && dist > 4) {
     dragAction.type = 'move';
   } else if (dragAction.type === 'pending_marquee' && dist > 4) {
     dragAction.type = 'marquee';
@@ -1347,6 +1694,33 @@ function handleCanvasMouseMove(e) {
       selectedSeatKeys.value = new Set();
       hintSlotsToCreate.value.clear();
     }
+  }
+
+  // Handle Locked Seat Drag (Reassigning customer booking)
+  if (dragAction.type === 'locked_move') {
+    dragAction.currentClientX = e.clientX;
+    dragAction.currentClientY = e.clientY;
+    const hoveredEl = document.elementFromPoint(e.clientX, e.clientY);
+    const targetSlot = hoveredEl ? hoveredEl.closest('.seat-node, .empty-grid-slot') : null;
+
+    if (targetSlot) {
+      const hoverRow = targetSlot.getAttribute('data-row');
+      const hoverCol = parseInt(targetSlot.getAttribute('data-seat'), 10);
+      if (hoverRow && hoverCol) {
+        const hoverKey = `${hoverRow}-${hoverCol}`;
+        const targetSeat = draftSeats.value.find(s => s.row_label === hoverRow && s.seat_number === hoverCol);
+        dragAction.targetHoverSlot = {
+          row: hoverRow,
+          col: hoverCol,
+          key: hoverKey,
+          isLocked: targetSeat ? isSeatLocked(targetSeat) : false,
+          seat: targetSeat || null,
+        };
+      }
+    } else {
+      dragAction.targetHoverSlot = null;
+    }
+    return;
   }
 
   // Handle Move Drag
@@ -1430,10 +1804,45 @@ function handleCanvasMouseMove(e) {
   }
 }
 
-function handleCanvasMouseUp() {
+function handleCanvasMouseUp(e) {
   if (dragAction.type === 'none') return;
 
-  if (dragAction.type === 'pending_move' || dragAction.type === 'pending_marquee') {
+  if (dragAction.type === 'pending_locked_move') {
+    // Clicked without dragging on a locked seat
+    if (dragAction.clickedSeat) {
+      handleSeatClick(dragAction.clickedSeat, { shiftKey: dragAction.isShift });
+    }
+  } else if (dragAction.type === 'locked_move') {
+    const draggedSeat = dragAction.clickedSeat;
+    const bInfo = getBookedSeatInfo(draggedSeat);
+
+    const hoveredEl = (e && e.clientX) ? document.elementFromPoint(e.clientX, e.clientY) : null;
+    const targetSlot = hoveredEl ? hoveredEl.closest('.seat-node, .empty-grid-slot') : null;
+
+    if (!bInfo) {
+      showToast('Booking details not found for this seat', 'error');
+    } else if (!bInfo.order_id) {
+      showToast(`Cannot reassign seat: booking status is "${bInfo.status}" (held or no order)`, 'warning');
+    } else if (!targetSlot) {
+      showToast('Drop onto an unbooked seat to reassign', 'info');
+    } else {
+      const targetRow = targetSlot.getAttribute('data-row');
+      const targetCol = parseInt(targetSlot.getAttribute('data-seat'), 10);
+      const targetKey = `${targetRow}-${targetCol}`;
+      const originKey = `${draggedSeat.row_label}-${draggedSeat.seat_number}`;
+
+      if (targetKey === originKey) {
+        // Dropped on itself, no action
+      } else {
+        const targetSeat = draftSeats.value.find(s => s.row_label === targetRow && s.seat_number === targetCol);
+        if (targetSeat && isSeatLocked(targetSeat)) {
+          showToast(`Seat ${targetRow}${targetCol} is already booked. Please choose an unbooked seat.`, 'warning');
+        } else {
+          openChangeSeatModalFromEditor(draggedSeat, bInfo, targetRow, targetCol, targetSeat);
+        }
+      }
+    }
+  } else if (dragAction.type === 'pending_move' || dragAction.type === 'pending_marquee') {
     // Clicked without dragging
     if (dragAction.clickedSeat) {
       handleSeatClick(dragAction.clickedSeat, { shiftKey: dragAction.isShift });
@@ -1499,7 +1908,74 @@ function handleCanvasMouseUp() {
 
   dragAction.type = 'none';
   dragAction.moveTargetSlots.clear();
+  dragAction.targetHoverSlot = null;
   marquee.active = false;
+}
+
+async function openChangeSeatModalFromEditor(draggedSeat, bInfo, targetRow, targetCol, targetSeat) {
+  changeSeatDialog.value = {
+    show: true,
+    loading: true,
+    submitting: false,
+    orderId: bInfo.order_id,
+    showtimeId: bInfo.showtime_id,
+    eventTitle: bInfo.event_title || 'Show',
+    userEmail: bInfo.user_email || '',
+    oldSeat: {
+      seat_booking_id: bInfo.seat_booking_id,
+      seat_id: draggedSeat?.id || bInfo.seat_id,
+      row_label: draggedSeat?.row_label || bInfo.row_label,
+      seat_number: draggedSeat?.seat_number || bInfo.seat_number,
+      zone_name: getZoneName(draggedSeat?.zone_id),
+      price_cents: getZonePrice(draggedSeat?.zone_id),
+    },
+    newSeat: null,
+    seats: [],
+    isFreeUpgrade: true,
+    reason: `Seat change via seat map editor: Row ${draggedSeat?.row_label || bInfo.row_label}${draggedSeat?.seat_number || bInfo.seat_number} → Row ${targetRow}${targetCol}`,
+  };
+
+  try {
+    const res = await api.get(`/showtimes/${bInfo.showtime_id}/seats`);
+    const showtimeSeats = res.data || [];
+    changeSeatDialog.value.seats = showtimeSeats;
+
+    // Find the target seat in the showtime seats list
+    const found = showtimeSeats.find(s => s.row_label === targetRow && s.seat_number === targetCol);
+    if (found) {
+      if (found.status === 'available') {
+        changeSeatDialog.value.newSeat = found;
+      } else if (found.id !== changeSeatDialog.value.oldSeat.seat_id) {
+        showToast(`Target seat Row ${targetRow}, Seat ${targetCol} is currently ${found.status}. You may select another seat from the map below.`, 'warning');
+      }
+    }
+  } catch (err) {
+    showToast(err.response?.data?.error || 'Failed to load showtime seat availability', 'error');
+  } finally {
+    changeSeatDialog.value.loading = false;
+  }
+}
+
+async function handleConfirmChangeSeat() {
+  if (!changeSeatDialog.value.oldSeat || !changeSeatDialog.value.newSeat || !changeSeatDialog.value.orderId) return;
+
+  changeSeatDialog.value.submitting = true;
+  try {
+    await api.post(`/orders/${changeSeatDialog.value.orderId}/change-seat`, {
+      old_seat_booking_id: changeSeatDialog.value.oldSeat.seat_booking_id,
+      new_seat_id: changeSeatDialog.value.newSeat.id,
+      is_free_upgrade: changeSeatDialog.value.isFreeUpgrade,
+      reason: changeSeatDialog.value.reason?.trim() || undefined,
+    });
+
+    showToast(`Seat changed to Row ${changeSeatDialog.value.newSeat.row_label}, Seat ${changeSeatDialog.value.newSeat.seat_number} successfully!`, 'success');
+    changeSeatDialog.value.show = false;
+    await fetchLayout();
+  } catch (err) {
+    showToast(err.response?.data?.error || 'Failed to change seat assignment', 'error');
+  } finally {
+    changeSeatDialog.value.submitting = false;
+  }
 }
 
 // Bulk Actions
@@ -2093,5 +2569,140 @@ onUnmounted(() => {
 
 .gap-2 {
   gap: 8px;
+}
+
+/* Floating ghost badge during locked seat drag */
+.locked-drag-ghost {
+  position: fixed;
+  z-index: 9999;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1.5px solid #f59e0b;
+  border-radius: 8px;
+  padding: 6px 12px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 0 12px rgba(245, 158, 11, 0.4);
+  color: #fff;
+  white-space: nowrap;
+}
+
+.locked-seat-being-dragged {
+  opacity: 0.45 !important;
+  border-style: dashed !important;
+  border-color: #f59e0b !important;
+}
+
+.locked-target-valid {
+  border-color: #22c55e !important;
+  border-width: 2px !important;
+  border-style: dashed !important;
+  background: rgba(34, 197, 94, 0.25) !important;
+  box-shadow: 0 0 10px rgba(34, 197, 94, 0.6) !important;
+  transform: scale(1.1);
+  z-index: 5;
+}
+
+.locked-target-invalid {
+  border-color: #ef4444 !important;
+  border-width: 2px !important;
+  border-style: dashed !important;
+  background: rgba(239, 68, 68, 0.25) !important;
+  box-shadow: 0 0 10px rgba(239, 68, 68, 0.6) !important;
+  transform: scale(1.05);
+  z-index: 5;
+}
+
+/* Change Seat Modal Seat Picker */
+.seat-picker-canvas {
+  background: #0f131c !important;
+  border-color: #2a3142 !important;
+  max-height: 380px;
+}
+
+.picker-screen {
+  height: 18px;
+  max-width: 320px;
+  background: linear-gradient(180deg, #f59e0b 0%, rgba(245, 158, 11, 0.1) 100%);
+  border-radius: 50% 50% 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.picker-screen-text {
+  font-size: 8px;
+  letter-spacing: 3px;
+  color: #fff;
+  font-weight: 800;
+  opacity: 0.8;
+}
+
+.picker-row-header {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: #64748b;
+}
+
+.picker-seat-node {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid #4b5563;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.1s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.picker-seat-node:hover:not(:disabled) {
+  transform: scale(1.15);
+  border-color: #f59e0b !important;
+  z-index: 2;
+}
+
+.picker-seat-selected {
+  border-color: #f59e0b !important;
+  border-width: 2px !important;
+  transform: scale(1.1);
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+  z-index: 3;
+}
+
+.picker-seat-current {
+  opacity: 0.5;
+  cursor: not-allowed !important;
+}
+
+.picker-seat-unavailable {
+  opacity: 0.35;
+  cursor: not-allowed !important;
+}
+
+.picker-empty-slot {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.picker-seat-label {
+  font-size: 9px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.picker-check {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background: #f59e0b;
+  border-radius: 50%;
+  padding: 1px;
 }
 </style>

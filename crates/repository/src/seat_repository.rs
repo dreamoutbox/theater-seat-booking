@@ -13,6 +13,7 @@ impl SeatRepository {
         sqlx::query_as(
             "SELECT 
                 s.id AS seat_id,
+                sb.id AS seat_booking_id,
                 s.row_label,
                 s.seat_number,
                 sb.showtime_id,

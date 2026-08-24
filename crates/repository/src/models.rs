@@ -479,6 +479,7 @@ pub struct ShowtimeDashboardRow {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct BookedSeatInfo {
     pub seat_id: Uuid,
+    pub seat_booking_id: Uuid,
     pub row_label: String,
     pub seat_number: i32,
     pub showtime_id: Uuid,
