@@ -7,10 +7,6 @@ if [ -z "$STRIPE_API_KEY" ]; then
   exit 1
 fi
 
-# Login using the provided API key
-echo "Logging in to Stripe CLI..."
-stripe login --api-key "$STRIPE_API_KEY"
-
-# Start forwarding events to apiserver
-echo "Forwarding Stripe events to $FORWARD_TO"
-exec stripe listen --forward-to $FORWARD_TO
+# Start forwarding events to apiserver headlessly
+echo "Forwarding Stripe events to $FORWARD_TO..."
+exec stripe listen --api-key "$STRIPE_API_KEY" --all-snapshot --forward-to "$FORWARD_TO" --skip-update
