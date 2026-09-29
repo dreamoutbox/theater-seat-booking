@@ -34,14 +34,15 @@ pub async fn stripe_webhook(
     );
 
     // 1. Idempotency Check (§12 locked decision):
-    let already_processed = OrderRepository::exists_payment_event_by_stripe_event_id(&state.pool, &event_id)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let already_processed =
+        OrderRepository::exists_payment_event_by_stripe_event_id(&state.pool, &event_id)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?;
 
     if already_processed {
         tracing::info!(
@@ -52,9 +53,7 @@ pub async fn stripe_webhook(
     }
 
     // For checkout.session.completed, the payment_intent is nested inside the session object
-    let data_object = event
-        .get("data")
-        .and_then(|d| d.get("object"));
+    let data_object = event.get("data").and_then(|d| d.get("object"));
 
     // Primary: extract order_id from event metadata (set by us on both PI and checkout session).
     // This is reliable regardless of which PaymentIntent Stripe creates internally.
@@ -200,18 +199,24 @@ pub async fn stripe_webhook(
         if let Some(oid) = order_id {
             let post_pay_state = state.clone();
             tokio::spawn(async move {
-                match crate::routes::order::generate_and_upload_order_pdf(&post_pay_state, oid).await {
+                match crate::routes::order::generate_and_upload_order_pdf(&post_pay_state, oid)
+                    .await
+                {
                     Ok(pdf_bytes) => {
                         if let Err(e) = post_pay_state
                             .email
                             .send_order_confirmation(&post_pay_state.pool, oid, pdf_bytes)
                             .await
                         {
-                            tracing::warn!("Failed to send order confirmation email via webhook: {e}");
+                            tracing::warn!(
+                                "Failed to send order confirmation email via webhook: {e}"
+                            );
                         }
                     }
                     Err(e) => {
-                        tracing::warn!("Failed to generate/upload order receipt PDF via webhook: {e}");
+                        tracing::warn!(
+                            "Failed to generate/upload order receipt PDF via webhook: {e}"
+                        );
                     }
                 }
             });

@@ -57,13 +57,11 @@ impl ZoneRepository {
         id: Uuid,
         theater_id: Uuid,
     ) -> Result<bool, sqlx::Error> {
-        sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM zones WHERE id = $1 AND theater_id = $2)",
-        )
-        .bind(id)
-        .bind(theater_id)
-        .fetch_one(executor)
-        .await
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM zones WHERE id = $1 AND theater_id = $2)")
+            .bind(id)
+            .bind(theater_id)
+            .fetch_one(executor)
+            .await
     }
 
     pub async fn save<'e, E: PgExecutor<'e>>(

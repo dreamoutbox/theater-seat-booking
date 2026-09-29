@@ -56,23 +56,25 @@ pub async fn enqueue_booking(
 
     // 1. Check active booking count for this user
     // Active = held seat_bookings (with expires_at > now()) + pending/processing in booking_queue
-    let active_holds_count = SeatBookingRepository::count_active_holds_by_user_id(&mut *tx, auth_user.id)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let active_holds_count =
+        SeatBookingRepository::count_active_holds_by_user_id(&mut *tx, auth_user.id)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?;
 
-    let in_flight_queue_count = BookingQueueRepository::count_in_flight_by_user_id(&mut *tx, auth_user.id)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
+    let in_flight_queue_count =
+        BookingQueueRepository::count_in_flight_by_user_id(&mut *tx, auth_user.id)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?;
 
     let total_active = active_holds_count + in_flight_queue_count;
     if total_active >= state.config.max_bookings_per_user {
@@ -100,18 +102,19 @@ pub async fn enqueue_booking(
 
     if let Some((max_booking, max_user)) = event_limits {
         // A. Limit per booking session / showtime
-        let showtime_active_holds = SeatBookingRepository::count_active_holds_by_showtime_and_user_id(
-            &mut *tx,
-            payload.showtime_id,
-            auth_user.id,
-        )
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
+        let showtime_active_holds =
+            SeatBookingRepository::count_active_holds_by_showtime_and_user_id(
+                &mut *tx,
+                payload.showtime_id,
+                auth_user.id,
             )
-        })?;
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?;
 
         if showtime_active_holds + in_flight_queue_count >= max_booking as i64 {
             tx.rollback().await.ok();
@@ -127,18 +130,19 @@ pub async fn enqueue_booking(
         }
 
         // B. Cumulative limit per customer for this entire event
-        let total_user_event_seats = SeatBookingRepository::count_confirmed_and_held_by_showtime_and_user_id(
-            &mut *tx,
-            payload.showtime_id,
-            auth_user.id,
-        )
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
+        let total_user_event_seats =
+            SeatBookingRepository::count_confirmed_and_held_by_showtime_and_user_id(
+                &mut *tx,
+                payload.showtime_id,
+                auth_user.id,
             )
-        })?;
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?;
 
         if total_user_event_seats + in_flight_queue_count >= max_user as i64 {
             tx.rollback().await.ok();

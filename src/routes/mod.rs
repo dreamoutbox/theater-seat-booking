@@ -21,9 +21,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 
-use crate::{
-    config::AppConfig, email::EmailService, s3::S3Service, stripe::StripeService,
-};
+use crate::{config::AppConfig, email::EmailService, s3::S3Service, stripe::StripeService};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -68,7 +66,10 @@ pub fn create_router(state: AppState) -> Router {
             "/theaters/{id}",
             axum::routing::put(theater::update_theater).delete(theater::delete_theater),
         )
-        .route("/events", get(theater::list_events).post(theater::create_event))
+        .route(
+            "/events",
+            get(theater::list_events).post(theater::create_event),
+        )
         .route(
             "/events/{id}",
             axum::routing::put(theater::update_event).delete(theater::delete_event),
@@ -102,11 +103,17 @@ pub fn create_router(state: AppState) -> Router {
         .route("/orders", post(order::create_order).get(order::list_orders))
         .route("/orders/{id}", get(order::get_order))
         .route("/orders/{id}/confirm-mock", post(order::confirm_mock_order))
-        .route("/orders/{id}/checkout-session", post(order::create_checkout_session))
+        .route(
+            "/orders/{id}/checkout-session",
+            post(order::create_checkout_session),
+        )
         .route("/orders/{id}/refund", post(order::refund_order))
         .route("/orders/{id}/refunds", get(order::get_order_refunds))
         .route("/orders/{id}/change-seat", post(order::change_seat))
-        .route("/orders/{id}/seat-changes", get(order::get_order_seat_changes))
+        .route(
+            "/orders/{id}/seat-changes",
+            get(order::get_order_seat_changes),
+        )
         .route("/orders/{id}/tickets", get(ticket::list_order_tickets))
         .route("/orders/{id}/pdf", get(order::download_order_pdf))
         // Tickets & Scanning
@@ -131,7 +138,10 @@ pub fn create_router(state: AppState) -> Router {
             "/events/{id}/gatekeepers/{user_id}",
             delete(gatekeeper::remove_gatekeeper_from_event),
         )
-        .route("/gatekeeper/events", get(gatekeeper::list_my_assigned_events))
+        .route(
+            "/gatekeeper/events",
+            get(gatekeeper::list_my_assigned_events),
+        )
         // Webhooks
         .route("/webhooks/stripe", post(webhook::stripe_webhook));
 

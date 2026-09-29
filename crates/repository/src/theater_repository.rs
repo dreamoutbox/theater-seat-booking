@@ -6,9 +6,7 @@ use crate::models::Theater;
 pub struct TheaterRepository;
 
 impl TheaterRepository {
-    pub async fn find_all<'e, E: PgExecutor<'e>>(
-        executor: E,
-    ) -> Result<Vec<Theater>, sqlx::Error> {
+    pub async fn find_all<'e, E: PgExecutor<'e>>(executor: E) -> Result<Vec<Theater>, sqlx::Error> {
         sqlx::query_as("SELECT id, name, address FROM theaters ORDER BY name")
             .fetch_all(executor)
             .await

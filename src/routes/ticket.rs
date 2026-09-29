@@ -102,9 +102,10 @@ pub async fn get_ticket_by_code(
 
     // If gatekeeper, verify assigned to event
     if auth_user.role == UserRole::Gatekeeper {
-        let assigned = GatekeeperRepository::is_assigned(&state.pool, auth_user.id, ticket.event_id)
-            .await
-            .unwrap_or(false);
+        let assigned =
+            GatekeeperRepository::is_assigned(&state.pool, auth_user.id, ticket.event_id)
+                .await
+                .unwrap_or(false);
         if !assigned {
             return Err((
                 StatusCode::FORBIDDEN,
@@ -171,9 +172,10 @@ pub async fn scan_ticket(
 
     // Scoping authorization check
     if auth_user.role == UserRole::Gatekeeper {
-        let assigned = GatekeeperRepository::is_assigned(&state.pool, auth_user.id, ticket.event_id)
-            .await
-            .unwrap_or(false);
+        let assigned =
+            GatekeeperRepository::is_assigned(&state.pool, auth_user.id, ticket.event_id)
+                .await
+                .unwrap_or(false);
         if !assigned {
             return Err((
                 StatusCode::FORBIDDEN,

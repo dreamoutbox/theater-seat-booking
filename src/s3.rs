@@ -32,9 +32,7 @@ impl S3Service {
             .load()
             .await;
 
-        let s3_config = Builder::from(&sdk_config)
-            .force_path_style(true)
-            .build();
+        let s3_config = Builder::from(&sdk_config).force_path_style(true).build();
 
         let client = Client::from_conf(s3_config);
 
@@ -48,18 +46,33 @@ impl S3Service {
         info!("Checking MinIO S3 bucket '{}'...", self.bucket);
         match self.client.head_bucket().bucket(&self.bucket).send().await {
             Ok(_) => {
-                info!("MinIO S3 bucket '{}' already exists and is ready.", self.bucket);
+                info!(
+                    "MinIO S3 bucket '{}' already exists and is ready.",
+                    self.bucket
+                );
                 Ok(())
             }
             Err(_) => {
-                info!("Bucket '{}' not accessible or does not exist. Creating...", self.bucket);
-                match self.client.create_bucket().bucket(&self.bucket).send().await {
+                info!(
+                    "Bucket '{}' not accessible or does not exist. Creating...",
+                    self.bucket
+                );
+                match self
+                    .client
+                    .create_bucket()
+                    .bucket(&self.bucket)
+                    .send()
+                    .await
+                {
                     Ok(_) => {
                         info!("Successfully created S3 bucket '{}'.", self.bucket);
                         Ok(())
                     }
                     Err(create_err) => {
-                        warn!("Could not create bucket '{}': {:?}", self.bucket, create_err);
+                        warn!(
+                            "Could not create bucket '{}': {:?}",
+                            self.bucket, create_err
+                        );
                         Err(format!("Failed to create bucket: {create_err}"))
                     }
                 }

@@ -300,12 +300,10 @@ impl TicketRepository {
         executor: E,
         order_id: Uuid,
     ) -> Result<i64, sqlx::Error> {
-        sqlx::query_scalar(
-            "SELECT COUNT(*) FROM tickets WHERE order_id = $1 AND status = 'active'",
-        )
-        .bind(order_id)
-        .fetch_one(executor)
-        .await
+        sqlx::query_scalar("SELECT COUNT(*) FROM tickets WHERE order_id = $1 AND status = 'active'")
+            .bind(order_id)
+            .fetch_one(executor)
+            .await
     }
 
     pub async fn cancel_by_seat_booking_id<'e, E: PgExecutor<'e>>(

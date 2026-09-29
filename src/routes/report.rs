@@ -34,11 +34,7 @@ pub async fn list_event_reports(
 ) -> Result<Json<EventReportsListResponse>, (StatusCode, Json<serde_json::Value>)> {
     check_role(
         &auth_user,
-        &[
-            UserRole::Admin,
-            UserRole::Staff,
-            UserRole::EventOrganizer,
-        ],
+        &[UserRole::Admin, UserRole::Staff, UserRole::EventOrganizer],
     )
     .map_err(|_| {
         (
@@ -86,7 +82,11 @@ pub async fn list_event_reports(
     } else if let Some(latest) = reports.first() {
         let elapsed = (now - latest.generated_at).num_seconds();
         if elapsed < ORGANIZER_COOLDOWN_SECONDS {
-            (false, ORGANIZER_COOLDOWN_SECONDS - elapsed, Some(latest.generated_at))
+            (
+                false,
+                ORGANIZER_COOLDOWN_SECONDS - elapsed,
+                Some(latest.generated_at),
+            )
         } else {
             (true, 0, Some(latest.generated_at))
         }
@@ -110,11 +110,7 @@ pub async fn generate_event_report(
 ) -> Result<Json<EventFinancialReportDetail>, (StatusCode, Json<serde_json::Value>)> {
     check_role(
         &auth_user,
-        &[
-            UserRole::Admin,
-            UserRole::Staff,
-            UserRole::EventOrganizer,
-        ],
+        &[UserRole::Admin, UserRole::Staff, UserRole::EventOrganizer],
     )
     .map_err(|_| {
         (
@@ -177,31 +173,27 @@ pub async fn generate_event_report(
     }
 
     // Compute live metrics & showtimes snapshot
-    let metrics = AnalyticsRepository::get_event_dashboard_metrics(
-        &state.pool,
-        Some(event_id),
-        None,
-    )
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": format!("Failed to compute metrics: {e}") })),
-        )
-    })?;
+    let metrics =
+        AnalyticsRepository::get_event_dashboard_metrics(&state.pool, Some(event_id), None)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": format!("Failed to compute metrics: {e}") })),
+                )
+            })?;
 
-    let showtimes = AnalyticsRepository::get_showtime_dashboard_breakdown(
-        &state.pool,
-        Some(event_id),
-        None,
-    )
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": format!("Failed to compute showtimes: {e}") })),
-        )
-    })?;
+    let showtimes =
+        AnalyticsRepository::get_showtime_dashboard_breakdown(&state.pool, Some(event_id), None)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(
+                        serde_json::json!({ "error": format!("Failed to compute showtimes: {e}") }),
+                    ),
+                )
+            })?;
 
     // Organizer email lookup
     let organizer_email = if let Some(owner_id) = event.owner_id {
@@ -313,7 +305,11 @@ pub async fn generate_event_report(
         &showtimes,
     ) {
         let s3_key = format!("reports/{}/{}.pdf", event_id, statement_ref);
-        if let Err(e) = state.s3.upload_file(&s3_key, pdf_bytes, "application/pdf").await {
+        if let Err(e) = state
+            .s3
+            .upload_file(&s3_key, pdf_bytes, "application/pdf")
+            .await
+        {
             tracing::warn!("Failed to upload report PDF to S3: {e}");
         }
     }
@@ -329,11 +325,7 @@ pub async fn get_report_by_id(
 ) -> Result<Json<EventFinancialReportDetail>, (StatusCode, Json<serde_json::Value>)> {
     check_role(
         &auth_user,
-        &[
-            UserRole::Admin,
-            UserRole::Staff,
-            UserRole::EventOrganizer,
-        ],
+        &[UserRole::Admin, UserRole::Staff, UserRole::EventOrganizer],
     )
     .map_err(|_| {
         (
@@ -389,11 +381,7 @@ pub async fn download_report_pdf(
 ) -> Result<axum::response::Response, (StatusCode, Json<serde_json::Value>)> {
     check_role(
         &auth_user,
-        &[
-            UserRole::Admin,
-            UserRole::Staff,
-            UserRole::EventOrganizer,
-        ],
+        &[UserRole::Admin, UserRole::Staff, UserRole::EventOrganizer],
     )
     .map_err(|_| {
         (
@@ -447,7 +435,9 @@ pub async fn download_report_pdf(
                 .await
                 .ok()
                 .flatten();
-            let event_title = event.map(|e| e.title).unwrap_or_else(|| "Event".to_string());
+            let event_title = event
+                .map(|e| e.title)
+                .unwrap_or_else(|| "Event".to_string());
             let showtimes = AnalyticsRepository::get_showtime_dashboard_breakdown(
                 &state.pool,
                 Some(report.event_id),
@@ -468,7 +458,10 @@ pub async fn download_report_pdf(
                 )
             })?;
 
-            let _ = state.s3.upload_file(&s3_key, generated.clone(), "application/pdf").await;
+            let _ = state
+                .s3
+                .upload_file(&s3_key, generated.clone(), "application/pdf")
+                .await;
             generated
         }
     };

@@ -326,11 +326,23 @@ pub async fn update_event(
         max_booking,
         max_user,
         owner_id,
-        payload.tax_business_name.as_deref().or(existing.tax_business_name.as_deref()),
+        payload
+            .tax_business_name
+            .as_deref()
+            .or(existing.tax_business_name.as_deref()),
         payload.tax_id.as_deref().or(existing.tax_id.as_deref()),
-        payload.tax_address.as_deref().or(existing.tax_address.as_deref()),
-        payload.tax_email.as_deref().or(existing.tax_email.as_deref()),
-        payload.tax_phone.as_deref().or(existing.tax_phone.as_deref()),
+        payload
+            .tax_address
+            .as_deref()
+            .or(existing.tax_address.as_deref()),
+        payload
+            .tax_email
+            .as_deref()
+            .or(existing.tax_email.as_deref()),
+        payload
+            .tax_phone
+            .as_deref()
+            .or(existing.tax_phone.as_deref()),
     )
     .await
     .map_err(|e| {
@@ -721,22 +733,20 @@ pub async fn save_theater_layout(
                     })?
                 }
             }
-            None => {
-                ZoneRepository::save(
-                    &mut *tx,
-                    theater_id,
-                    zone_name,
-                    zone_item.price_cents,
-                    zone_color,
+            None => ZoneRepository::save(
+                &mut *tx,
+                theater_id,
+                zone_name,
+                zone_item.price_cents,
+                zone_color,
+            )
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
                 )
-                .await
-                .map_err(|e| {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(serde_json::json!({ "error": e.to_string() })),
-                    )
-                })?
-            }
+            })?,
         };
 
         valid_zone_ids.insert(zone_id);
@@ -753,10 +763,13 @@ pub async fn save_theater_layout(
 
         // Validate zone_id is valid
         if !valid_zone_ids.contains(&seat_item.zone_id) {
-            let zone_exists =
-                ZoneRepository::exists_by_id_and_theater_id(&mut *tx, seat_item.zone_id, theater_id)
-                    .await
-                    .unwrap_or(false);
+            let zone_exists = ZoneRepository::exists_by_id_and_theater_id(
+                &mut *tx,
+                seat_item.zone_id,
+                theater_id,
+            )
+            .await
+            .unwrap_or(false);
 
             if !zone_exists {
                 tx.rollback().await.ok();

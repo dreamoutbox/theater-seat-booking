@@ -32,11 +32,7 @@ pub async fn get_dashboard_data(
 ) -> Result<Json<DashboardResponse>, (StatusCode, Json<serde_json::Value>)> {
     check_role(
         &auth_user,
-        &[
-            UserRole::Admin,
-            UserRole::Staff,
-            UserRole::EventOrganizer,
-        ],
+        &[UserRole::Admin, UserRole::Staff, UserRole::EventOrganizer],
     )
     .map_err(|_e| {
         (
@@ -62,7 +58,9 @@ pub async fn get_dashboard_data(
                 if event.owner_id != Some(auth_user.id) {
                     return Err((
                         StatusCode::FORBIDDEN,
-                        Json(serde_json::json!({ "error": "Access denied to requested event analytics" })),
+                        Json(
+                            serde_json::json!({ "error": "Access denied to requested event analytics" }),
+                        ),
                     ));
                 }
             } else {
@@ -77,18 +75,15 @@ pub async fn get_dashboard_data(
         None
     };
 
-    let metrics = AnalyticsRepository::get_event_dashboard_metrics(
-        &state.pool,
-        query.event_id,
-        owner_id,
-    )
-    .await
-    .map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": format!("Failed to compute metrics: {e}") })),
-        )
-    })?;
+    let metrics =
+        AnalyticsRepository::get_event_dashboard_metrics(&state.pool, query.event_id, owner_id)
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": format!("Failed to compute metrics: {e}") })),
+                )
+            })?;
 
     let showtimes = AnalyticsRepository::get_showtime_dashboard_breakdown(
         &state.pool,
@@ -99,7 +94,9 @@ pub async fn get_dashboard_data(
     .map_err(|e| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": format!("Failed to fetch showtime breakdown: {e}") })),
+            Json(
+                serde_json::json!({ "error": format!("Failed to fetch showtime breakdown: {e}") }),
+            ),
         )
     })?;
 

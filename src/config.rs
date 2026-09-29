@@ -54,14 +54,10 @@ impl AppConfig {
                 .unwrap_or_else(|_| "whsec_mock_key_for_poc".to_string()),
             s3_endpoint: env::var("S3_ENDPOINT")
                 .unwrap_or_else(|_| "http://127.0.0.1:9000".to_string()),
-            s3_access_key: env::var("S3_ACCESS_KEY")
-                .unwrap_or_else(|_| "miniominio".to_string()),
-            s3_secret_key: env::var("S3_SECRET_KEY")
-                .unwrap_or_else(|_| "miniominio".to_string()),
-            s3_bucket: env::var("S3_BUCKET")
-                .unwrap_or_else(|_| "theater-documents".to_string()),
-            s3_region: env::var("S3_REGION")
-                .unwrap_or_else(|_| "us-east-1".to_string()),
+            s3_access_key: env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "miniominio".to_string()),
+            s3_secret_key: env::var("S3_SECRET_KEY").unwrap_or_else(|_| "miniominio".to_string()),
+            s3_bucket: env::var("S3_BUCKET").unwrap_or_else(|_| "theater-documents".to_string()),
+            s3_region: env::var("S3_REGION").unwrap_or_else(|_| "us-east-1".to_string()),
             smtp_host: env::var("SMTP_HOST")
                 .ok()
                 .map(|s| s.trim().to_string())

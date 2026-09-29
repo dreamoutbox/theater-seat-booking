@@ -528,4 +528,3 @@ pub struct EventFinancialReportDetail {
     pub attendance_rate_percent: i32,
     pub report_data: serde_json::Value,
 }
-

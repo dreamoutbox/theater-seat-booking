@@ -6,9 +6,7 @@ use crate::models::Event;
 pub struct EventRepository;
 
 impl EventRepository {
-    pub async fn find_all<'e, E: PgExecutor<'e>>(
-        executor: E,
-    ) -> Result<Vec<Event>, sqlx::Error> {
+    pub async fn find_all<'e, E: PgExecutor<'e>>(executor: E) -> Result<Vec<Event>, sqlx::Error> {
         sqlx::query_as(
             "SELECT id, title, max_seats_per_booking, max_seats_per_user, owner_id, event_number,
                     tax_business_name, tax_id, tax_address, tax_email, tax_phone

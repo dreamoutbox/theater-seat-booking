@@ -108,16 +108,12 @@ impl ReportRepository {
         .await
     }
 
-    pub async fn count_by_event_id(
-        pool: &PgPool,
-        event_id: Uuid,
-    ) -> Result<i64, sqlx::Error> {
-        let count: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM event_financial_reports WHERE event_id = $1",
-        )
-        .bind(event_id)
-        .fetch_one(pool)
-        .await?;
+    pub async fn count_by_event_id(pool: &PgPool, event_id: Uuid) -> Result<i64, sqlx::Error> {
+        let count: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM event_financial_reports WHERE event_id = $1")
+                .bind(event_id)
+                .fetch_one(pool)
+                .await?;
 
         Ok(count.0)
     }

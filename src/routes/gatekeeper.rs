@@ -131,12 +131,14 @@ pub async fn create_and_assign_gatekeeper(
     }
 
     // Find or create user
-    let user = match UserRepository::find_by_email(&state.pool, &email).await.map_err(|e| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({ "error": e.to_string() })),
-        )
-    })? {
+    let user = match UserRepository::find_by_email(&state.pool, &email)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })? {
         Some(u) => u,
         None => {
             let password_hash = hash_password(&payload.password).map_err(|e| {
@@ -256,14 +258,12 @@ pub async fn list_my_assigned_events(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<Event>>, (StatusCode, Json<serde_json::Value>)> {
     if auth_user.role == UserRole::Admin || auth_user.role == UserRole::Staff {
-        let events = EventRepository::find_all(&state.pool)
-            .await
-            .map_err(|e| {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    Json(serde_json::json!({ "error": e.to_string() })),
-                )
-            })?;
+        let events = EventRepository::find_all(&state.pool).await.map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
         return Ok(Json(events));
     }
 

@@ -550,7 +550,10 @@ pub async fn create_checkout_session(
 
     let base_url = "http://localhost:5173";
     let success_url = format!("{base_url}/orders/{order_id}?payment=success");
-    let cancel_url = format!("{base_url}/showtimes/{}/booking?payment=cancelled&order_id={order_id}", order.showtime_id);
+    let cancel_url = format!(
+        "{base_url}/showtimes/{}/booking?payment=cancelled&order_id={order_id}",
+        order.showtime_id
+    );
 
     let session = state
         .stripe
