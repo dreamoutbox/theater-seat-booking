@@ -27,7 +27,7 @@
                   <div class="d-flex align-center gap-2 mb-1">
                     <span class="text-caption text-grey font-weight-mono text-uppercase">EVENT GATEKEEPERS</span>
                     <span class="text-caption font-weight-mono text-teal-accent-3 font-weight-bold">#{{ event?.id
-                    }}</span>
+                      }}</span>
                   </div>
                   <h1 class="text-h4 font-weight-bold text-white mb-1">
                     {{ event?.title }}
@@ -338,7 +338,7 @@ onMounted(() => {
 .manage-main-content {
   flex: 1;
   min-width: 0;
-  padding: 0px 10px 0px 10px;
+  padding: 15px 10px 0px 10px;
 }
 
 .max-w-5xl {

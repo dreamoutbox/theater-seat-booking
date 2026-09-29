@@ -513,9 +513,10 @@ All routes are prefixed with `/api`.
 12. **Order items QR column** — Embedded QR code and ticket code inside the Order Items table
 13. **Ticket refund flow** — Modal dialog with ticket selection checkboxes + per-row refund trigger + refunded badges & financial summary
 14. **Event Analytics Dashboard** (`/manage/dashboard`) — Full KPI summary cards, event selector dropdown, and showtime-by-showtime attendance and financial performance table
-15. **Event Management Sidebar** (`EventSidebar.vue`) — Compact navigation sidebar across Event Overview, Gatekeepers, Settings, Financial Reports, and Orders
+15. **Event Management Sidebar** (`EventSidebar.vue`) — Compact navigation sidebar across Event Overview, Scheduled Showtimes, Gatekeepers, Settings, Financial Reports, and Orders
 16. **Event Financial Reports List View** (`/manage/events/:id/financial-reports`) — Historical snapshot list, live KPI snapshot cards, inline button cooldown timer, and direct PDF streaming links
 17. **Event Settings & Tax Info View** (`/manage/events/:id/settings`) — Configurable seat limits and business tax entity profile for customer receipts & tax statements
+18. **Scheduled Showtimes View** (`/manage/events/:id/showtimes`) — Dedicated showtimes management view with session scheduling, theater selection, customer seat map links, and hall layout editor triggers
 
 ---
 

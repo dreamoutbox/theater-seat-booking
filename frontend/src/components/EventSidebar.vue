@@ -32,6 +32,15 @@
         </router-link>
       </li>
 
+      <!-- Scheduled Showtimes -->
+      <li class="sidebar-nav-item">
+        <router-link :to="event ? `/manage/events/${event.id}/showtimes` : '#'" class="sidebar-nav-link"
+          :class="{ active: activeItem === 'showtimes' }">
+          <v-icon icon="mdi-calendar-clock" size="18" class="sidebar-icon"></v-icon>
+          <span class="sidebar-label">Scheduled Showtimes</span>
+        </router-link>
+      </li>
+
       <!-- Seat Map Editor -->
       <li class="sidebar-nav-item">
         <button type="button" class="sidebar-nav-link" :class="{ active: activeItem === 'seat-map' }"

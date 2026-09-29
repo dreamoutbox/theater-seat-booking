@@ -40,10 +40,18 @@
                     <v-icon start icon="mdi-account-lock-outline" size="14"></v-icon>
                     Personal Limit: {{ event.max_seats_per_user || 10 }} seats / customer
                   </v-chip>
-                  <span class="text-caption text-grey ml-2">
+                  <v-btn
+                    variant="tonal"
+                    size="small"
+                    color="amber-darken-1"
+                    prepend-icon="mdi-calendar-clock"
+                    class="font-weight-bold text-none ml-2"
+                    :to="`/manage/events/${event.id}/showtimes`"
+                  >
                     {{ eventShowtimes.length }} {{ eventShowtimes.length === 1 ?
                       'Showtime session' : 'Showtime sessions' }}
-                  </span>
+                    <v-icon end icon="mdi-chevron-right" size="14"></v-icon>
+                  </v-btn>
                 </div>
               </div>
             </div>
@@ -168,126 +176,9 @@
               </v-col>
             </v-row>
           </div>
-
-          <!-- Scheduled Showtimes Card -->
-          <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
-            <div class="d-flex justify-space-between align-center mb-4">
-              <div>
-                <h2 class="text-h6 font-weight-bold text-white mb-1">Scheduled Showtimes</h2>
-                <span class="text-caption text-grey">Manage sessions, customer seat maps, and hall layouts</span>
-              </div>
-              <v-btn prepend-icon="mdi-plus" color="amber-darken-1" variant="tonal" size="small"
-                class="text-none font-weight-bold" @click="openAddShowtimeDialog">
-                New Session
-              </v-btn>
-            </div>
-
-            <!-- Empty State -->
-            <div v-if="eventShowtimes.length === 0"
-              class="text-center pa-8 rounded-lg bg-surface-variant border border-dashed">
-              <v-icon icon="mdi-calendar-clock" size="48" color="grey" class="mb-2"></v-icon>
-              <div class="text-body-1 text-grey font-weight-medium">No showtimes scheduled for this event</div>
-              <div class="text-caption text-grey-darken-1 mt-1">Add your first showtime session to open ticket booking
-                for users.</div>
-              <v-btn color="amber-darken-1" variant="flat" prepend-icon="mdi-plus"
-                class="mt-4 text-none font-weight-bold" @click="openAddShowtimeDialog">
-                Add Showtime
-              </v-btn>
-            </div>
-
-            <!-- Showtimes Table -->
-            <v-table v-else class="showtimes-table rounded-lg border">
-              <thead>
-                <tr>
-                  <th class="text-left font-weight-bold">Date & Time</th>
-                  <th class="text-left font-weight-bold">Theater Location</th>
-                  <th class="text-left font-weight-bold">Session ID</th>
-                  <th class="text-right font-weight-bold">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="show in eventShowtimes" :key="show.id">
-                  <!-- Starts at -->
-                  <td class="py-3 font-weight-bold text-white">
-                    <v-icon icon="mdi-calendar-clock" size="16" color="amber-darken-1" class="mr-2"></v-icon>
-                    {{ formatDate(show.starts_at) }}
-                  </td>
-
-                  <!-- Theater name -->
-                  <td>
-                    <div class="font-weight-medium text-white">{{ show.theater_name }}</div>
-                    <div class="text-caption text-grey font-weight-mono">Grand Horizon Hall</div>
-                  </td>
-
-                  <!-- Session ID -->
-                  <td>
-                    <span class="font-weight-mono text-caption text-grey">#{{ show.id.substring(0, 8) }}</span>
-                  </td>
-
-                  <!-- Actions -->
-                  <td class="text-right">
-                    <div class="d-flex align-center justify-end gap-1">
-                      <!-- Seat Map Editor for Theater -->
-                      <v-btn variant="tonal" size="small" color="indigo-lighten-2" prepend-icon="mdi-seat-passenger"
-                        class="text-none font-weight-bold" title="Open Seat Map Editor for this Theater"
-                        :to="`/manage/theaters/${show.theater_id}/seat-map`">
-                        Edit Layout
-                      </v-btn>
-
-                      <!-- Customer Booking View -->
-                      <v-btn variant="text" size="small" color="amber-darken-1" prepend-icon="mdi-seat"
-                        class="text-none font-weight-bold" title="View Customer Booking Seat Map"
-                        :to="`/booking/${show.id}`">
-                        Seat Map
-                      </v-btn>
-
-                      <!-- Edit Showtime -->
-                      <v-btn icon="mdi-pencil" size="small" variant="text" color="grey" title="Edit Showtime Session"
-                        @click="openEditShowtimeDialog(show)"></v-btn>
-
-                      <!-- Delete Showtime -->
-                      <v-btn icon="mdi-delete" size="small" variant="text" color="red-lighten-2"
-                        title="Delete Showtime Session" @click="openDeleteShowtimeDialog(show)"></v-btn>
-                    </div>
-                  </td>
-                </tr>
-              </tbody>
-            </v-table>
-          </v-card>
         </div>
       </main>
     </div>
-
-    <!-- Showtime Dialog (Add / Edit) -->
-    <v-dialog v-model="showtimeDialog.show" max-width="500">
-      <v-card theme="dark" class="rounded-xl pa-4">
-        <v-card-title class="text-h6 font-weight-bold">
-          {{ showtimeDialog.isEdit ? 'Edit Showtime Session' : 'Add Showtime Session' }}
-        </v-card-title>
-        <v-card-text>
-          <div class="mb-4">
-            <span class="text-caption text-grey text-uppercase font-weight-bold">EVENT</span>
-            <div class="text-body-1 font-weight-bold text-white">{{ event?.title }}</div>
-          </div>
-
-          <v-select v-model="showtimeDialog.theaterId" label="Theater Location" :items="theaters" item-title="name"
-            item-value="id" variant="outlined" density="comfortable" class="mb-4"></v-select>
-
-          <div>
-            <label class="text-caption text-grey mb-1 d-block font-weight-bold">START DATE & TIME (Local Time)</label>
-            <input type="datetime-local" v-model="showtimeDialog.datetimeLocal" class="datetime-input mb-2" />
-          </div>
-        </v-card-text>
-        <v-card-actions class="pa-4 pt-0">
-          <v-btn variant="text" @click="showtimeDialog.show = false">Cancel</v-btn>
-          <v-spacer></v-spacer>
-          <v-btn color="amber-darken-1" variant="flat" class="font-weight-bold text-none"
-            :loading="showtimeDialog.saving" @click="saveShowtime">
-            {{ showtimeDialog.isEdit ? 'Save Showtime' : 'Schedule Showtime' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
 
     <!-- Theater Selector Dialog for Seat Map Editor -->
     <v-dialog v-model="theaterSelectorDialog.show" max-width="450">
@@ -381,15 +272,6 @@ const eventShowtimes = computed(() => {
   return allShowtimes.value
     .filter((s) => s.event_id === event.value.id)
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
-});
-
-const showtimeDialog = ref({
-  show: false,
-  isEdit: false,
-  showtimeId: null,
-  theaterId: null,
-  datetimeLocal: '',
-  saving: false,
 });
 
 const theaterSelectorDialog = ref({
@@ -486,90 +368,6 @@ function goToSeatMapEditor() {
   }
 }
 
-function openAddShowtimeDialog() {
-  const defaultTheaterId = eventShowtimes.value[0]?.theater_id || theaters.value[0]?.id || '';
-  const now = new Date();
-  const defaultDate = new Date(now.getTime() + 86400000);
-  defaultDate.setHours(19, 0, 0, 0);
-  const localIso = new Date(defaultDate.getTime() - defaultDate.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
-
-  showtimeDialog.value = {
-    show: true,
-    isEdit: false,
-    showtimeId: null,
-    theaterId: defaultTheaterId,
-    datetimeLocal: localIso,
-    saving: false,
-  };
-}
-
-function openEditShowtimeDialog(show) {
-  const d = new Date(show.starts_at);
-  const localIso = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-    .toISOString()
-    .slice(0, 16);
-
-  showtimeDialog.value = {
-    show: true,
-    isEdit: true,
-    showtimeId: show.id,
-    theaterId: show.theater_id,
-    datetimeLocal: localIso,
-    saving: false,
-  };
-}
-
-async function saveShowtime() {
-  if (!showtimeDialog.value.datetimeLocal) {
-    showToast('Please select a date and time', 'warning');
-    return;
-  }
-  if (!showtimeDialog.value.theaterId) {
-    showToast('Please select a theater', 'warning');
-    return;
-  }
-
-  showtimeDialog.value.saving = true;
-  const startsAtUtc = new Date(showtimeDialog.value.datetimeLocal).toISOString();
-
-  try {
-    if (showtimeDialog.value.isEdit) {
-      await api.put(`/showtimes/${showtimeDialog.value.showtimeId}`, {
-        theater_id: showtimeDialog.value.theaterId,
-        starts_at: startsAtUtc,
-      });
-      showToast('Showtime session updated', 'success');
-    } else {
-      await api.post('/showtimes', {
-        event_id: event.value.id,
-        theater_id: showtimeDialog.value.theaterId,
-        starts_at: startsAtUtc,
-      });
-      showToast('Showtime session scheduled', 'success');
-    }
-    showtimeDialog.value.show = false;
-    const showtimesRes = await api.get('/showtimes');
-    allShowtimes.value = showtimesRes.data;
-    await fetchEventMetrics();
-  } catch (err) {
-    showToast(err.response?.data?.error || 'Failed to save showtime', 'error');
-  } finally {
-    showtimeDialog.value.saving = false;
-  }
-}
-
-function openDeleteShowtimeDialog(show) {
-  deleteDialog.value = {
-    show: true,
-    type: 'showtime',
-    itemId: show.id,
-    itemName: `Showtime on ${formatDate(show.starts_at)}`,
-    deleting: false,
-  };
-}
-
 async function confirmDelete() {
   deleteDialog.value.deleting = true;
   try {
@@ -578,13 +376,6 @@ async function confirmDelete() {
       showToast('Event deleted successfully', 'success');
       deleteDialog.value.show = false;
       router.push('/manage/events');
-    } else if (deleteDialog.value.type === 'showtime') {
-      await api.delete(`/showtimes/${deleteDialog.value.itemId}`);
-      showToast('Showtime deleted successfully', 'success');
-      deleteDialog.value.show = false;
-      const showtimesRes = await api.get('/showtimes');
-      allShowtimes.value = showtimesRes.data;
-      await fetchEventMetrics();
     }
   } catch (err) {
     showToast(err.response?.data?.error || 'Failed to delete item', 'error');
@@ -645,27 +436,6 @@ onMounted(() => {
 .highlight-card {
   border: 1px solid rgba(245, 158, 11, 0.3) !important;
   background: linear-gradient(180deg, #1e2330 0%, #181c27 100%) !important;
-}
-
-.showtimes-table {
-  background: #131722 !important;
-  border-color: #2a3142 !important;
-}
-
-.datetime-input {
-  width: 100%;
-  padding: 10px 14px;
-  background-color: #131722;
-  border: 1px solid #3b4256;
-  border-radius: 8px;
-  color: #fff;
-  font-family: inherit;
-  font-size: 14px;
-  outline: none;
-}
-
-.datetime-input:focus {
-  border-color: #f59e0b;
 }
 
 .gap-1 {

@@ -15,7 +15,9 @@
 
 - [x] fix page at `http://localhost:5173/orders/<order-uuid>` missing left sidebar panel
 
-- [ ] move Scheduled Showtimes to new page & add link to left sidebar panel.
+- [x] move Scheduled Showtimes to new page & add link to left sidebar panel.
+
+- [ ] event 2 can edit event 1 seat map editor. should separate it.
 
 - [ ] send email use outbox with send email worker
 
