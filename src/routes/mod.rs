@@ -102,7 +102,6 @@ pub fn create_router(state: AppState) -> Router {
         // Orders
         .route("/orders", post(order::create_order).get(order::list_orders))
         .route("/orders/{id}", get(order::get_order))
-        .route("/orders/{id}/confirm-mock", post(order::confirm_mock_order))
         .route(
             "/orders/{id}/checkout-session",
             post(order::create_checkout_session),

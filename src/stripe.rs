@@ -35,16 +35,8 @@ impl StripeService {
         currency: &str,
         order_id: &str,
     ) -> Result<StripePaymentIntentResult, String> {
-        // If the key is a mock placeholder, generate mock client secret
-        if self.secret_key.is_empty() || self.secret_key.starts_with("sk_test_mock") {
-            let mock_id = format!("pi_mock_{}", &order_id[..8.min(order_id.len())]);
-            let mock_secret = format!("{}_secret_{}", mock_id, uuid::Uuid::new_v4());
-            return Ok(StripePaymentIntentResult {
-                id: mock_id,
-                client_secret: mock_secret,
-                amount: amount_cents,
-                status: "requires_payment_method".to_string(),
-            });
+        if self.secret_key.is_empty() {
+            return Err("Stripe secret key is not configured".to_string());
         }
 
         // Call real Stripe API via HTTP POST
@@ -103,14 +95,8 @@ impl StripeService {
         success_url: &str,
         cancel_url: &str,
     ) -> Result<StripeCheckoutSessionResult, String> {
-        // Mock mode: return a fake checkout URL pointing back to our mock-confirm endpoint
-        if self.secret_key.is_empty() || self.secret_key.starts_with("sk_test_mock") {
-            let mock_session_id = format!("cs_mock_{}", &order_id[..8.min(order_id.len())]);
-            return Ok(StripeCheckoutSessionResult {
-                id: mock_session_id,
-                url: format!("{cancel_url}?mock_order={order_id}"),
-                payment_intent: None,
-            });
+        if self.secret_key.is_empty() {
+            return Err("Stripe secret key is not configured".to_string());
         }
 
         let amount_str = amount_cents.to_string();
@@ -175,13 +161,8 @@ impl StripeService {
         amount_cents: i64,
         reason: Option<&str>,
     ) -> Result<String, String> {
-        // If mock mode or mock payment intent ID, generate mock refund ID
-        if self.secret_key.is_empty()
-            || self.secret_key.starts_with("sk_test_mock")
-            || payment_intent_id.starts_with("pi_mock_")
-        {
-            let mock_refund_id = format!("re_mock_{}", &uuid::Uuid::new_v4().to_string()[..8]);
-            return Ok(mock_refund_id);
+        if self.secret_key.is_empty() {
+            return Err("Stripe secret key is not configured".to_string());
         }
 
         let mut params = vec![
@@ -238,7 +219,7 @@ impl StripeService {
         &self,
         order_id: &str,
     ) -> Result<Option<String>, String> {
-        if self.secret_key.is_empty() || self.secret_key.starts_with("sk_test_mock") {
+        if self.secret_key.is_empty() {
             return Ok(None);
         }
 
