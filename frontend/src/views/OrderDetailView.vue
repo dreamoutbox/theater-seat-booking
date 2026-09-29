@@ -1,10 +1,15 @@
 <template>
-  <v-container class="py-8 max-w-4xl">
-    <!-- Back Button & Actions -->
-    <div class="d-flex justify-space-between align-center mb-4">
-      <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/orders" class="text-none font-weight-bold">
-        Back to Orders
-      </v-btn>
+  <div :class="authStore.isElevated ? 'manage-layout-body' : 'py-8 max-w-4xl mx-auto px-4'">
+    <!-- Elevated Left Sidebar (Flush Left) -->
+    <EventSidebar v-if="authStore.isElevated" :event="event" active-item="orders" />
+
+    <!-- Main Content Column -->
+    <main :class="authStore.isElevated ? 'manage-main-content' : ''">
+        <!-- Back Button & Actions -->
+        <div class="d-flex justify-space-between align-center mb-4">
+          <v-btn variant="text" prepend-icon="mdi-arrow-left" :to="order?.event_id ? `/orders?event_id=${order.event_id}` : '/orders'" class="text-none font-weight-bold">
+            Back to Orders
+          </v-btn>
 
       <div class="d-flex align-center gap-2">
         <!-- Download S3 PDF Receipt -->
@@ -742,7 +747,8 @@
         </div>
       </div>
     </div>
-  </v-container>
+    </main>
+  </div>
 </template>
 
 <script setup>
@@ -751,6 +757,7 @@ import { useRoute } from 'vue-router';
 import QrcodeVue from 'qrcode.vue';
 import api from '../api/client';
 import { useAuthStore } from '../stores/auth';
+import EventSidebar from '../components/EventSidebar.vue';
 
 const props = defineProps({
   id: { type: String, required: true },
@@ -759,6 +766,7 @@ const props = defineProps({
 const route = useRoute();
 const authStore = useAuthStore();
 const order = ref(null);
+const event = ref(null);
 const tickets = ref([]);
 const refunds = ref([]);
 const seatChanges = ref([]);
@@ -1024,6 +1032,10 @@ async function fetchOrderDetail() {
     const res = await api.get(`/orders/${orderId}`);
     order.value = res.data;
 
+    if (authStore.isElevated && order.value?.event_id) {
+      loadEvent(order.value.event_id, order.value.event_title);
+    }
+
     if (['paid', 'partially_refunded', 'refunded'].includes(order.value.status)) {
       await Promise.all([
         fetchTickets(orderId),
@@ -1038,6 +1050,19 @@ async function fetchOrderDetail() {
     console.error('Fetch order error:', err);
   } finally {
     loading.value = false;
+  }
+}
+
+async function loadEvent(eventId, eventTitle) {
+  event.value = { id: eventId, title: eventTitle || 'Event' };
+  try {
+    const res = await api.get('/events');
+    const found = res.data.find((e) => e.id === eventId);
+    if (found) {
+      event.value = found;
+    }
+  } catch (err) {
+    console.error('Failed to load event details for sidebar', err);
   }
 }
 
@@ -1505,5 +1530,24 @@ onUnmounted(() => {
     border-radius: 4px;
     letter-spacing: 1px;
   }
+}
+
+.manage-layout-body {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 56px);
+  width: 100%;
+}
+
+@media (min-width: 960px) {
+  .manage-layout-body {
+    flex-direction: row;
+  }
+}
+
+.manage-main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 32px 48px;
 }
 </style>

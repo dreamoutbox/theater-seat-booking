@@ -1,7 +1,7 @@
 <template>
   <div class="orders-table-wrapper">
     <!-- Header -->
-    <div class="d-flex flex-wrap justify-space-between align-center gap-4 mb-4">
+    <div class="d-flex flex-wrap justify-space-between align-center gap-1 mb-4">
       <div>
         <h2 class="text-h6 font-weight-bold text-white mb-1">
           {{ tableHeaderTitle }}
@@ -11,13 +11,7 @@
         </span>
       </div>
       <div class="d-flex align-center gap-2">
-        <v-btn
-          prepend-icon="mdi-refresh"
-          variant="outlined"
-          size="small"
-          :loading="loading"
-          @click="fetchOrders"
-        >
+        <v-btn prepend-icon="mdi-refresh" variant="outlined" size="small" :loading="loading" @click="fetchOrders">
           Refresh
         </v-btn>
       </div>
@@ -27,71 +21,35 @@
     <v-card theme="dark" class="pa-3 mb-4 rounded-xl border bg-surface" elevation="2">
       <div class="d-flex flex-wrap align-center justify-space-between gap-4">
         <!-- Search Input -->
-        <v-text-field
-          v-model="searchQuery"
-          placeholder="Search by Order ID, Event, Customer Email, Showtime, Status..."
-          prepend-inner-icon="mdi-magnify"
-          variant="outlined"
-          density="compact"
-          hide-details
-          clearable
-          class="search-input"
-        ></v-text-field>
+        <v-text-field v-model="searchQuery" placeholder="Search by Order ID, Event, Customer Email, Showtime, Status..."
+          prepend-inner-icon="mdi-magnify" variant="outlined" density="compact" hide-details clearable
+          class="search-input"></v-text-field>
 
         <!-- Status Filter Chips -->
         <div class="d-flex align-center gap-2 flex-wrap">
-          <v-chip
-            size="small"
-            :variant="selectedStatus === 'all' ? 'flat' : 'outlined'"
-            color="amber-darken-1"
-            class="font-weight-bold cursor-pointer"
-            @click="selectedStatus = 'all'"
-          >
+          <v-chip size="small" :variant="selectedStatus === 'all' ? 'flat' : 'outlined'" color="amber-darken-1"
+            class="font-weight-bold cursor-pointer" @click="selectedStatus = 'all'">
             All ({{ orders.length }})
           </v-chip>
-          <v-chip
-            size="small"
-            :variant="selectedStatus === 'paid' ? 'flat' : 'outlined'"
-            color="success"
-            class="font-weight-bold cursor-pointer"
-            @click="selectedStatus = 'paid'"
-          >
+          <v-chip size="small" :variant="selectedStatus === 'paid' ? 'flat' : 'outlined'" color="success"
+            class="font-weight-bold cursor-pointer" @click="selectedStatus = 'paid'">
             Paid
           </v-chip>
-          <v-chip
-            size="small"
-            :variant="selectedStatus === 'pending_payment' ? 'flat' : 'outlined'"
-            color="warning"
-            class="font-weight-bold cursor-pointer"
-            @click="selectedStatus = 'pending_payment'"
-          >
+          <v-chip size="small" :variant="selectedStatus === 'pending_payment' ? 'flat' : 'outlined'" color="warning"
+            class="font-weight-bold cursor-pointer" @click="selectedStatus = 'pending_payment'">
             Pending
           </v-chip>
-          <v-chip
-            size="small"
-            :variant="selectedStatus === 'partially_refunded' ? 'flat' : 'outlined'"
-            color="deep-purple-accent-2"
-            class="font-weight-bold cursor-pointer"
-            @click="selectedStatus = 'partially_refunded'"
-          >
+          <v-chip size="small" :variant="selectedStatus === 'partially_refunded' ? 'flat' : 'outlined'"
+            color="deep-purple-accent-2" class="font-weight-bold cursor-pointer"
+            @click="selectedStatus = 'partially_refunded'">
             Partially Refunded
           </v-chip>
-          <v-chip
-            size="small"
-            :variant="selectedStatus === 'refunded' ? 'flat' : 'outlined'"
-            color="grey-darken-1"
-            class="font-weight-bold cursor-pointer"
-            @click="selectedStatus = 'refunded'"
-          >
+          <v-chip size="small" :variant="selectedStatus === 'refunded' ? 'flat' : 'outlined'" color="grey-darken-1"
+            class="font-weight-bold cursor-pointer" @click="selectedStatus = 'refunded'">
             Refunded
           </v-chip>
-          <v-chip
-            size="small"
-            :variant="selectedStatus === 'expired' ? 'flat' : 'outlined'"
-            color="red-accent-3"
-            class="font-weight-bold cursor-pointer"
-            @click="selectedStatus = 'expired'"
-          >
+          <v-chip size="small" :variant="selectedStatus === 'expired' ? 'flat' : 'outlined'" color="red-accent-3"
+            class="font-weight-bold cursor-pointer" @click="selectedStatus = 'expired'">
             Expired
           </v-chip>
         </div>
@@ -105,9 +63,11 @@
         {{ orders.length === 0 ? 'No orders found' : 'No orders matching your search' }}
       </div>
       <div class="text-caption text-grey-darken-1 mt-1">
-        {{ orders.length === 0 ? 'Book some seats from the showtimes page to see them here.' : 'Try adjusting your search query or filters.' }}
+        {{ orders.length === 0 ?
+          'Book some seats from the showtimes page to see them here.' : 'Try adjusting your search query or filters.' }}
       </div>
-      <v-btn v-if="orders.length === 0" color="amber-darken-1" variant="flat" to="/" class="mt-4 text-none font-weight-bold">
+      <v-btn v-if="orders.length === 0" color="amber-darken-1" variant="flat" to="/"
+        class="mt-4 text-none font-weight-bold">
         Browse Showtimes
       </v-btn>
     </v-card>
@@ -128,12 +88,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr
-            v-for="order in paginatedOrders"
-            :key="order.id"
-            class="clickable-row"
-            @click="goToOrderDetail(order.id)"
-          >
+          <tr v-for="order in paginatedOrders" :key="order.id" class="clickable-row" @click="goToOrderDetail(order.id)">
             <!-- Order ID & Date -->
             <td class="py-3">
               <div class="font-weight-mono text-caption text-amber-darken-1 font-weight-bold">
@@ -168,14 +123,8 @@
             <!-- Seats -->
             <td>
               <div class="d-flex flex-wrap gap-1">
-                <v-chip
-                  v-for="s in order.seats"
-                  :key="s.seat_booking_id"
-                  size="x-small"
-                  variant="outlined"
-                  color="grey-lighten-1"
-                  class="font-weight-bold"
-                >
+                <v-chip v-for="s in order.seats" :key="s.seat_booking_id" size="x-small" variant="outlined"
+                  color="grey-lighten-1" class="font-weight-bold">
                   {{ s.row_label }}{{ s.seat_number }} ({{ s.zone_name }})
                 </v-chip>
               </div>
@@ -199,12 +148,8 @@
 
             <!-- Status -->
             <td>
-              <v-chip
-                size="small"
-                :color="getStatusColor(order.status)"
-                variant="flat"
-                class="font-weight-bold text-uppercase text-caption"
-              >
+              <v-chip size="small" :color="getStatusColor(order.status)" variant="flat"
+                class="font-weight-bold text-uppercase text-caption">
                 {{ formatStatus(order.status) }}
               </v-chip>
             </td>
@@ -212,26 +157,13 @@
             <!-- Actions -->
             <td class="text-right">
               <div class="d-flex align-center justify-end gap-2" @click.stop>
-                <v-btn
-                  v-if="order.status === 'pending_payment'"
-                  color="amber-darken-1"
-                  size="small"
-                  variant="flat"
-                  prepend-icon="mdi-credit-card-check"
-                  class="text-none font-weight-bold"
-                  :loading="payingOrderId === order.id"
-                  @click.stop="handlePayNow(order.id)"
-                >
+                <v-btn v-if="order.status === 'pending_payment'" color="amber-darken-1" size="small" variant="flat"
+                  prepend-icon="mdi-credit-card-check" class="text-none font-weight-bold"
+                  :loading="payingOrderId === order.id" @click.stop="handlePayNow(order.id)">
                   Pay Now
                 </v-btn>
-                <v-btn
-                  icon="mdi-chevron-right"
-                  size="small"
-                  variant="text"
-                  color="grey"
-                  title="View order details"
-                  @click.stop="goToOrderDetail(order.id)"
-                ></v-btn>
+                <v-btn icon="mdi-chevron-right" size="small" variant="text" color="grey" title="View order details"
+                  @click.stop="goToOrderDetail(order.id)"></v-btn>
               </div>
             </td>
           </tr>
@@ -242,42 +174,27 @@
       <div class="d-flex flex-wrap justify-space-between align-center pa-4 bg-surface border-t gap-4">
         <!-- Range Info -->
         <div class="text-caption text-grey">
-          Showing <strong>{{ paginationStart }}</strong>–<strong>{{ paginationEnd }}</strong> of <strong>{{ filteredOrders.length }}</strong> orders
+          Showing <strong>{{ paginationStart }}</strong>–<strong>{{ paginationEnd }}</strong> of <strong>{{
+            filteredOrders.length }}</strong> orders
         </div>
 
         <div class="d-flex align-center gap-4">
           <!-- Limit Selector Dropdown -->
           <div class="d-flex align-center gap-2">
             <span class="text-caption text-grey">Rows per page:</span>
-            <v-select
-              v-model="itemsPerPage"
-              :items="itemsPerPageOptions"
-              variant="outlined"
-              density="compact"
-              hide-details
-              style="width: 80px;"
-            ></v-select>
+            <v-select v-model="itemsPerPage" :items="itemsPerPageOptions" variant="outlined" density="compact"
+              hide-details style="width: 80px;"></v-select>
           </div>
 
           <!-- Page Controls -->
           <div class="d-flex align-center gap-1">
-            <v-btn
-              icon="mdi-chevron-left"
-              variant="outlined"
-              size="small"
-              :disabled="page <= 1"
-              @click="page--"
-            ></v-btn>
+            <v-btn icon="mdi-chevron-left" variant="outlined" size="small" :disabled="page <= 1"
+              @click="page--"></v-btn>
             <span class="text-caption text-grey mx-2 font-weight-mono">
               Page {{ page }} of {{ totalPages || 1 }}
             </span>
-            <v-btn
-              icon="mdi-chevron-right"
-              variant="outlined"
-              size="small"
-              :disabled="page >= totalPages"
-              @click="page++"
-            ></v-btn>
+            <v-btn icon="mdi-chevron-right" variant="outlined" size="small" :disabled="page >= totalPages"
+              @click="page++"></v-btn>
           </div>
         </div>
       </div>
@@ -498,8 +415,7 @@ defineExpose({
 
 <style scoped>
 .orders-table-wrapper {
-  max-width: 1200px;
-  margin: 0 auto;
+  padding: 0px 10px 00px 20px;
 }
 
 .bg-surface {

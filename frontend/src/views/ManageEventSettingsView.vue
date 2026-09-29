@@ -1,15 +1,5 @@
 <template>
-  <v-container fluid class="py-6 px-4 px-md-6 px-lg-8">
-    <!-- Top Bar with Back Link -->
-    <div class="d-flex align-center justify-space-between mb-4">
-      <div class="d-flex align-center gap-3">
-        <v-btn variant="text" prepend-icon="mdi-arrow-left" :to="`/manage/events/${eventId}`"
-          class="text-none font-weight-bold">
-          Back to Event Details
-        </v-btn>
-      </div>
-    </div>
-
+  <div class="manage-layout">
     <!-- Loading State -->
     <div v-if="loading" class="text-center py-12">
       <v-progress-circular indeterminate color="amber-darken-1" size="64"></v-progress-circular>
@@ -17,21 +7,16 @@
     </div>
 
     <!-- Error State -->
-    <v-alert v-else-if="error" type="error" variant="tonal" class="rounded-xl mb-6">
+    <v-alert v-else-if="error" type="error" variant="tonal" class="rounded-xl ma-6">
       {{ error }}
     </v-alert>
 
-    <v-row v-else-if="event" class="mt-1">
-      <!-- Sidebar Column (Left) -->
-      <v-col cols="12" md="3" xl="2">
-        <div class="sticky-sidebar">
-          <EventSidebar :event="event" active-item="settings" @add-showtime="goToEventDetails"
-            @open-seat-map="goToEventDetails" @delete-event="goToEventDetails" />
-        </div>
-      </v-col>
+    <div v-else-if="event" class="manage-layout-body">
+      <!-- Sidebar (Flush Left) -->
+      <EventSidebar :event="event" active-item="settings" />
 
       <!-- Main Content Column (Right) -->
-      <v-col cols="12" md="9" xl="10">
+      <main class="manage-main-content">
         <v-form @submit.prevent="saveSettings">
           <!-- Page Header Card -->
           <v-card theme="dark" class="rounded-xl pa-6 border bg-surface mb-6" elevation="3">
@@ -101,7 +86,7 @@
               </v-col>
               <v-col cols="12" sm="6">
                 <v-text-field v-model="form.tax_id" label="Tax ID / VAT / GST Registration Number"
-                  placeholder="e.g. TAX-8842-TSB-2026 / US-EIN-991823" variant="outlined" density="comfortable"
+                  placeholder="e.g. TAX-8842-TSB-2026" variant="outlined" density="comfortable"
                   class="mb-3"></v-text-field>
               </v-col>
             </v-row>
@@ -135,8 +120,60 @@
             </v-btn>
           </div>
         </v-form>
-      </v-col>
-    </v-row>
+
+        <!-- Section 3: Danger Zone -->
+        <v-card theme="dark" class="rounded-xl border border-red-darken-4 pa-6 mb-8 bg-surface">
+          <div class="d-flex align-center justify-space-between flex-wrap gap-4">
+            <div>
+              <div class="d-flex align-center gap-2 mb-1">
+                <v-icon icon="mdi-alert-outline" color="red-lighten-2" size="22"></v-icon>
+                <span class="text-h6 font-weight-bold text-red-lighten-2">Danger Zone</span>
+              </div>
+              <p class="text-caption text-grey mb-0" style="max-width: 600px;">
+                Permanently delete this event and all associated showtimes, tickets, and configurations. This action is
+                irreversible.
+              </p>
+            </div>
+
+            <v-btn color="red-darken-1" variant="flat" size="default" prepend-icon="mdi-delete-outline"
+              class="text-none font-weight-bold delete-event-btn" @click="openDeleteEventDialog">
+              Delete Event
+            </v-btn>
+          </div>
+        </v-card>
+      </main>
+    </div>
+
+    <!-- Delete Event Confirmation Dialog -->
+    <v-dialog v-model="deleteDialog.show" max-width="440" theme="dark">
+      <v-card theme="dark" class="rounded-xl pa-6 border bg-surface">
+        <div class="d-flex align-center gap-3 mb-4">
+          <v-avatar color="red-darken-4" size="44">
+            <v-icon icon="mdi-alert" color="red-lighten-2" size="24"></v-icon>
+          </v-avatar>
+          <div>
+            <h3 class="text-h6 font-weight-bold text-white">Delete Event</h3>
+            <span class="text-caption text-grey">This action cannot be undone.</span>
+          </div>
+        </div>
+
+        <p class="text-body-2 text-grey-lighten-1 mb-6">
+          Are you sure you want to delete <strong>{{ event?.title }}</strong>? All showtimes, seat reservations, and
+          associated data will be permanently removed.
+        </p>
+
+        <div class="d-flex justify-end gap-3">
+          <v-btn variant="text" class="text-none font-weight-bold" :disabled="deleteDialog.deleting"
+            @click="deleteDialog.show = false">
+            Cancel
+          </v-btn>
+          <v-btn color="red-darken-1" variant="flat" class="text-none font-weight-bold px-6"
+            :loading="deleteDialog.deleting" @click="confirmDeleteEvent">
+            Yes, Delete Event
+          </v-btn>
+        </div>
+      </v-card>
+    </v-dialog>
 
     <!-- Global Snackbar -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3500" location="bottom right">
@@ -145,7 +182,7 @@
         <v-btn variant="text" @click="snackbar.show = false">Close</v-btn>
       </template>
     </v-snackbar>
-  </v-container>
+  </div>
 </template>
 
 <script setup>
@@ -249,21 +286,80 @@ async function saveSettings() {
   }
 }
 
+const deleteDialog = ref({
+  show: false,
+  deleting: false,
+});
+
+function openDeleteEventDialog() {
+  deleteDialog.value = {
+    show: true,
+    deleting: false,
+  };
+}
+
+async function confirmDeleteEvent() {
+  deleteDialog.value.deleting = true;
+  try {
+    await api.delete(`/events/${eventId}`);
+    deleteDialog.value.show = false;
+    showToast('Event deleted successfully', 'success');
+    setTimeout(() => {
+      router.push('/manage/events');
+    }, 500);
+  } catch (err) {
+    showToast(err.response?.data?.error || 'Failed to delete event', 'error');
+  } finally {
+    deleteDialog.value.deleting = false;
+  }
+}
+
 onMounted(() => {
   loadEvent();
 });
 </script>
 
 <style scoped>
-.sticky-sidebar {
-  position: sticky;
-  top: 80px;
-  z-index: 10;
+.manage-layout {
+  min-height: calc(100vh - 56px);
+  width: 100%;
+}
+
+.manage-layout-body {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 56px);
+  width: 100%;
+}
+
+@media (min-width: 960px) {
+  .manage-layout-body {
+    flex-direction: row;
+  }
+}
+
+.manage-main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 32px 48px;
 }
 
 .bg-surface {
   background: #181c27 !important;
   border-color: #2a3142 !important;
+}
+
+.border-red-darken-4 {
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+.delete-event-btn {
+  transition: all 0.2s ease;
+}
+
+.delete-event-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
 }
 
 .gap-2 {

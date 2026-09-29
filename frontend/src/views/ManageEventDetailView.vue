@@ -1,32 +1,20 @@
 <template>
-  <v-container fluid class="py-6 px-4 px-md-6 px-lg-8">
-    <!-- Back Navigation -->
-    <div class="mb-4">
-      <v-btn variant="text" prepend-icon="mdi-arrow-left" to="/manage/events" class="text-none font-weight-bold">
-        Back to Events
-      </v-btn>
-    </div>
-
+  <div class="manage-layout">
     <!-- Loading Skeleton -->
     <v-skeleton-loader v-if="loading" type="article, table, actions" theme="dark"
-      class="rounded-xl"></v-skeleton-loader>
+      class="rounded-xl ma-6"></v-skeleton-loader>
 
     <!-- Error State -->
-    <v-alert v-else-if="error" type="error" variant="tonal" class="rounded-xl mb-6">
+    <v-alert v-else-if="error" type="error" variant="tonal" class="rounded-xl ma-6">
       {{ error }}
     </v-alert>
 
-    <v-row v-else-if="event" class="mt-1">
-      <!-- Sidebar Column (Left) -->
-      <v-col cols="12" md="3" xl="2">
-        <div class="sticky-sidebar">
-          <EventSidebar :event="event" active-item="overview" @add-showtime="openAddShowtimeDialog"
-            @open-seat-map="openTheaterSeatMapSelector" @delete-event="openDeleteEventDialog" />
-        </div>
-      </v-col>
+    <div v-else-if="event" class="manage-layout-body">
+      <!-- Sidebar (Flush Left) -->
+      <EventSidebar :event="event" active-item="overview" @open-seat-map="openTheaterSeatMapSelector" />
 
       <!-- Main Content Column (Right) -->
-      <v-col cols="12" md="9" xl="10">
+      <main class="manage-main-content">
         <div class="d-flex flex-column gap-6">
           <!-- Event Header Card -->
           <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
@@ -53,7 +41,8 @@
                     Personal Limit: {{ event.max_seats_per_user || 10 }} seats / customer
                   </v-chip>
                   <span class="text-caption text-grey ml-2">
-                    {{ eventShowtimes.length }} {{ eventShowtimes.length === 1 ? 'Showtime session' : 'Showtime sessions' }}
+                    {{ eventShowtimes.length }} {{ eventShowtimes.length === 1 ?
+                      'Showtime session' : 'Showtime sessions' }}
                   </span>
                 </div>
               </div>
@@ -266,8 +255,8 @@
             </v-table>
           </v-card>
         </div>
-      </v-col>
-    </v-row>
+      </main>
+    </div>
 
     <!-- Showtime Dialog (Add / Edit) -->
     <v-dialog v-model="showtimeDialog.show" max-width="500">
@@ -343,7 +332,7 @@
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3000">
       {{ snackbar.text }}
     </v-snackbar>
-  </v-container>
+  </div>
 </template>
 
 <script setup>
@@ -610,9 +599,28 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.sticky-sidebar {
-  position: sticky;
-  top: 80px;
+.manage-layout {
+  min-height: calc(100vh - 56px);
+  width: 100%;
+}
+
+.manage-layout-body {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 56px);
+  width: 100%;
+}
+
+@media (min-width: 960px) {
+  .manage-layout-body {
+    flex-direction: row;
+  }
+}
+
+.manage-main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 32px 48px;
 }
 
 .bg-surface {

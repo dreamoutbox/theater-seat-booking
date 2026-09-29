@@ -1,33 +1,20 @@
 <template>
-  <v-container fluid class="py-6 px-4 px-md-6 px-lg-8">
-    <!-- Back Navigation -->
-    <div class="mb-4">
-      <v-btn variant="text" prepend-icon="mdi-arrow-left" :to="`/manage/events/${eventId}`"
-        class="text-none font-weight-bold">
-        Back to Event Details
-      </v-btn>
-    </div>
-
+  <div class="manage-layout">
     <!-- Loading Skeleton -->
     <v-skeleton-loader v-if="loading" type="article, table, actions" theme="dark"
-      class="rounded-xl"></v-skeleton-loader>
+      class="rounded-xl ma-6"></v-skeleton-loader>
 
     <!-- Error State -->
-    <v-alert v-else-if="error" type="error" variant="tonal" class="rounded-xl mb-6">
+    <v-alert v-else-if="error" type="error" variant="tonal" class="rounded-xl ma-6">
       {{ error }}
     </v-alert>
 
-    <v-row v-else-if="event" class="mt-1">
-      <!-- Sidebar Column (Left) -->
-      <v-col cols="12" md="3" xl="2">
-        <div class="sticky-sidebar">
-          <EventSidebar :event="event" active-item="financial-report" @add-showtime="goToEventDetails"
-            @open-seat-map="goToEventDetails" @delete-event="goToEventDetails" />
-        </div>
-      </v-col>
+    <div v-else-if="event" class="manage-layout-body">
+      <!-- Sidebar (Flush Left) -->
+      <EventSidebar :event="event" active-item="financial-report" />
 
       <!-- Main Content Column (Right) -->
-      <v-col cols="12" md="9" xl="10">
+      <main class="manage-main-content">
         <div class="d-flex flex-column gap-6">
           <!-- Header & Generator Card -->
           <v-card theme="dark" class="rounded-xl pa-6 border bg-surface" elevation="3">
@@ -247,14 +234,14 @@
             </v-table>
           </v-card>
         </div>
-      </v-col>
-    </v-row>
+      </main>
+    </div>
 
     <!-- Snackbar Notification -->
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="4000">
       {{ snackbar.text }}
     </v-snackbar>
-  </v-container>
+  </div>
 </template>
 
 <script setup>
@@ -424,9 +411,28 @@ onUnmounted(() => {
   border-color: #2a3142 !important;
 }
 
-.sticky-sidebar {
-  position: sticky;
-  top: 80px;
+.manage-layout {
+  min-height: calc(100vh - 56px);
+  width: 100%;
+}
+
+.manage-layout-body {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 56px);
+  width: 100%;
+}
+
+@media (min-width: 960px) {
+  .manage-layout-body {
+    flex-direction: row;
+  }
+}
+
+.manage-main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 32px 48px;
 }
 
 .kpi-card {

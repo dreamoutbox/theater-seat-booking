@@ -21,40 +21,40 @@
       Manage Events
     </v-btn>
 
-    <v-btn v-if="authStore.isGatekeeper || authStore.isElevated" variant="text" prepend-icon="mdi-qrcode-scan" to="/scan"
-      class="text-none font-weight-medium text-emerald-lighten-2">
+    <v-btn v-if="authStore.isGatekeeper || authStore.isElevated" variant="text" prepend-icon="mdi-qrcode-scan"
+      to="/scan" class="text-none font-weight-medium text-emerald-lighten-2">
       Scan Passes
     </v-btn>
 
-    <v-btn v-if="authStore.isAuthenticated && !authStore.isElevated && !authStore.isGatekeeper" variant="text" prepend-icon="mdi-ticket-confirmation" to="/orders"
-      class="text-none font-weight-medium">
+    <v-btn v-if="authStore.isAuthenticated && !authStore.isElevated && !authStore.isGatekeeper" variant="text"
+      prepend-icon="mdi-ticket-confirmation" to="/orders" class="text-none font-weight-medium">
       My Orders
     </v-btn>
 
     <v-divider vertical class="mx-3 my-2" v-if="authStore.isAuthenticated"></v-divider>
 
     <!-- Demo Role Switcher Menu -->
-    <v-menu location="bottom end">
+    <!-- <v-menu location="bottom end">
       <template #activator="{ props }">
         <v-btn v-bind="props" variant="outlined" color="amber-darken-1" size="small" prepend-icon="mdi-account-switch"
           class="text-none mr-2">
           Demo Switcher
         </v-btn>
       </template>
-      <v-list density="compact" bg-color="#1e222d" class="pa-1">
-        <v-list-subheader class="text-caption text-grey">SWITCH DEMO ACCOUNT</v-list-subheader>
-        <v-list-item v-for="acc in demoAccounts" :key="acc.email" @click="quickLogin(acc.email, acc.password)"
-          class="rounded mb-1" :active="authStore.user?.email === acc.email">
-          <template #prepend>
+<v-list density="compact" bg-color="#1e222d" class="pa-1">
+  <v-list-subheader class="text-caption text-grey">SWITCH DEMO ACCOUNT</v-list-subheader>
+  <v-list-item v-for="acc in demoAccounts" :key="acc.email" @click="quickLogin(acc.email, acc.password)"
+    class="rounded mb-1" :active="authStore.user?.email === acc.email">
+    <template #prepend>
             <v-chip size="x-small" :color="getRoleColor(acc.role)" class="mr-2 font-weight-bold">
               {{ acc.role.toUpperCase() }}
             </v-chip>
           </template>
-          <v-list-item-title class="text-body-2">{{ acc.label }}</v-list-item-title>
-          <v-list-item-subtitle class="text-caption text-grey">{{ acc.email }}</v-list-item-subtitle>
-        </v-list-item>
-      </v-list>
-    </v-menu>
+    <v-list-item-title class="text-body-2">{{ acc.label }}</v-list-item-title>
+    <v-list-item-subtitle class="text-caption text-grey">{{ acc.email }}</v-list-item-subtitle>
+  </v-list-item>
+</v-list>
+</v-menu> -->
 
     <!-- User Profile or Login -->
     <template v-if="authStore.isAuthenticated">
@@ -131,6 +131,7 @@ async function handleLogout() {
 .cursor-pointer {
   cursor: pointer;
 }
+
 .text-emerald-lighten-2 {
   color: #34d399 !important;
 }

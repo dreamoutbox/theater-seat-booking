@@ -1,40 +1,19 @@
 <template>
-  <v-container :fluid="authStore.isElevated" class="py-6 px-4 px-md-6 px-lg-8">
-    <!-- Elevated Management Layout (Admin / Staff / Event Organizer) -->
-    <v-row v-if="authStore.isElevated && (activeEvent || events.length > 0)" class="mt-1">
-      <!-- Sidebar Column (Left) -->
-      <v-col cols="12" md="3" xl="2">
-        <div class="sticky-sidebar d-flex flex-column gap-3">
-          <!-- Event Selector Card if multiple events exist -->
-          <v-card v-if="events.length > 1" theme="dark" class="rounded-xl border bg-surface pa-3" elevation="2">
-            <div class="d-flex align-center justify-space-between mb-2 px-1">
-              <span class="text-caption font-weight-bold text-grey text-uppercase tracking-wider">
-                Event Filter
-              </span>
-              <v-icon icon="mdi-filter-variant" color="amber-darken-1" size="16"></v-icon>
-            </div>
-            <v-select v-model="selectedEventId" :items="eventSelectItems" item-title="label" item-value="id"
-              variant="outlined" density="compact" hide-details class="event-selector"
-              @update:model-value="onSelectEvent"></v-select>
-          </v-card>
+  <!-- Elevated Management Layout (Admin / Staff / Event Organizer) -->
+  <div v-if="authStore.isElevated && (activeEvent || events.length > 0)" class="manage-layout-body">
+    <!-- Sidebar Column (Flush Left) -->
+    <EventSidebar v-if="activeEvent" :event="activeEvent" active-item="orders" />
 
-          <!-- Main Event Sidebar -->
-          <EventSidebar v-if="activeEvent" :event="activeEvent" active-item="orders" @add-showtime="goToEventDetails"
-            @open-seat-map="goToEventDetails" @delete-event="goToEventDetails" />
-        </div>
-      </v-col>
+    <!-- Main Content Column (Right) -->
+    <main class="manage-main-content">
+      <OrdersTable :scope="authStore.isElevated ? 'all' : 'own'" :event-id="activeEvent?.id"
+        :event-title="activeEvent?.title" />
+    </main>
+  </div>
 
-      <!-- Main Content Column (Right) -->
-      <v-col cols="12" md="9" xl="10">
-        <OrdersTable :scope="authStore.isElevated ? 'all' : 'own'" :event-id="activeEvent?.id"
-          :event-title="activeEvent?.title" />
-      </v-col>
-    </v-row>
-
-    <!-- Standard View (Customer or elevated without events) -->
-    <div v-else>
-      <OrdersTable :scope="authStore.isElevated ? 'all' : 'own'" />
-    </div>
+  <!-- Standard View (Customer or elevated without events) -->
+  <v-container v-else class="py-8 max-w-5xl">
+    <OrdersTable :scope="authStore.isElevated ? 'all' : 'own'" />
   </v-container>
 </template>
 
@@ -66,32 +45,7 @@ const activeEvent = computed(() => {
   return events.value.find((e) => e.id === selectedEventId.value) || null;
 });
 
-const eventSelectItems = computed(() => {
-  const items = events.value.map((e) => ({
-    id: e.id,
-    label: e.title,
-  }));
-  if (authStore.isAdmin || authStore.isStaff) {
-    items.unshift({ id: 'all', label: '— All System Events —' });
-  }
-  return items;
-});
 
-function goToEventDetails() {
-  if (activeEvent.value) {
-    router.push(`/manage/events/${activeEvent.value.id}`);
-  }
-}
-
-function onSelectEvent(newVal) {
-  if (!newVal || newVal === 'all') {
-    selectedEventId.value = null;
-    router.replace({ path: '/orders' });
-  } else {
-    selectedEventId.value = newVal;
-    router.replace({ path: '/orders', query: { event_id: newVal } });
-  }
-}
 
 async function loadEvents() {
   if (!authStore.isElevated) return;
@@ -131,10 +85,23 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.sticky-sidebar {
-  position: sticky;
-  top: 80px;
-  z-index: 10;
+.manage-layout-body {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 56px);
+  width: 100%;
+}
+
+@media (min-width: 960px) {
+  .manage-layout-body {
+    flex-direction: row;
+  }
+}
+
+.manage-main-content {
+  flex: 1;
+  min-width: 0;
+  padding: 0px 0px 1px;
 }
 
 .bg-surface {

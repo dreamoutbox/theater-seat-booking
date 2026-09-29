@@ -1,176 +1,110 @@
 <template>
-  <div class="event-sidebar-container d-flex flex-column gap-3">
-    <!-- Quick Actions Card -->
-    <v-card theme="dark" class="rounded-xl border bg-surface pa-3" elevation="2">
-      <div class="d-flex align-center justify-space-between mb-2 px-1">
-        <span class="text-caption font-weight-bold text-grey text-uppercase tracking-wider">
-          Quick Actions
-        </span>
-        <v-icon icon="mdi-flash" color="amber-darken-1" size="16"></v-icon>
+  <div class="bootstrap-sidebar">
+    <!-- Brand Header: Dream Cinema Logo on top of Event Title -->
+    <div class="sidebar-header pb-2">
+      <!-- Dream Cinema Logo -->
+      <!-- <div class="sidebar-brand-wrapper mb-2">
+        <router-link to="/" class="sidebar-brand-link d-inline-flex align-center">
+          <v-icon icon="mdi-theater" color="amber-darken-1" size="22" class="mr-2"></v-icon>
+          <span class="brand-text text-white font-weight-bold">
+            DREAM<span class="text-amber-darken-1 font-weight-light">CINEMA</span>
+          </span>
+        </router-link>
+      </div> -->
+
+      <!-- Event Title in Full (No ellipsis, wraps naturally) -->
+      <div class="event-title text-white font-weight-bold">
+        {{ event?.title || 'Manage Event' }}
       </div>
+    </div>
 
-      <div class="d-flex flex-column gap-2">
-        <!-- Add Showtime Button -->
-        <v-btn
-          color="amber-darken-1"
-          variant="flat"
-          block
-          size="small"
-          prepend-icon="mdi-calendar-plus"
-          class="text-none font-weight-bold action-btn"
-          @click="$emit('add-showtime')"
-        >
-          Add Showtime
-        </v-btn>
+    <!-- Divider -->
+    <hr class="sidebar-divider" />
 
-        <!-- Seat Map Editor Button -->
-        <v-btn
-          color="indigo-darken-1"
-          variant="flat"
-          block
-          size="small"
-          prepend-icon="mdi-seat-passenger"
-          class="text-none font-weight-bold action-btn"
-          @click="$emit('open-seat-map')"
-        >
-          Seat Map Editor
-        </v-btn>
-      </div>
-    </v-card>
+    <!-- Navigation List -->
+    <ul class="sidebar-nav">
+      <!-- Overview & Analytics -->
+      <li class="sidebar-nav-item">
+        <router-link :to="event ? `/manage/events/${event.id}` : '#'" class="sidebar-nav-link"
+          :class="{ active: activeItem === 'overview' }">
+          <v-icon icon="mdi-home-outline" size="18" class="sidebar-icon"></v-icon>
+          <span class="sidebar-label">Overview & Analytics</span>
+        </router-link>
+      </li>
 
-    <!-- Navigation Menu Card -->
-    <v-card theme="dark" class="rounded-xl border bg-surface pa-2" elevation="2">
-      <div class="d-flex align-center justify-space-between mb-1 px-2 pt-1">
-        <span class="text-caption font-weight-bold text-grey text-uppercase tracking-wider">
-          Event Navigation
-        </span>
-        <v-icon icon="mdi-tune-vertical" color="grey" size="16"></v-icon>
-      </div>
+      <!-- Seat Map Editor -->
+      <li class="sidebar-nav-item">
+        <button type="button" class="sidebar-nav-link" :class="{ active: activeItem === 'seat-map' }"
+          @click="handleSeatMapClick">
+          <v-icon icon="mdi-seat-passenger" size="18" class="sidebar-icon"></v-icon>
+          <span class="sidebar-label">Seat Map Editor</span>
+        </button>
+      </li>
 
-      <v-list density="compact" class="bg-transparent pa-0 nav-list">
-        <!-- Event Overview & Analytics -->
-        <v-list-item
-          :to="event ? `/manage/events/${event.id}` : '#'"
-          :active="activeItem === 'overview'"
-          rounded="lg"
-          class="mb-1 nav-item"
-          active-class="nav-item-active"
-        >
-          <template #prepend>
-            <v-icon icon="mdi-view-dashboard-outline" color="amber-lighten-2" size="18" class="mr-2"></v-icon>
-          </template>
-          <v-list-item-title class="font-weight-bold text-body-2">
-            Overview & Analytics
-          </v-list-item-title>
-          <v-list-item-subtitle class="text-caption text-grey">
-            Sessions & revenue KPIs
-          </v-list-item-subtitle>
-        </v-list-item>
+      <!-- Orders -->
+      <li class="sidebar-nav-item">
+        <router-link :to="event ? `/orders?event_id=${event.id}` : '/orders'" class="sidebar-nav-link"
+          :class="{ active: activeItem === 'orders' }">
+          <v-icon icon="mdi-table-large" size="18" class="sidebar-icon"></v-icon>
+          <span class="sidebar-label">Orders</span>
+        </router-link>
+      </li>
 
-        <!-- Gatekeepers (Scanner Staff) -->
-        <v-list-item
-          :to="event ? `/manage/events/${event.id}/gatekeepers` : '#'"
-          :active="activeItem === 'gatekeepers'"
-          rounded="lg"
-          class="mb-1 nav-item"
-          active-class="nav-item-active"
-        >
-          <template #prepend>
-            <v-icon icon="mdi-shield-account" color="teal-accent-3" size="18" class="mr-2"></v-icon>
-          </template>
-          <v-list-item-title class="font-weight-bold text-body-2">
-            Gatekeepers
-          </v-list-item-title>
-          <v-list-item-subtitle class="text-caption text-grey">
-            Scanner staff & access
-          </v-list-item-subtitle>
-        </v-list-item>
+      <!-- Gatekeepers -->
+      <li class="sidebar-nav-item">
+        <router-link :to="event ? `/manage/events/${event.id}/gatekeepers` : '#'" class="sidebar-nav-link"
+          :class="{ active: activeItem === 'gatekeepers' }">
+          <v-icon icon="mdi-shield-account-outline" size="18" class="sidebar-icon"></v-icon>
+          <span class="sidebar-label">Gatekeepers</span>
+        </router-link>
+      </li>
 
-        <!-- Financial & Tax Report -->
-        <v-list-item
-          :to="event ? `/manage/events/${event.id}/financial-reports` : '#'"
-          :active="activeItem === 'financial-report'"
-          rounded="lg"
-          class="mb-1 nav-item"
-          active-class="nav-item-active"
-        >
-          <template #prepend>
-            <v-icon icon="mdi-file-document-outline" color="amber-darken-1" size="18" class="mr-2"></v-icon>
-          </template>
-          <v-list-item-title class="font-weight-bold text-body-2">
-            Financial & Tax Reports
-          </v-list-item-title>
-          <v-list-item-subtitle class="text-caption text-grey">
-            Statements & tax filings
-          </v-list-item-subtitle>
-        </v-list-item>
+      <!-- Financial Reports -->
+      <li class="sidebar-nav-item">
+        <router-link :to="event ? `/manage/events/${event.id}/financial-reports` : '#'" class="sidebar-nav-link"
+          :class="{ active: activeItem === 'financial-report' }">
+          <v-icon icon="mdi-file-document-outline" size="18" class="sidebar-icon"></v-icon>
+          <span class="sidebar-label">Financial Reports</span>
+        </router-link>
+      </li>
 
-        <!-- Settings & Tax Info -->
-        <v-list-item
-          :to="event ? `/manage/events/${event.id}/settings` : '#'"
-          :active="activeItem === 'settings'"
-          rounded="lg"
-          class="mb-1 nav-item"
-          active-class="nav-item-active"
-        >
-          <template #prepend>
-            <v-icon icon="mdi-cog-outline" color="blue-grey-lighten-2" size="18" class="mr-2"></v-icon>
-          </template>
-          <v-list-item-title class="font-weight-bold text-body-2">
-            Settings & Tax Info
-          </v-list-item-title>
-          <v-list-item-subtitle class="text-caption text-grey">
-            Limits & organizer profile
-          </v-list-item-subtitle>
-        </v-list-item>
+      <!-- Settings & Tax Info -->
+      <li class="sidebar-nav-item">
+        <router-link :to="event ? `/manage/events/${event.id}/settings` : '#'" class="sidebar-nav-link"
+          :class="{ active: activeItem === 'settings' }">
+          <v-icon icon="mdi-cog-outline" size="18" class="sidebar-icon"></v-icon>
+          <span class="sidebar-label">Settings</span>
+        </router-link>
+      </li>
+    </ul>
 
-        <!-- Manage Orders -->
-        <v-list-item
-          :to="event ? `/orders?event_id=${event.id}` : '/orders'"
-          :active="activeItem === 'orders'"
-          rounded="lg"
-          class="mb-1 nav-item"
-          active-class="nav-item-active"
-        >
-          <template #prepend>
-            <v-icon icon="mdi-ticket-confirmation" color="amber-lighten-2" size="18" class="mr-2"></v-icon>
-          </template>
-          <v-list-item-title class="font-weight-bold text-body-2">
-            Manage Orders
-          </v-list-item-title>
-          <v-list-item-subtitle class="text-caption text-grey">
-            Orders & customer passes
-          </v-list-item-subtitle>
-        </v-list-item>
-      </v-list>
-    </v-card>
+    <!-- Bottom Footer: Back to Events / Details Navigation Link -->
+    <div class="sidebar-footer mt-auto pt-3">
+      <hr class="sidebar-divider mb-3" />
 
-    <!-- Danger Zone Card -->
-    <v-card theme="dark" class="rounded-xl border border-red-darken-4 bg-surface pa-3" elevation="2">
-      <div class="d-flex align-center justify-space-between mb-2 px-1">
-        <span class="text-caption font-weight-bold text-red-lighten-2 text-uppercase tracking-wider">
-          Danger Zone
-        </span>
-        <v-icon icon="mdi-alert-outline" color="red-lighten-2" size="16"></v-icon>
-      </div>
+      <!-- Subpage context: Back to Event Details -->
+      <router-link v-if="activeItem !== 'overview'" :to="event ? `/manage/events/${event.id}` : '/manage/events'"
+        class="sidebar-nav-link back-link mb-1">
+        <v-icon icon="mdi-arrow-left" size="18" class="sidebar-icon"></v-icon>
+        <span class="sidebar-label">Back to Event Details</span>
+      </router-link>
 
-      <v-btn
-        variant="outlined"
-        color="red-lighten-2"
-        block
-        size="small"
-        prepend-icon="mdi-delete-outline"
-        class="text-none font-weight-bold delete-btn"
-        @click="$emit('delete-event')"
-      >
-        Delete Event
-      </v-btn>
-    </v-card>
+      <!-- Back to all events -->
+      <router-link to="/manage/events" class="sidebar-nav-link back-link"
+        :class="{ 'opacity-75': activeItem !== 'overview' }">
+        <v-icon :icon="activeItem === 'overview' ? 'mdi-arrow-left' : 'mdi-view-grid-outline'" size="18"
+          class="sidebar-icon"></v-icon>
+        <span class="sidebar-label">{{ activeItem === 'overview' ? 'Back to Events' : 'Back to All Events' }}</span>
+      </router-link>
+    </div>
   </div>
 </template>
 
 <script setup>
-defineProps({
+import { useAttrs } from 'vue';
+import { useRouter } from 'vue-router';
+
+const props = defineProps({
   event: {
     type: Object,
     default: null,
@@ -181,76 +115,153 @@ defineProps({
   },
 });
 
-defineEmits(['add-showtime', 'open-seat-map', 'delete-event']);
+const emit = defineEmits(['open-seat-map']);
+const attrs = useAttrs();
+const router = useRouter();
+
+function handleSeatMapClick() {
+  if (attrs.onOpenSeatMap || attrs['onOpen-seat-map']) {
+    emit('open-seat-map');
+  } else {
+    router.push('/manage/seat-map');
+  }
+}
 </script>
 
 <style scoped>
-.event-sidebar-container {
+.bootstrap-sidebar {
+  width: 100%;
+  background-color: #212529;
+  /* Exact Bootstrap 5 bg-dark */
+  border-right: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: none;
+  border-left: none;
+  border-bottom: none;
+  border-radius: 0;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+@media (min-width: 960px) {
+  .bootstrap-sidebar {
+    width: 280px;
+    min-width: 280px;
+    max-width: 280px;
+    height: calc(100vh - 56px);
+    position: sticky;
+    top: 56px;
+    z-index: 10;
+  }
+}
+
+.sidebar-brand-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+.sidebar-brand-link {
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.sidebar-brand-link:hover {
+  opacity: 0.85;
+}
+
+.brand-text {
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.event-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+  white-space: normal;
+  color: #f8fafc;
+}
+
+.sidebar-divider {
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  margin: 12px 0 16px 0;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+
+.sidebar-nav-item {
   width: 100%;
 }
 
-.bg-surface {
-  background: #181c27 !important;
-  border-color: #2a3142 !important;
+.sidebar-nav-link {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+  text-align: left;
 }
 
-.border-red-darken-4 {
-  border-color: rgba(239, 68, 68, 0.25) !important;
+.sidebar-nav-link:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
 }
 
-.tracking-wider {
-  letter-spacing: 0.08em;
-  font-size: 0.7rem !important;
+.sidebar-nav-link.active {
+  background-color: #0d6efd !important;
+  /* Bootstrap primary blue */
+  color: #ffffff !important;
+  font-weight: 600;
 }
 
-.gap-2 {
-  gap: 8px;
+.sidebar-icon {
+  margin-right: 12px;
+  flex-shrink: 0;
+  color: inherit !important;
 }
 
-.gap-3 {
-  gap: 12px;
+.sidebar-label {
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.action-btn {
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  height: 36px !important;
+.sidebar-footer {
+  flex-shrink: 0;
 }
 
-.action-btn:hover {
-  transform: translateY(-1px);
+.back-link {
+  color: rgba(255, 255, 255, 0.7);
 }
 
-.nav-list {
-  background: transparent !important;
+.back-link:hover {
+  color: #ffffff;
+  background-color: rgba(255, 255, 255, 0.08);
 }
 
-.nav-item {
-  border: 1px solid transparent;
-  transition: all 0.2s ease;
-  padding: 6px 10px !important;
-  min-height: 42px !important;
-}
-
-.nav-item:hover {
-  background: #1e2330 !important;
-  border-color: #2a3142 !important;
-}
-
-.nav-item-active {
-  background: rgba(245, 158, 11, 0.12) !important;
-  border: 1px solid rgba(245, 158, 11, 0.35) !important;
-}
-
-.nav-item-active :deep(.v-list-item-title) {
-  color: #f59e0b !important;
-}
-
-.delete-btn {
-  transition: all 0.2s ease;
-  height: 34px !important;
-}
-
-.delete-btn:hover {
-  background: rgba(239, 68, 68, 0.1) !important;
+.opacity-75 {
+  opacity: 0.75;
 }
 </style>

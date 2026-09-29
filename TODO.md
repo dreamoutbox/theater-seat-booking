@@ -11,12 +11,17 @@
     - [x] view order test
     - [ ] refund test
 
-- [ ] redesign manage event page left sidebar panel
+- [x] redesign manage event page left sidebar panel
 
-- [ ] fix page at `http://localhost:5173/orders/<order-uuid>` missing left sidebar panel
+- [x] fix page at `http://localhost:5173/orders/<order-uuid>` missing left sidebar panel
+
+- [ ] move Scheduled Showtimes to new page & add link to left sidebar panel.
 
 - [ ] send email use outbox with send email worker
 
 - [ ] frontend remove test logins info
 
 - [ ] use THB instead of USD
+
+- [ ] loadtest. simulate 1000+ users sale for big event. 
+      skip stripe payment to prevent rate limit.

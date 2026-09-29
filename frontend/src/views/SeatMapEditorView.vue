@@ -1,19 +1,24 @@
 <template>
   <v-container fluid class="pa-2 max-w-full editor-container">
     <!-- Top Header & Actions Bar (Compact) -->
-    <div class="d-flex flex-wrap justify-space-between align-center gap-2 mb-2">
+    <div class="d-flex flex-wrap justify-space-between align-center gap-2 mb-3">
       <div>
-        <div class="d-flex align-center gap-2 mb-0">
-          <v-btn variant="text" size="small" density="compact" prepend-icon="mdi-arrow-left" to="/manage/theaters" class="text-none font-weight-bold mr-1">
-            Theaters
+        <div class="header-title-row d-flex align-baseline gap-2 mb-2 flex-wrap">
+          <v-btn variant="text" size="small" density="compact" prepend-icon="mdi-arrow-left" @click="goBack"
+            class="text-none font-weight-bold mr-1 back-btn">
+            <h2 class="text-h6">Back</h2>
           </v-btn>
-          <v-icon icon="mdi-seat-passenger" color="amber-darken-1" size="22"></v-icon>
-          <h1 class="text-h6 font-weight-bold text-white mb-0">Seat Map Editor</h1>
-          <v-chip v-if="currentTheaterName" size="small" color="indigo-lighten-2" variant="tonal" class="font-weight-bold ml-1">
+          <h1 class="header-heading text-h6 font-weight-bold text-white ma-0 d-inline-flex align-center">
+            <v-icon icon="mdi-seat-passenger" color="amber-darken-1" size="30" class="header-seat-icon mr-1"></v-icon>
+            <span>Seat Map Editor</span>
+          </h1>
+          <v-chip v-if="currentTheaterName" size="small" color="indigo-lighten-2" variant="tonal"
+            class="font-weight-bold ml-1 theater-chip">
             <v-icon start icon="mdi-theater" size="14"></v-icon>
             {{ currentTheaterName }}
           </v-chip>
-          <v-chip v-if="isModified" size="x-small" color="amber-darken-1" variant="flat" class="font-weight-bold ml-1">
+          <v-chip v-if="isModified" size="x-small" color="amber-darken-1" variant="flat"
+            class="font-weight-bold ml-1 unsaved-chip">
             Unsaved ({{ draftSeats.length }} seats)
           </v-chip>
         </div>
@@ -24,57 +29,27 @@
 
       <!-- Main Action Controls (Compact) -->
       <div class="d-flex align-center gap-2 flex-wrap">
-        <v-btn
-          prepend-icon="mdi-grid"
-          color="indigo-darken-1"
-          variant="flat"
-          size="small"
-          class="text-none font-weight-bold"
-          @click="openGridGeneratorDialog"
-        >
+        <v-btn prepend-icon="mdi-grid" color="indigo-darken-1" variant="flat" size="small"
+          class="text-none font-weight-bold" @click="openGridGeneratorDialog">
           Seat Generator
         </v-btn>
 
-        <v-btn
-          prepend-icon="mdi-plus"
-          variant="outlined"
-          size="small"
-          class="text-none font-weight-bold"
-          @click="openAddSeatDialog"
-        >
+        <v-btn prepend-icon="mdi-plus" variant="outlined" size="small" class="text-none font-weight-bold"
+          @click="openAddSeatDialog">
           Add Seat
         </v-btn>
 
-        <v-btn
-          prepend-icon="mdi-tag-multiple"
-          variant="outlined"
-          size="small"
-          class="text-none font-weight-bold"
-          @click="openZoneManagerDialog"
-        >
+        <v-btn prepend-icon="mdi-tag-multiple" variant="outlined" size="small" class="text-none font-weight-bold"
+          @click="openZoneManagerDialog">
           Zones ({{ draftZones.length }})
         </v-btn>
 
-        <v-btn
-          v-if="isModified"
-          variant="text"
-          size="small"
-          color="grey"
-          class="text-none"
-          @click="discardChanges"
-        >
+        <v-btn v-if="isModified" variant="text" size="small" color="grey" class="text-none" @click="discardChanges">
           Discard
         </v-btn>
 
-        <v-btn
-          color="amber-darken-1"
-          variant="flat"
-          prepend-icon="mdi-content-save"
-          size="small"
-          class="text-none font-weight-bold"
-          :loading="saving"
-          @click="saveLayout"
-        >
+        <v-btn color="amber-darken-1" variant="flat" prepend-icon="mdi-content-save" size="small"
+          class="text-none font-weight-bold" :loading="saving" @click="saveLayout">
           Save Layout
         </v-btn>
       </div>
@@ -89,15 +64,13 @@
           <div class="d-flex justify-space-between align-center mb-2 flex-wrap gap-2">
             <!-- Zone Legend -->
             <div class="d-flex align-center gap-2 flex-wrap">
-              <span class="text-caption text-grey font-weight-bold text-uppercase" style="font-size: 10px;">Zones:</span>
-              <div
-                v-for="zone in draftZones"
-                :key="zone.id"
-                class="d-flex align-center gap-1 zone-legend-badge"
-              >
+              <span class="text-caption text-grey font-weight-bold text-uppercase"
+                style="font-size: 10px;">Zones:</span>
+              <div v-for="zone in draftZones" :key="zone.id" class="d-flex align-center gap-1 zone-legend-badge">
                 <div class="zone-color-dot" :style="{ background: getZoneColorHex(zone.name) }"></div>
                 <span class="text-caption text-white font-weight-bold" style="font-size: 11px;">{{ zone.name }}</span>
-                <span class="text-caption text-grey font-weight-mono" style="font-size: 10px;">(${{ (zone.price_cents / 100).toFixed(2) }})</span>
+                <span class="text-caption text-grey font-weight-mono" style="font-size: 10px;">(${{ (zone.price_cents /
+                  100).toFixed(2) }})</span>
               </div>
             </div>
 
@@ -106,40 +79,27 @@
               <!-- Visible Columns Selector -->
               <div class="d-flex align-center gap-1">
                 <span class="text-caption text-grey" style="font-size: 11px;">Cols:</span>
-                <v-select
-                  v-model="gridColumnsCount"
-                  :items="[20, 30, 40, 50, 75, 100]"
-                  variant="outlined"
-                  density="compact"
-                  hide-details
-                  style="width: 75px;"
-                ></v-select>
+                <v-select v-model="gridColumnsCount" :items="[20, 30, 40, 50, 75, 100]" variant="outlined"
+                  density="compact" hide-details style="width: 75px;"></v-select>
               </div>
 
               <!-- Visible Rows Selector -->
               <div class="d-flex align-center gap-1">
                 <span class="text-caption text-grey" style="font-size: 11px;">Rows:</span>
-                <v-select
-                  v-model="gridRowsSpan"
-                  :items="[
-                    { title: 'A–Z (26)', value: 'Z' },
-                    { title: 'A–AZ (52)', value: 'AZ' },
-                    { title: 'A–BZ (78)', value: 'BZ' },
-                    { title: 'A–ZZ (702)', value: 'ZZ' },
-                  ]"
-                  item-title="title"
-                  item-value="value"
-                  variant="outlined"
-                  density="compact"
-                  hide-details
-                  style="width: 115px;"
-                ></v-select>
+                <v-select v-model="gridRowsSpan" :items="[
+                  { title: 'A–Z (26)', value: 'Z' },
+                  { title: 'A–AZ (52)', value: 'AZ' },
+                  { title: 'A–BZ (78)', value: 'BZ' },
+                  { title: 'A–ZZ (702)', value: 'ZZ' },
+                ]" item-title="title" item-value="value" variant="outlined" density="compact" hide-details
+                  style="width: 115px;"></v-select>
               </div>
 
               <v-btn size="x-small" variant="text" color="amber-darken-1" class="text-none" @click="selectAllSeats">
                 Select All ({{ draftSeats.length }})
               </v-btn>
-              <v-btn v-if="selectedSeatKeys.size > 0" size="x-small" variant="text" color="grey" class="text-none" @click="clearSelection">
+              <v-btn v-if="selectedSeatKeys.size > 0" size="x-small" variant="text" color="grey" class="text-none"
+                @click="clearSelection">
                 Deselect ({{ selectedSeatKeys.size }})
               </v-btn>
             </div>
@@ -153,24 +113,15 @@
           </div>
 
           <!-- Interactive Drag Canvas -->
-          <div
-            ref="canvasRef"
-            class="seat-canvas-container"
+          <div ref="canvasRef" class="seat-canvas-container"
             :class="{ 'cursor-move-active': dragAction.type === 'move' || dragAction.type === 'locked_move' }"
-            @mousedown="handleCanvasMouseDown"
-            @mousemove="handleCanvasMouseMove"
-            @mouseup="handleCanvasMouseUp"
-            @mouseleave="handleCanvasMouseUp"
-          >
+            @mousedown="handleCanvasMouseDown" @mousemove="handleCanvasMouseMove" @mouseup="handleCanvasMouseUp"
+            @mouseleave="handleCanvasMouseUp">
             <!-- Floating Ghost Badge for Drag-Moving Locked Seat -->
-            <div
-              v-if="dragAction.type === 'locked_move' && dragAction.clickedSeat"
-              class="locked-drag-ghost"
-              :style="{
-                left: `${dragAction.currentClientX + 16}px`,
-                top: `${dragAction.currentClientY + 16}px`,
-              }"
-            >
+            <div v-if="dragAction.type === 'locked_move' && dragAction.clickedSeat" class="locked-drag-ghost" :style="{
+              left: `${dragAction.currentClientX + 16}px`,
+              top: `${dragAction.currentClientY + 16}px`,
+            }">
               <div class="d-flex align-center gap-1">
                 <v-icon icon="mdi-lock" size="12" color="amber-darken-1"></v-icon>
                 <span class="font-weight-bold">
@@ -186,26 +137,19 @@
             </div>
 
             <!-- Marquee Selection Rectangle Overlay -->
-            <div
-              v-if="marquee.active"
-              class="marquee-selection-box"
-              :style="{
-                left: `${marquee.left}px`,
-                top: `${marquee.top}px`,
-                width: `${marquee.width}px`,
-                height: `${marquee.height}px`,
-              }"
-            ></div>
+            <div v-if="marquee.active" class="marquee-selection-box" :style="{
+              left: `${marquee.left}px`,
+              top: `${marquee.top}px`,
+              width: `${marquee.width}px`,
+              height: `${marquee.height}px`,
+            }"></div>
 
             <!-- Grid Header Column Numbers (1 to gridMaxCols) -->
             <div class="d-flex align-center gap-1 mb-1">
               <div class="row-header-placeholder"></div>
               <div class="d-flex align-center gap-1 seat-row-items">
-                <div
-                  v-for="col in gridMaxCols"
-                  :key="col"
-                  class="col-header-number text-caption text-grey font-weight-bold font-weight-mono"
-                >
+                <div v-for="col in gridMaxCols" :key="col"
+                  class="col-header-number text-caption text-grey font-weight-bold font-weight-mono">
                   {{ col }}
                 </div>
               </div>
@@ -214,22 +158,13 @@
 
             <!-- Rows of Grid Slots (A..Z, AA..ZZ) -->
             <div class="d-flex flex-column gap-1">
-              <div
-                v-for="row in gridRows"
-                :key="row.label"
-                class="seat-row d-flex align-center gap-1"
-              >
+              <div v-for="row in gridRows" :key="row.label" class="seat-row d-flex align-center gap-1">
                 <!-- Row Left Selector Header Button -->
-                <button
-                  type="button"
-                  class="row-header-btn"
-                  :class="{
-                    'row-header-selected': isRowFullySelected(row.label),
-                    'row-header-empty': !hasSeatsInRow(row.label),
-                  }"
-                  :title="`Click to toggle selection for Row ${row.label}`"
-                  @click.stop="toggleRowSelection(row.label)"
-                >
+                <button type="button" class="row-header-btn" :class="{
+                  'row-header-selected': isRowFullySelected(row.label),
+                  'row-header-empty': !hasSeatsInRow(row.label),
+                }" :title="`Click to toggle selection for Row ${row.label}`"
+                  @click.stop="toggleRowSelection(row.label)">
                   {{ row.label }}
                 </button>
 
@@ -237,19 +172,15 @@
                 <div class="d-flex align-center gap-1 seat-row-items">
                   <template v-for="slot in row.slots" :key="`${slot.rowLabel}-${slot.seatNumber}`">
                     <!-- Case 1: Active Seat exists -->
-                    <div
-                      v-if="slot.seat"
-                      :ref="el => registerSlotElement(el, slot.rowLabel, slot.seatNumber)"
-                      class="seat-node"
-                      :class="{
+                    <div v-if="slot.seat" :ref="el => registerSlotElement(el, slot.rowLabel, slot.seatNumber)"
+                      class="seat-node" :class="{
                         'seat-node-selected': isSeatSelected(slot.rowLabel, slot.seatNumber),
                         'seat-node-move-preview': isSlotInMovePreview(slot.rowLabel, slot.seatNumber),
                         'seat-node-locked': isSeatLocked(slot.seat),
                         'locked-seat-being-dragged': isSeatBeingDragged(slot.seat),
                         'locked-target-valid': isSlotLockedMoveTargetValid(slot.rowLabel, slot.seatNumber),
                         'locked-target-invalid': isSlotLockedMoveTargetInvalid(slot.rowLabel, slot.seatNumber),
-                      }"
-                      :style="{
+                      }" :style="{
                         borderColor: isSeatLocked(slot.seat)
                           ? '#ef4444'
                           : getZoneColorHex(getZoneName(slot.seat.zone_id)),
@@ -260,44 +191,27 @@
                             : getZoneBgColorHex(getZoneName(slot.seat.zone_id)),
                       }"
                       :title="isSeatLocked(slot.seat)
-                        ? `🔒 LOCKED: Row ${slot.rowLabel}, Seat ${slot.seatNumber} is booked in '${getBookedSeatInfo(slot.seat)?.event_title || 'Show'}' (${getBookedSeatInfo(slot.seat)?.order_id ? 'Order #' + getBookedSeatInfo(slot.seat).order_id.substring(0,8) : 'Held'}) • Drag to reassign • Right-click to view order`
+                        ? `🔒 LOCKED: Row ${slot.rowLabel}, Seat ${slot.seatNumber} is booked in '${getBookedSeatInfo(slot.seat)?.event_title || 'Show'}' (${getBookedSeatInfo(slot.seat)?.order_id ? 'Order #' + getBookedSeatInfo(slot.seat).order_id.substring(0, 8) : 'Held'}) • Drag to reassign • Right-click to view order`
                         : `Row ${slot.rowLabel}, Seat ${slot.seatNumber} (${getZoneName(slot.seat.zone_id)} - $${(getZonePrice(slot.seat.zone_id) / 100).toFixed(2)}) • Drag to move`"
-                      :data-row="slot.rowLabel"
-                      :data-seat="slot.seatNumber"
-                      @contextmenu.prevent.stop="handleSeatContextMenu($event, slot.seat)"
-                    >
+                      :data-row="slot.rowLabel" :data-seat="slot.seatNumber"
+                      @contextmenu.prevent.stop="handleSeatContextMenu($event, slot.seat)">
                       <span class="seat-number-label">{{ slot.seatNumber }}</span>
-                      <v-icon
-                        v-if="isSeatLocked(slot.seat)"
-                        icon="mdi-lock"
-                        size="11"
-                        color="red-accent-2"
-                        class="locked-seat-icon"
-                      ></v-icon>
-                      <v-icon
-                        v-else-if="isSeatSelected(slot.rowLabel, slot.seatNumber)"
-                        icon="mdi-check"
-                        size="11"
-                        color="amber-darken-1"
-                        class="selected-check-icon"
-                      ></v-icon>
+                      <v-icon v-if="isSeatLocked(slot.seat)" icon="mdi-lock" size="11" color="red-accent-2"
+                        class="locked-seat-icon"></v-icon>
+                      <v-icon v-else-if="isSeatSelected(slot.rowLabel, slot.seatNumber)" icon="mdi-check" size="11"
+                        color="amber-darken-1" class="selected-check-icon"></v-icon>
                     </div>
 
                     <!-- Case 2: Empty Grid Slot (Walkway or Vacant Slot) -->
-                    <div
-                      v-else
-                      :ref="el => registerSlotElement(el, slot.rowLabel, slot.seatNumber)"
-                      class="empty-grid-slot"
-                      :class="{
+                    <div v-else :ref="el => registerSlotElement(el, slot.rowLabel, slot.seatNumber)"
+                      class="empty-grid-slot" :class="{
                         'hint-slot-active': isSlotInHint(slot.rowLabel, slot.seatNumber),
                         'seat-node-move-target': isSlotInMovePreview(slot.rowLabel, slot.seatNumber),
                         'locked-target-valid': isSlotLockedMoveTargetValid(slot.rowLabel, slot.seatNumber),
                         'locked-target-invalid': isSlotLockedMoveTargetInvalid(slot.rowLabel, slot.seatNumber),
                       }"
                       :title="`Empty Slot: Row ${slot.rowLabel}, Seat ${slot.seatNumber} (Click or drag to create seat)`"
-                      :data-row="slot.rowLabel"
-                      :data-seat="slot.seatNumber"
-                    >
+                      :data-row="slot.rowLabel" :data-seat="slot.seatNumber">
                       <template v-if="isSlotInHint(slot.rowLabel, slot.seatNumber)">
                         <v-icon icon="mdi-plus" size="10" color="amber-darken-1"></v-icon>
                         <span class="hint-label">{{ slot.rowLabel }}{{ slot.seatNumber }}</span>
@@ -326,10 +240,12 @@
           <!-- Sidebar Header -->
           <div class="d-flex justify-space-between align-center mb-2">
             <div class="d-flex align-center gap-1">
-              <v-icon icon="mdi-checkbox-multiple-marked" :color="selectedSeatKeys.size > 0 ? 'amber-darken-1' : 'grey'" size="18"></v-icon>
+              <v-icon icon="mdi-checkbox-multiple-marked" :color="selectedSeatKeys.size > 0 ? 'amber-darken-1' : 'grey'"
+                size="18"></v-icon>
               <h3 class="text-subtitle-2 font-weight-bold text-white mb-0">Selection Actions</h3>
             </div>
-            <v-chip size="x-small" :color="selectedSeatKeys.size > 0 ? 'amber-darken-1' : 'grey'" variant="flat" class="font-weight-bold">
+            <v-chip size="x-small" :color="selectedSeatKeys.size > 0 ? 'amber-darken-1' : 'grey'" variant="flat"
+              class="font-weight-bold">
               {{ selectedSeatKeys.size }} selected
             </v-chip>
           </div>
@@ -342,47 +258,41 @@
           </div>
 
           <!-- Reassign Locked Seat Drag Active Indicator -->
-          <div v-else-if="dragAction.type === 'locked_move'" class="pa-2 rounded-lg bg-teal-darken-4 border mb-2 text-caption">
+          <div v-else-if="dragAction.type === 'locked_move'"
+            class="pa-2 rounded-lg bg-teal-darken-4 border mb-2 text-caption">
             <v-icon icon="mdi-swap-horizontal" size="14" class="mr-1 text-amber-accent-2"></v-icon>
-            <strong class="text-amber-accent-2">Reassigning Seat {{ dragAction.clickedSeat?.row_label }}{{ dragAction.clickedSeat?.seat_number }}...</strong>
+            <strong class="text-amber-accent-2">Reassigning Seat {{ dragAction.clickedSeat?.row_label }}{{
+              dragAction.clickedSeat?.seat_number }}...</strong>
             <div class="text-caption text-grey-lighten-2" style="font-size: 10px;">
               Release mouse over an unbooked seat to open Change Seat Assignment
             </div>
           </div>
 
           <!-- Hint Slots creation prompt if empty slots dragged -->
-          <div v-else-if="hintSlotsToCreate.size > 0 && selectedSeatKeys.size === 0" class="pa-2 rounded-lg bg-indigo-darken-4 border mb-2">
+          <div v-else-if="hintSlotsToCreate.size > 0 && selectedSeatKeys.size === 0"
+            class="pa-2 rounded-lg bg-indigo-darken-4 border mb-2">
             <div class="d-flex align-center gap-1 mb-1">
               <v-icon icon="mdi-creation" color="amber-darken-1" size="16"></v-icon>
-              <span class="text-caption font-weight-bold text-white">{{ hintSlotsToCreate.size }} Empty Slots Selected</span>
+              <span class="text-caption font-weight-bold text-white">{{ hintSlotsToCreate.size }} Empty Slots
+                Selected</span>
             </div>
             <div class="text-caption text-grey-lighten-2 mb-2" style="font-size: 11px;">
-              Rows <strong>{{ inferredRange.startRow }}–{{ inferredRange.endRow }}</strong> (Cols {{ inferredRange.startSeat }}–{{ inferredRange.endSeat }}).
+              Rows <strong>{{ inferredRange.startRow }}–{{ inferredRange.endRow }}</strong> (Cols {{
+                inferredRange.startSeat
+              }}–{{ inferredRange.endSeat }}).
             </div>
-            <v-btn
-              color="amber-darken-1"
-              variant="flat"
-              block
-              size="x-small"
-              prepend-icon="mdi-plus"
-              class="text-none font-weight-bold mb-1"
-              @click="createSeatsFromHintSlots"
-            >
+            <v-btn color="amber-darken-1" variant="flat" block size="x-small" prepend-icon="mdi-plus"
+              class="text-none font-weight-bold mb-1" @click="createSeatsFromHintSlots">
               Create {{ hintSlotsToCreate.size }} Seats Here
             </v-btn>
-            <v-btn
-              variant="text"
-              block
-              size="x-small"
-              class="text-none text-grey"
-              @click="hintSlotsToCreate.clear()"
-            >
+            <v-btn variant="text" block size="x-small" class="text-none text-grey" @click="hintSlotsToCreate.clear()">
               Cancel
             </v-btn>
           </div>
 
           <!-- Empty selection helper -->
-          <div v-else-if="selectedSeatKeys.size === 0" class="pa-2 rounded-lg bg-surface-variant border border-dashed mb-2 text-center">
+          <div v-else-if="selectedSeatKeys.size === 0"
+            class="pa-2 rounded-lg bg-surface-variant border border-dashed mb-2 text-center">
             <v-icon icon="mdi-cursor-default-click" size="18" color="grey" class="mb-1"></v-icon>
             <div class="text-caption text-grey font-weight-medium" style="font-size: 11px;">No seats selected</div>
             <div class="text-caption text-grey-darken-1 mt-1" style="font-size: 10px;">
@@ -401,27 +311,12 @@
             <label class="text-caption text-grey font-weight-bold text-uppercase d-block mb-1" style="font-size: 10px;">
               REASSIGN ZONE
             </label>
-            <v-select
-              v-model="bulkZoneId"
-              :items="draftZones"
-              :item-title="item => `${item.name} ($${(item.price_cents / 100).toFixed(2)})`"
-              item-value="id"
-              variant="outlined"
-              density="compact"
-              hide-details
-              placeholder="Select Zone..."
-              :disabled="selectedSeatKeys.size === 0"
-              class="mb-1"
-            ></v-select>
-            <v-btn
-              color="indigo-darken-1"
-              variant="flat"
-              block
-              size="x-small"
-              class="text-none font-weight-bold"
-              :disabled="selectedSeatKeys.size === 0 || !bulkZoneId"
-              @click="applyBulkZone"
-            >
+            <v-select v-model="bulkZoneId" :items="draftZones"
+              :item-title="item => `${item.name} ($${(item.price_cents / 100).toFixed(2)})`" item-value="id"
+              variant="outlined" density="compact" hide-details placeholder="Select Zone..."
+              :disabled="selectedSeatKeys.size === 0" class="mb-1"></v-select>
+            <v-btn color="indigo-darken-1" variant="flat" block size="x-small" class="text-none font-weight-bold"
+              :disabled="selectedSeatKeys.size === 0 || !bulkZoneId" @click="applyBulkZone">
               Apply to {{ selectedSeatKeys.size }} Seats
             </v-btn>
           </div>
@@ -434,23 +329,11 @@
               RENAME ROW
             </label>
             <div class="d-flex gap-1">
-              <v-text-field
-                v-model="bulkRowLabel"
-                placeholder="e.g. AA"
-                variant="outlined"
-                density="compact"
-                hide-details
-                maxlength="4"
-                :disabled="selectedSeatKeys.size === 0"
-                class="text-uppercase"
-              ></v-text-field>
-              <v-btn
-                variant="outlined"
-                size="small"
-                class="text-none font-weight-bold"
-                :disabled="selectedSeatKeys.size === 0 || !bulkRowLabel.trim()"
-                @click="applyBulkRowLabel"
-              >
+              <v-text-field v-model="bulkRowLabel" placeholder="e.g. AA" variant="outlined" density="compact"
+                hide-details maxlength="4" :disabled="selectedSeatKeys.size === 0"
+                class="text-uppercase"></v-text-field>
+              <v-btn variant="outlined" size="small" class="text-none font-weight-bold"
+                :disabled="selectedSeatKeys.size === 0 || !bulkRowLabel.trim()" @click="applyBulkRowLabel">
                 Apply
               </v-btn>
             </div>
@@ -460,15 +343,8 @@
 
           <!-- Action 3: Quick Generator from Selection -->
           <div class="mb-2">
-            <v-btn
-              color="indigo-darken-1"
-              variant="outlined"
-              block
-              size="x-small"
-              prepend-icon="mdi-grid"
-              class="text-none font-weight-bold"
-              @click="openGridGeneratorDialog"
-            >
+            <v-btn color="indigo-darken-1" variant="outlined" block size="x-small" prepend-icon="mdi-grid"
+              class="text-none font-weight-bold" @click="openGridGeneratorDialog">
               Seat Generator Wizard
             </v-btn>
           </div>
@@ -477,27 +353,14 @@
 
           <!-- Action 4: Bulk Delete & Clear -->
           <div class="d-flex flex-column gap-1">
-            <v-btn
-              color="red-darken-1"
-              variant="flat"
-              block
-              size="small"
-              prepend-icon="mdi-trash-can-outline"
-              class="text-none font-weight-bold"
-              :disabled="selectedSeatKeys.size === 0"
-              @click="bulkDeleteSelectedSeats"
-            >
+            <v-btn color="red-darken-1" variant="flat" block size="small" prepend-icon="mdi-trash-can-outline"
+              class="text-none font-weight-bold" :disabled="selectedSeatKeys.size === 0"
+              @click="bulkDeleteSelectedSeats">
               Delete {{ selectedSeatKeys.size }} Seats
             </v-btn>
 
-            <v-btn
-              v-if="selectedSeatKeys.size > 0"
-              variant="outlined"
-              block
-              size="x-small"
-              class="text-none"
-              @click="clearSelection"
-            >
+            <v-btn v-if="selectedSeatKeys.size > 0" variant="outlined" block size="x-small" class="text-none"
+              @click="clearSelection">
               Deselect All
             </v-btn>
           </div>
@@ -514,67 +377,35 @@
         </v-card-title>
         <v-card-text>
           <div class="text-caption text-grey mb-3">
-            Generate rows (supports <strong>A..Z</strong> and <strong>AA..ZZ</strong>) and seat numbers up to <strong>100</strong>.
+            Generate rows (supports <strong>A..Z</strong> and <strong>AA..ZZ</strong>) and seat numbers up to
+            <strong>100</strong>.
           </div>
 
           <v-row dense class="mb-2">
             <v-col cols="6">
-              <v-text-field
-                v-model="gridDialog.startRow"
-                label="Start Row (e.g. A, AA)"
-                placeholder="A"
-                variant="outlined"
-                density="comfortable"
-                class="text-uppercase"
-              ></v-text-field>
+              <v-text-field v-model="gridDialog.startRow" label="Start Row (e.g. A, AA)" placeholder="A"
+                variant="outlined" density="comfortable" class="text-uppercase"></v-text-field>
             </v-col>
             <v-col cols="6">
-              <v-text-field
-                v-model="gridDialog.endRow"
-                label="End Row (e.g. Z, ZZ)"
-                placeholder="Z"
-                variant="outlined"
-                density="comfortable"
-                class="text-uppercase"
-              ></v-text-field>
+              <v-text-field v-model="gridDialog.endRow" label="End Row (e.g. Z, ZZ)" placeholder="Z" variant="outlined"
+                density="comfortable" class="text-uppercase"></v-text-field>
             </v-col>
           </v-row>
 
           <v-row dense class="mb-2">
             <v-col cols="6">
-              <v-text-field
-                v-model.number="gridDialog.startSeat"
-                label="Start Seat Number"
-                type="number"
-                min="1"
-                max="100"
-                variant="outlined"
-                density="comfortable"
-              ></v-text-field>
+              <v-text-field v-model.number="gridDialog.startSeat" label="Start Seat Number" type="number" min="1"
+                max="100" variant="outlined" density="comfortable"></v-text-field>
             </v-col>
             <v-col cols="6">
-              <v-text-field
-                v-model.number="gridDialog.endSeat"
-                label="End Seat Number"
-                type="number"
-                min="1"
-                max="100"
-                variant="outlined"
-                density="comfortable"
-              ></v-text-field>
+              <v-text-field v-model.number="gridDialog.endSeat" label="End Seat Number" type="number" min="1" max="100"
+                variant="outlined" density="comfortable"></v-text-field>
             </v-col>
           </v-row>
 
-          <v-select
-            v-model="gridDialog.zoneId"
-            label="Default Zone"
-            :items="draftZones"
-            :item-title="item => `${item.name} ($${(item.price_cents / 100).toFixed(2)})`"
-            item-value="id"
-            variant="outlined"
-            density="comfortable"
-            class="mb-3"
-          ></v-select>
+          <v-select v-model="gridDialog.zoneId" label="Default Zone" :items="draftZones"
+            :item-title="item => `${item.name} ($${(item.price_cents / 100).toFixed(2)})`" item-value="id"
+            variant="outlined" density="comfortable" class="mb-3"></v-select>
 
           <v-radio-group v-model="gridDialog.mode" inline density="compact">
             <v-radio label="Append to existing layout" value="append"></v-radio>
@@ -582,19 +413,18 @@
           </v-radio-group>
 
           <v-alert type="info" variant="tonal" density="compact" class="rounded-lg">
-            Will generate <strong>{{ calculatedGridCount }}</strong> seat(s) across rows <strong>{{ (gridDialog.startRow || 'A').toUpperCase() }}–{{ (gridDialog.endRow || 'Z').toUpperCase() }}</strong> (Seats {{ gridDialog.startSeat }}–{{ gridDialog.endSeat }}).
+            Will generate <strong>{{ calculatedGridCount }}</strong> seat(s) across rows <strong>{{ (gridDialog.startRow
+              ||
+              'A').toUpperCase() }}–{{ (gridDialog.endRow || 'Z').toUpperCase() }}</strong> (Seats {{
+                gridDialog.startSeat
+              }}–{{ gridDialog.endSeat }}).
           </v-alert>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
           <v-btn variant="text" @click="gridDialog.show = false">Cancel</v-btn>
           <v-spacer></v-spacer>
-          <v-btn
-            color="amber-darken-1"
-            variant="flat"
-            class="font-weight-bold text-none"
-            :disabled="calculatedGridCount <= 0 || !gridDialog.zoneId"
-            @click="executeGridGenerator"
-          >
+          <v-btn color="amber-darken-1" variant="flat" class="font-weight-bold text-none"
+            :disabled="calculatedGridCount <= 0 || !gridDialog.zoneId" @click="executeGridGenerator">
             Generate {{ calculatedGridCount }} Seats
           </v-btn>
         </v-card-actions>
@@ -606,33 +436,13 @@
       <v-card theme="dark" class="rounded-xl pa-4 border bg-surface">
         <v-card-title class="text-h6 font-weight-bold">Add Individual Seat</v-card-title>
         <v-card-text>
-          <v-text-field
-            v-model="singleSeatDialog.rowLabel"
-            label="Row Label (e.g. A, AA, ZZ)"
-            placeholder="e.g. AA"
-            variant="outlined"
-            density="comfortable"
-            class="text-uppercase mb-2"
-          ></v-text-field>
-          <v-text-field
-            v-model.number="singleSeatDialog.seatNumber"
-            label="Seat Number (1–100)"
-            type="number"
-            min="1"
-            max="100"
-            variant="outlined"
-            density="comfortable"
-            class="mb-2"
-          ></v-text-field>
-          <v-select
-            v-model="singleSeatDialog.zoneId"
-            label="Zone Tier"
-            :items="draftZones"
-            :item-title="item => `${item.name} ($${(item.price_cents / 100).toFixed(2)})`"
-            item-value="id"
-            variant="outlined"
-            density="comfortable"
-          ></v-select>
+          <v-text-field v-model="singleSeatDialog.rowLabel" label="Row Label (e.g. A, AA, ZZ)" placeholder="e.g. AA"
+            variant="outlined" density="comfortable" class="text-uppercase mb-2"></v-text-field>
+          <v-text-field v-model.number="singleSeatDialog.seatNumber" label="Seat Number (1–100)" type="number" min="1"
+            max="100" variant="outlined" density="comfortable" class="mb-2"></v-text-field>
+          <v-select v-model="singleSeatDialog.zoneId" label="Zone Tier" :items="draftZones"
+            :item-title="item => `${item.name} ($${(item.price_cents / 100).toFixed(2)})`" item-value="id"
+            variant="outlined" density="comfortable"></v-select>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
           <v-btn variant="text" @click="singleSeatDialog.show = false">Cancel</v-btn>
@@ -652,7 +462,8 @@
             <v-icon icon="mdi-palette" color="amber-darken-1" size="22"></v-icon>
             <span>Manage Pricing Zones & Colors</span>
           </div>
-          <v-btn size="small" color="amber-darken-1" variant="flat" prepend-icon="mdi-plus" class="text-none font-weight-bold" @click="addNewDraftZone">
+          <v-btn size="small" color="amber-darken-1" variant="flat" prepend-icon="mdi-plus"
+            class="text-none font-weight-bold" @click="addNewDraftZone">
             New Zone
           </v-btn>
         </v-card-title>
@@ -673,90 +484,47 @@
             <tbody>
               <tr v-for="(z, idx) in draftZones" :key="z.id">
                 <td class="py-2">
-                  <v-text-field
-                    v-model="z.name"
-                    placeholder="e.g. VIP Lounge"
-                    variant="outlined"
-                    density="compact"
-                    hide-details
-                  ></v-text-field>
+                  <v-text-field v-model="z.name" placeholder="e.g. VIP Lounge" variant="outlined" density="compact"
+                    hide-details></v-text-field>
                 </td>
                 <td>
-                  <v-text-field
-                    :model-value="(z.price_cents / 100).toFixed(2)"
-                    prefix="$"
-                    type="number"
-                    step="0.50"
-                    min="0"
-                    variant="outlined"
-                    density="compact"
-                    hide-details
-                    @update:model-value="val => z.price_cents = Math.round(parseFloat(val || 0) * 100)"
-                  ></v-text-field>
+                  <v-text-field :model-value="(z.price_cents / 100).toFixed(2)" prefix="$" type="number" step="0.50"
+                    min="0" variant="outlined" density="compact" hide-details
+                    @update:model-value="val => z.price_cents = Math.round(parseFloat(val || 0) * 100)"></v-text-field>
                 </td>
                 <td class="py-2">
                   <div class="d-flex align-center gap-2">
                     <!-- Native color picker wrapper -->
-                    <div
-                      class="color-picker-wrapper"
-                      :style="{ background: z.color || '#14b8a6' }"
-                      :title="`Pick color (${z.color || '#14b8a6'})`"
-                    >
-                      <input
-                        type="color"
-                        :value="z.color || '#14b8a6'"
-                        class="native-color-input"
-                        @input="e => z.color = e.target.value"
-                      />
+                    <div class="color-picker-wrapper" :style="{ background: z.color || '#14b8a6' }"
+                      :title="`Pick color (${z.color || '#14b8a6'})`">
+                      <input type="color" :value="z.color || '#14b8a6'" class="native-color-input"
+                        @input="e => z.color = e.target.value" />
                     </div>
 
                     <!-- Hex Code Input -->
-                    <v-text-field
-                      v-model="z.color"
-                      placeholder="#14b8a6"
-                      variant="outlined"
-                      density="compact"
-                      hide-details
-                      class="font-weight-mono text-caption"
-                      style="max-width: 95px;"
-                    ></v-text-field>
+                    <v-text-field v-model="z.color" placeholder="#14b8a6" variant="outlined" density="compact"
+                      hide-details class="font-weight-mono text-caption" style="max-width: 95px;"></v-text-field>
 
                     <!-- Standard Color Preset Swatches -->
                     <div class="d-flex align-center gap-1">
-                      <button
-                        v-for="preset in PRESET_ZONE_COLORS.slice(0, 5)"
-                        :key="preset.hex"
-                        type="button"
+                      <button v-for="preset in PRESET_ZONE_COLORS.slice(0, 5)" :key="preset.hex" type="button"
                         class="preset-color-dot"
                         :class="{ 'preset-selected': z.color?.toLowerCase() === preset.hex.toLowerCase() }"
-                        :style="{ background: preset.hex }"
-                        :title="`${preset.name} (${preset.hex})`"
-                        @click="z.color = preset.hex"
-                      ></button>
+                        :style="{ background: preset.hex }" :title="`${preset.name} (${preset.hex})`"
+                        @click="z.color = preset.hex"></button>
                       <v-menu offset-y>
                         <template #activator="{ props: menuProps }">
-                          <v-btn
-                            v-bind="menuProps"
-                            icon="mdi-dots-horizontal"
-                            size="x-small"
-                            variant="text"
-                            color="grey"
-                            title="More colors"
-                          ></v-btn>
+                          <v-btn v-bind="menuProps" icon="mdi-dots-horizontal" size="x-small" variant="text"
+                            color="grey" title="More colors"></v-btn>
                         </template>
                         <v-card theme="dark" class="pa-2 border rounded-lg bg-surface" style="width: 170px;">
                           <div class="text-caption text-grey mb-1 font-weight-bold">Presets</div>
                           <div class="d-flex flex-wrap gap-1">
-                            <button
-                              v-for="preset in PRESET_ZONE_COLORS"
-                              :key="preset.hex"
-                              type="button"
+                            <button v-for="preset in PRESET_ZONE_COLORS" :key="preset.hex" type="button"
                               class="preset-color-dot-lg"
                               :class="{ 'preset-selected': z.color?.toLowerCase() === preset.hex.toLowerCase() }"
-                              :style="{ background: preset.hex }"
-                              :title="`${preset.name} (${preset.hex})`"
-                              @click="z.color = preset.hex"
-                            ></button>
+                              :style="{ background: preset.hex }" :title="`${preset.name} (${preset.hex})`"
+                              @click="z.color = preset.hex"></button>
                           </div>
                         </v-card>
                       </v-menu>
@@ -764,14 +532,8 @@
                   </div>
                 </td>
                 <td class="text-right">
-                  <v-btn
-                    icon="mdi-delete-outline"
-                    size="small"
-                    variant="text"
-                    color="red-lighten-2"
-                    :disabled="draftZones.length <= 1"
-                    @click="removeDraftZone(idx)"
-                  ></v-btn>
+                  <v-btn icon="mdi-delete-outline" size="small" variant="text" color="red-lighten-2"
+                    :disabled="draftZones.length <= 1" @click="removeDraftZone(idx)"></v-btn>
                 </td>
               </tr>
             </tbody>
@@ -779,7 +541,8 @@
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
           <v-spacer></v-spacer>
-          <v-btn color="amber-darken-1" variant="flat" class="font-weight-bold text-none px-6" @click="zoneDialog.show = false">
+          <v-btn color="amber-darken-1" variant="flat" class="font-weight-bold text-none px-6"
+            @click="zoneDialog.show = false">
             Done
           </v-btn>
         </v-card-actions>
@@ -798,8 +561,10 @@
               <h3 class="text-h6 font-weight-bold text-white">Change Seat Assignment</h3>
               <span class="text-caption text-grey">
                 Reassign booking for <strong>{{ changeSeatDialog.eventTitle }}</strong>
-                <span v-if="changeSeatDialog.userEmail" class="ml-1 text-grey-lighten-1">({{ changeSeatDialog.userEmail }})</span>
-                <span v-if="changeSeatDialog.orderId" class="ml-1 text-amber-accent-2 font-mono">• Order #{{ changeSeatDialog.orderId.substring(0, 8) }}</span>
+                <span v-if="changeSeatDialog.userEmail" class="ml-1 text-grey-lighten-1">({{ changeSeatDialog.userEmail
+                }})</span>
+                <span v-if="changeSeatDialog.orderId" class="ml-1 text-amber-accent-2 font-mono">• Order #{{
+                  changeSeatDialog.orderId.substring(0, 8) }}</span>
               </span>
             </div>
           </div>
@@ -836,7 +601,9 @@
                   Row {{ changeSeatDialog.newSeat.row_label }}, Seat {{ changeSeatDialog.newSeat.seat_number }}
                 </span>
                 <span class="text-caption text-grey">
-                  ({{ changeSeatDialog.newSeat.zone_name }} - ${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2) }})
+                  ({{ changeSeatDialog.newSeat.zone_name }} - ${{ (changeSeatDialog.newSeat.price_cents /
+                    100).toFixed(2)
+                  }})
                 </span>
               </div>
               <div v-else class="text-caption text-grey-lighten-1 font-italic">
@@ -864,34 +631,18 @@
               <div class="d-flex align-center gap-1">
                 <template v-for="slot in row.slots" :key="`${row.label}-${slot.seatNumber}`">
                   <!-- Seat exists -->
-                  <button
-                    v-if="slot.seat"
-                    type="button"
-                    class="picker-seat-node"
-                    :class="{
-                      'picker-seat-selected': changeSeatDialog.newSeat?.id === slot.seat.id,
-                      'picker-seat-current': slot.seat.id === changeSeatDialog.oldSeat?.seat_id,
-                      'picker-seat-unavailable': isSeatUnavailableInChangeModal(slot.seat),
-                    }"
-                    :disabled="isSeatUnavailableInChangeModal(slot.seat)"
-                    :style="getChangeModalSeatStyle(slot.seat)"
+                  <button v-if="slot.seat" type="button" class="picker-seat-node" :class="{
+                    'picker-seat-selected': changeSeatDialog.newSeat?.id === slot.seat.id,
+                    'picker-seat-current': slot.seat.id === changeSeatDialog.oldSeat?.seat_id,
+                    'picker-seat-unavailable': isSeatUnavailableInChangeModal(slot.seat),
+                  }" :disabled="isSeatUnavailableInChangeModal(slot.seat)" :style="getChangeModalSeatStyle(slot.seat)"
                     :title="`Row ${slot.seat.row_label}, Seat ${slot.seat.seat_number} (${slot.seat.zone_name}) - ${slot.seat.status === 'available' ? 'Available' : 'Unavailable'}`"
-                    @click="selectNewSeatInModal(slot.seat)"
-                  >
+                    @click="selectNewSeatInModal(slot.seat)">
                     <span class="picker-seat-label">{{ slot.seat.seat_number }}</span>
-                    <v-icon
-                      v-if="changeSeatDialog.newSeat?.id === slot.seat.id"
-                      icon="mdi-check"
-                      size="10"
-                      color="white"
-                      class="picker-check"
-                    ></v-icon>
-                    <v-icon
-                      v-else-if="isSeatUnavailableInChangeModal(slot.seat)"
-                      icon="mdi-lock"
-                      size="10"
-                      color="grey"
-                    ></v-icon>
+                    <v-icon v-if="changeSeatDialog.newSeat?.id === slot.seat.id" icon="mdi-check" size="10"
+                      color="white" class="picker-check"></v-icon>
+                    <v-icon v-else-if="isSeatUnavailableInChangeModal(slot.seat)" icon="mdi-lock" size="10"
+                      color="grey"></v-icon>
                   </button>
                   <!-- Empty walkway slot -->
                   <div v-else class="picker-empty-slot"></div>
@@ -906,65 +657,47 @@
         <div v-if="changeSeatDialog.newSeat" class="mb-4">
           <div
             v-if="authStore.isElevated && changeSeatDialog.newSeat.price_cents > (changeSeatDialog.oldSeat?.price_cents || 0)"
-            class="pa-3 rounded-lg border bg-surface-variant mb-3"
-          >
+            class="pa-3 rounded-lg border bg-surface-variant mb-3">
             <div class="d-flex align-center justify-space-between flex-wrap gap-2">
               <div>
                 <div class="d-flex align-center gap-2">
-                  <v-icon
-                    :icon="changeSeatDialog.isFreeUpgrade ? 'mdi-gift-outline' : 'mdi-currency-usd'"
-                    :color="changeSeatDialog.isFreeUpgrade ? 'purple-accent-2' : 'amber-darken-1'"
-                  ></v-icon>
+                  <v-icon :icon="changeSeatDialog.isFreeUpgrade ? 'mdi-gift-outline' : 'mdi-currency-usd'"
+                    :color="changeSeatDialog.isFreeUpgrade ? 'purple-accent-2' : 'amber-darken-1'"></v-icon>
                   <span class="font-weight-bold text-white text-body-2">Free Upgrade / Complimentary Move</span>
                 </div>
                 <div class="text-caption text-grey mt-1">
                   <span v-if="changeSeatDialog.isFreeUpgrade">
-                    Order total remains <strong>${{ ((changeSeatDialog.oldSeat?.price_cents || 0) / 100).toFixed(2) }}</strong>.
+                    Order total remains <strong>${{ ((changeSeatDialog.oldSeat?.price_cents || 0) / 100).toFixed(2)
+                    }}</strong>.
                     No extra charge will be billed to the customer.
                   </span>
                   <span v-else>
-                    Order total will be updated to <strong>${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2) }}</strong>
-                    (+${{ (((changeSeatDialog.newSeat.price_cents || 0) - (changeSeatDialog.oldSeat?.price_cents || 0)) / 100).toFixed(2) }} price difference).
+                    Order total will be updated to <strong>${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2)
+                    }}</strong>
+                    (+${{ (((changeSeatDialog.newSeat.price_cents || 0) - (changeSeatDialog.oldSeat?.price_cents || 0))
+                      /
+                      100).toFixed(2) }} price difference).
                   </span>
                 </div>
               </div>
-              <v-switch
-                v-model="changeSeatDialog.isFreeUpgrade"
-                color="purple-accent-2"
-                hide-details
-                density="compact"
-                inset
-              ></v-switch>
+              <v-switch v-model="changeSeatDialog.isFreeUpgrade" color="purple-accent-2" hide-details density="compact"
+                inset></v-switch>
             </div>
           </div>
 
-          <v-text-field
-            v-model="changeSeatDialog.reason"
-            label="Reason for Seat Change (Optional)"
-            placeholder="e.g. Operational reseating, Customer request, Dragged from seat map"
-            density="compact"
-            variant="outlined"
-            hide-details
-          ></v-text-field>
+          <v-text-field v-model="changeSeatDialog.reason" label="Reason for Seat Change (Optional)"
+            placeholder="e.g. Operational reseating, Customer request, Dragged from seat map" density="compact"
+            variant="outlined" hide-details></v-text-field>
         </div>
 
         <div class="d-flex justify-end gap-3">
-          <v-btn
-            variant="text"
-            class="text-none font-weight-bold"
-            :disabled="changeSeatDialog.submitting"
-            @click="changeSeatDialog.show = false"
-          >
+          <v-btn variant="text" class="text-none font-weight-bold" :disabled="changeSeatDialog.submitting"
+            @click="changeSeatDialog.show = false">
             Cancel
           </v-btn>
-          <v-btn
-            color="amber-darken-1"
-            variant="flat"
-            class="text-none font-weight-bold px-6"
-            :loading="changeSeatDialog.submitting"
-            :disabled="!changeSeatDialog.newSeat"
-            @click="handleConfirmChangeSeat"
-          >
+          <v-btn color="amber-darken-1" variant="flat" class="text-none font-weight-bold px-6"
+            :loading="changeSeatDialog.submitting" :disabled="!changeSeatDialog.newSeat"
+            @click="handleConfirmChangeSeat">
             Confirm Change to Row {{ changeSeatDialog.newSeat?.row_label }}{{ changeSeatDialog.newSeat?.seat_number }}
           </v-btn>
         </div>
@@ -977,41 +710,23 @@
     </v-snackbar>
 
     <!-- Right-Click Context Menu on Locked / Booked Seat -->
-    <v-menu
-      v-model="contextMenu.show"
-      :target="[contextMenu.x, contextMenu.y]"
-      theme="dark"
-      location="bottom start"
-    >
+    <v-menu v-model="contextMenu.show" :target="[contextMenu.x, contextMenu.y]" theme="dark" location="bottom start">
       <v-list density="compact" class="rounded-lg bg-surface border elevation-8" style="min-width: 220px;">
         <v-list-subheader class="font-weight-bold text-caption text-grey text-uppercase px-3 py-1">
           Seat {{ contextMenu.seat?.row_label }}{{ contextMenu.seat?.seat_number }}
         </v-list-subheader>
 
-        <v-list-item
-          v-if="contextMenu.bookingInfo?.order_id"
-          prepend-icon="mdi-open-in-new"
-          title="Go to Order"
+        <v-list-item v-if="contextMenu.bookingInfo?.order_id" prepend-icon="mdi-open-in-new" title="Go to Order"
           :subtitle="`Order #${contextMenu.bookingInfo.order_id.substring(0, 8)} • ${contextMenu.bookingInfo.event_title}`"
           class="text-teal-accent-3 font-weight-bold cursor-pointer"
-          @click="openOrderPage(contextMenu.bookingInfo.order_id)"
-        ></v-list-item>
+          @click="openOrderPage(contextMenu.bookingInfo.order_id)"></v-list-item>
 
-        <v-list-item
-          v-else-if="contextMenu.bookingInfo"
-          prepend-icon="mdi-clock-outline"
-          title="Seat Held in Queue"
+        <v-list-item v-else-if="contextMenu.bookingInfo" prepend-icon="mdi-clock-outline" title="Seat Held in Queue"
           :subtitle="`${contextMenu.bookingInfo.event_title} (${contextMenu.bookingInfo.user_email || 'In Progress'})`"
-          disabled
-        ></v-list-item>
+          disabled></v-list-item>
 
-        <v-list-item
-          v-else
-          prepend-icon="mdi-check-circle-outline"
-          title="Available (No Bookings)"
-          subtitle="Seat is free to modify"
-          disabled
-        ></v-list-item>
+        <v-list-item v-else prepend-icon="mdi-check-circle-outline" title="Available (No Bookings)"
+          subtitle="Seat is free to modify" disabled></v-list-item>
       </v-list>
     </v-menu>
   </v-container>
@@ -1019,12 +734,21 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, reactive } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import api from '../api/client';
 
 const route = useRoute();
+const router = useRouter();
 const authStore = useAuthStore();
+
+function goBack() {
+  if (window.history.length > 1) {
+    router.back();
+  } else {
+    router.push('/manage/theaters');
+  }
+}
 
 const theaters = ref([]);
 const selectedTheaterId = ref(null);
@@ -2704,5 +2428,36 @@ onUnmounted(() => {
   background: #f59e0b;
   border-radius: 50%;
   padding: 1px;
+}
+
+.header-title-row {
+  align-items: baseline !important;
+}
+
+.header-heading {
+  margin: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 1.2 !important;
+}
+
+.header-seat-icon {
+  display: inline-flex !important;
+  align-items: center !important;
+  margin-top: -1px;
+}
+
+.back-btn {
+  transform: translateY(4.5px);
+}
+
+.theater-chip {
+  align-self: baseline !important;
+  transform: translateY(4.3px);
+}
+
+.unsaved-chip {
+  align-self: baseline !important;
+  transform: translateY(4.3px);
 }
 </style>
