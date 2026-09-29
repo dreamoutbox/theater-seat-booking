@@ -14,7 +14,10 @@ echo "=========================================="
 
 # 2. Run Playwright tests in frontend
 echo ""
+echo "=========================================="
 echo "🚀 Executing Playwright E2E Tests..."
 echo "=========================================="
+
 cd frontend
+
 pnpm exec playwright test "$@"

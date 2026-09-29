@@ -189,7 +189,19 @@ impl StripeService {
             ("amount", amount_cents.to_string()),
         ];
         if let Some(r) = reason {
-            params.push(("reason", r.to_string()));
+            let trimmed = r.trim();
+            if !trimmed.is_empty() {
+                // Stripe strictly restricts the `reason` enum parameter to one of:
+                // `duplicate`, `fraudulent`, or `requested_by_customer`.
+                // Free-text notes are stored in `metadata[reason]`.
+                let stripe_reason = match trimmed {
+                    "duplicate" => "duplicate",
+                    "fraudulent" => "fraudulent",
+                    _ => "requested_by_customer",
+                };
+                params.push(("reason", stripe_reason.to_string()));
+                params.push(("metadata[reason]", trimmed.to_string()));
+            }
         }
 
         let response = self
@@ -220,5 +232,49 @@ impl StripeService {
             .map_err(|e| format!("Failed to parse Stripe refund response: {e}"))?;
 
         Ok(refund_res.id)
+    }
+
+    pub async fn find_successful_payment_intent_by_order_id(
+        &self,
+        order_id: &str,
+    ) -> Result<Option<String>, String> {
+        if self.secret_key.is_empty() || self.secret_key.starts_with("sk_test_mock") {
+            return Ok(None);
+        }
+
+        let query = format!("metadata['order_id']:'{order_id}' AND status:'succeeded'");
+        let response = self
+            .client
+            .get("https://api.stripe.com/v1/payment_intents/search")
+            .bearer_auth(&self.secret_key)
+            .query(&[("query", query)])
+            .send()
+            .await
+            .map_err(|e| format!("Failed to search Stripe payment intents: {e}"))?;
+
+        if !response.status().is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown Stripe error".to_string());
+            return Err(format!("Stripe search API error: {error_text}"));
+        }
+
+        #[derive(Deserialize)]
+        struct StripeSearchResult {
+            data: Vec<StripePaymentIntentItem>,
+        }
+
+        #[derive(Deserialize)]
+        struct StripePaymentIntentItem {
+            id: String,
+        }
+
+        let search_res: StripeSearchResult = response
+            .json()
+            .await
+            .map_err(|e| format!("Failed to parse Stripe search response: {e}"))?;
+
+        Ok(search_res.data.into_iter().next().map(|item| item.id))
     }
 }

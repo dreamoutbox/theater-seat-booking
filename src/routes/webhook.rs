@@ -114,6 +114,32 @@ pub async fn stripe_webhook(
     match event_type.as_str() {
         "payment_intent.succeeded" | "checkout.session.completed" => {
             if let Some(oid) = order_id {
+                // Ensure order's stripe_payment_intent_id matches the actual charged PaymentIntent
+                let actual_pi_id = if event_type == "checkout.session.completed" {
+                    data_object
+                        .and_then(|o| o.get("payment_intent"))
+                        .and_then(|v| v.as_str())
+                } else {
+                    data_object
+                        .and_then(|o| o.get("id"))
+                        .and_then(|v| v.as_str())
+                };
+
+                if let Some(pi_id) = actual_pi_id {
+                    if !pi_id.is_empty() {
+                        if let Err(e) =
+                            OrderRepository::update_stripe_payment_intent_id(&mut *tx, oid, pi_id)
+                                .await
+                        {
+                            tracing::warn!(
+                                order_id = %oid,
+                                error = %e,
+                                "Failed to update stripe_payment_intent_id on order"
+                            );
+                        }
+                    }
+                }
+
                 // Guard: check current status to handle both events firing for the same order
                 let current_status = OrderRepository::find_status_by_id_for_update(&mut *tx, oid)
                     .await

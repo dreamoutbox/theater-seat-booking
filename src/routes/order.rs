@@ -432,6 +432,20 @@ pub async fn confirm_mock_order(
             )
         })?;
 
+    // Mark as mock payment so future refunds do not fail on real Stripe gateway
+    OrderRepository::update_stripe_payment_intent_id(
+        &mut *tx,
+        order_id,
+        &format!("pi_mock_{order_id}"),
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
     // 2.1 Assign sequential Thai tax invoice running number (INV-YYYYMM-XXXXX)
     let event_id = OrderRepository::find_event_id_by_order_id(&mut *tx, order_id)
         .await
@@ -782,14 +796,70 @@ pub async fn refund_order(
     // 6. Call Stripe refund if stripe_payment_intent_id exists
     let stripe_refund_id = match &stripe_payment_intent_id {
         Some(pi) if !pi.is_empty() => {
-            let res = state.stripe.create_refund(pi, refund_amount_cents, payload.reason.as_deref())
-                .await
-                .map_err(|e| {
-                    (
+            let refund_res = state
+                .stripe
+                .create_refund(pi, refund_amount_cents, payload.reason.as_deref())
+                .await;
+
+            let res = match refund_res {
+                Ok(ref_id) => ref_id,
+                Err(e) if e.contains("does not have a successful charge to refund") => {
+                    tracing::warn!(
+                        order_id = %order_id,
+                        payment_intent = %pi,
+                        "Stored payment intent has no charge to refund, searching Stripe for succeeded payment intent"
+                    );
+                    match state
+                        .stripe
+                        .find_successful_payment_intent_by_order_id(&order_id.to_string())
+                        .await
+                    {
+                        Ok(Some(actual_pi)) => {
+                            tracing::info!(
+                                order_id = %order_id,
+                                actual_payment_intent = %actual_pi,
+                                "Found succeeded payment intent, updating order and retrying refund"
+                            );
+                            let _ = OrderRepository::update_stripe_payment_intent_id(
+                                &mut *tx, order_id, &actual_pi,
+                            )
+                            .await;
+                            state
+                                .stripe
+                                .create_refund(
+                                    &actual_pi,
+                                    refund_amount_cents,
+                                    payload.reason.as_deref(),
+                                )
+                                .await
+                                .map_err(|retry_err| {
+                                    (
+                                        StatusCode::INTERNAL_SERVER_ERROR,
+                                        Json(serde_json::json!({
+                                            "error": format!("Payment gateway refund failed: {retry_err}")
+                                        })),
+                                    )
+                                })?
+                        }
+                        _ => {
+                            return Err((
+                                StatusCode::INTERNAL_SERVER_ERROR,
+                                Json(serde_json::json!({
+                                    "error": format!("Payment gateway refund failed: {e}")
+                                })),
+                            ));
+                        }
+                    }
+                }
+                Err(e) => {
+                    return Err((
                         StatusCode::INTERNAL_SERVER_ERROR,
-                        Json(serde_json::json!({ "error": format!("Payment gateway refund failed: {e}") })),
-                    )
-                })?;
+                        Json(serde_json::json!({
+                            "error": format!("Payment gateway refund failed: {e}")
+                        })),
+                    ));
+                }
+            };
             Some(res)
         }
         _ => None,
