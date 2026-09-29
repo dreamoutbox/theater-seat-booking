@@ -28,12 +28,8 @@
               </v-btn>
             </template>
             <v-list density="compact" bg-color="#1e222d">
-              <v-list-item
-                v-for="s in allShowtimes"
-                :key="s.id"
-                :to="`/booking/${s.id}`"
-                :active="s.id === props.showtimeId"
-              >
+              <v-list-item v-for="s in allShowtimes" :key="s.id" :to="`/booking/${s.id}`"
+                :active="s.id === props.showtimeId">
                 <v-list-item-title class="text-caption">
                   {{ s.event_title }} — {{ formatDate(s.starts_at) }}
                 </v-list-item-title>
@@ -48,28 +44,20 @@
     <v-row v-if="currentShowtime">
       <!-- Left Column: Seat Map (Fills Width Screen) -->
       <v-col cols="12" md="8" lg="9" xl="9">
-        <SeatMap
-          ref="seatMapRef"
-          :theater-id="currentShowtime.theater_id"
-          :showtime-id="props.showtimeId"
-          @held-seats-changed="onHeldSeatsChanged"
-        />
+        <SeatMap ref="seatMapRef" :theater-id="currentShowtime.theater_id" :showtime-id="props.showtimeId"
+          @held-seats-changed="onHeldSeatsChanged" />
       </v-col>
 
       <!-- Right Column: Order Summary & Selected Held Seats -->
       <v-col cols="12" md="4" lg="3" xl="3">
-        <v-card theme="dark" class="rounded-xl pa-5 border bg-surface h-100 d-flex flex-column justify-space-between" elevation="4">
+        <v-card theme="dark" class="rounded-xl pa-5 border bg-surface h-100 d-flex flex-column justify-space-between"
+          elevation="4">
           <div>
             <div class="d-flex justify-space-between align-center mb-3">
               <h2 class="text-h6 font-weight-bold text-white mb-0">Your Reservation</h2>
               <!-- Timer Badge -->
-              <v-chip
-                v-if="myHeldSeats.length > 0 && countdownSeconds > 0"
-                size="small"
-                color="warning"
-                variant="flat"
-                class="font-weight-bold font-weight-mono"
-              >
+              <v-chip v-if="myHeldSeats.length > 0 && countdownSeconds > 0" size="small" color="warning" variant="flat"
+                class="font-weight-bold font-weight-mono">
                 <v-icon start icon="mdi-timer-outline" size="14"></v-icon>
                 {{ formattedCountdown }}
               </v-chip>
@@ -87,52 +75,34 @@
                 <span class="text-caption text-grey font-weight-bold text-uppercase">
                   SELECTED HELD SEATS ({{ myHeldSeats.length }})
                 </span>
-                <v-btn
-                  v-if="myHeldSeats.length > 1 && !pendingOrder"
-                  variant="text"
-                  color="red-lighten-2"
-                  size="x-small"
-                  class="text-none px-1"
-                  :disabled="cancellingSeatId !== null"
-                  @click="handleCancelAllSeats"
-                >
+                <v-btn v-if="myHeldSeats.length > 1 && !pendingOrder" variant="text" color="red-lighten-2"
+                  size="x-small" class="text-none px-1" :disabled="cancellingSeatId !== null"
+                  @click="handleCancelAllSeats">
                   Cancel All
                 </v-btn>
               </div>
 
               <!-- Empty State -->
-              <div v-if="myHeldSeats.length === 0" class="text-center pa-6 rounded-lg bg-surface-variant border border-dashed">
+              <div v-if="myHeldSeats.length === 0"
+                class="text-center pa-6 rounded-lg bg-surface-variant border border-dashed">
                 <v-icon icon="mdi-seat-outline" size="36" color="grey" class="mb-2"></v-icon>
                 <div class="text-caption text-grey">No seats selected yet</div>
-                <div class="text-caption text-grey-darken-1 mt-1">Click on any available seat on the map to hold it.</div>
+                <div class="text-caption text-grey-darken-1 mt-1">Click on any available seat on the map to hold it.
+                </div>
               </div>
 
               <!-- List of Selected Held Seats -->
               <div v-else class="d-flex flex-column gap-2">
                 <!-- Pending order banner -->
-                <v-alert
-                  v-if="pendingOrder"
-                  type="warning"
-                  variant="tonal"
-                  density="compact"
-                  icon="mdi-lock-outline"
-                  class="mb-2 text-caption"
-                >
+                <v-alert v-if="pendingOrder" type="warning" variant="tonal" density="compact" icon="mdi-lock-outline"
+                  class="mb-2 text-caption">
                   Payment in progress. Seats are locked.
-                  <v-btn
-                    :to="`/orders/${pendingOrder.id}`"
-                    size="x-small"
-                    variant="text"
-                    color="amber-darken-1"
-                    class="ml-1 text-none font-weight-bold"
-                  >View Order →</v-btn>
+                  <v-btn :to="`/orders/${pendingOrder.id}`" size="x-small" variant="text" color="amber-darken-1"
+                    class="ml-1 text-none font-weight-bold">View Order →</v-btn>
                 </v-alert>
 
-                <div
-                  v-for="seat in myHeldSeats"
-                  :key="seat.id"
-                  class="d-flex justify-space-between align-center pa-3 rounded-lg bg-surface-variant border"
-                >
+                <div v-for="seat in myHeldSeats" :key="seat.id"
+                  class="d-flex justify-space-between align-center pa-3 rounded-lg bg-surface-variant border">
                   <div class="d-flex align-center gap-2">
                     <v-chip size="x-small" :color="getZoneColor(seat)" variant="flat" class="font-weight-bold">
                       {{ seat.row_label }}{{ seat.seat_number }}
@@ -150,17 +120,11 @@
                       ${{ (seat.price_cents / 100).toFixed(2) }}
                     </span>
                     <!-- Cancel button hidden when order is pending -->
-                    <v-btn
-                      v-if="!pendingOrder"
-                      icon="mdi-close"
-                      size="x-small"
-                      color="red-lighten-2"
-                      variant="text"
-                      title="Cancel booking for this seat"
-                      :loading="cancellingSeatId === seat.id"
-                      @click="handleCancelSeat(seat)"
-                    ></v-btn>
-                    <v-icon v-else icon="mdi-lock" size="16" color="warning" title="Locked — payment in progress"></v-icon>
+                    <v-btn v-if="!pendingOrder" icon="mdi-close" size="x-small" color="red-lighten-2" variant="text"
+                      title="Cancel booking for this seat" :loading="cancellingSeatId === seat.id"
+                      @click="handleCancelSeat(seat)"></v-btn>
+                    <v-icon v-else icon="mdi-lock" size="16" color="warning"
+                      title="Locked — payment in progress"></v-icon>
                   </div>
                 </div>
               </div>
@@ -193,30 +157,15 @@
           <!-- Actions -->
           <div class="mt-4">
             <!-- When order is pending: show "Complete Payment" button -->
-            <v-btn
-              v-if="pendingOrder"
-              color="amber-darken-1"
-              variant="flat"
-              block
-              size="large"
-              class="text-none font-weight-bold"
-              prepend-icon="mdi-credit-card-check"
-              :to="`/orders/${pendingOrder.id}`"
-            >
+            <v-btn v-if="pendingOrder" color="amber-darken-1" variant="flat" block size="large"
+              class="text-none font-weight-bold" prepend-icon="mdi-credit-card-check"
+              :to="`/orders/${pendingOrder.id}`">
               Complete Payment
             </v-btn>
-            <v-btn
-              v-else
-              color="amber-darken-1"
-              variant="flat"
-              block
-              size="large"
-              class="text-none font-weight-bold"
-              :disabled="myHeldSeats.length === 0"
-              prepend-icon="mdi-cart-arrow-right"
-              @click="goToCheckout"
-            >
-              {{ myHeldSeats.length === 0 ? 'Select Seats to Book' : `Proceed to Checkout ($${(totalCheckoutCents / 100).toFixed(2)})` }}
+            <v-btn v-else color="amber-darken-1" variant="flat" block size="large" class="text-none font-weight-bold"
+              :disabled="myHeldSeats.length === 0" prepend-icon="mdi-cart-arrow-right" @click="goToCheckout">
+              {{ myHeldSeats.length === 0 ? 'Select Seats to Book' : `Proceed to Checkout ($${(totalCheckoutCents /
+                100).toFixed(2)})` }}
             </v-btn>
             <div class="text-caption text-grey text-center mt-2">
               🔒 Instant lock reservation & transactional guarantee

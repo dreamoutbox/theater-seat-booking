@@ -10,17 +10,18 @@
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",
-    "axios": "^1.19.0",
+    "axios": "^1.20.0",
     "pinia": "^4.0.3",
-    "qrcode.vue": "^3.10.0",
-    "vue": "^3.5.40",
-    "vue-router": "^5.2.0",
-    "vuetify": "^4.1.9"
+    "qrcode.vue": "^3.11.0",
+    "vue": "^3.5.43",
+    "vue-router": "^5.3.1",
+    "vuetify": "^4.2.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1",
-    "@types/node": "^26.2.0",
-    "@vitejs/plugin-vue": "^6.0.8",
-    "vite": "^8.2.0"
-  }
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3",
+    "@vitejs/plugin-vue": "^6.0.9",
+    "vite": "^8.3.1"
+  },
+  "packageManager": "pnpm@12.6.0+sha512.3ef68f951cb111ac204b4a5a16f0b2ddf0da56a96e0413e81d855d9f0b55ef926714709028e1cd00c405c2c5fb7b9e8ec4dc46777c805d0373c2f2ff00fd20ec"
 }

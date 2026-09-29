@@ -73,6 +73,7 @@ theater-seat-booking/
 │   ├── 20260818000004_cascade_foreign_keys.sql
 │   └── 20260819000001_event_owner_tickets_gatekeepers.sql
 │
+├── dev-bootstrap.sh            # Bootstrap: docker compose up + run backend, worker, frontend in parallel
 ├── dev-reset-db.sh             # Wipe DB + re-run migrations + seed
 ├── dev-backend.sh              # Run backend API (with cargo-watch if available)
 ├── dev-frontend.sh             # Run Vite dev server (frontend)
@@ -153,9 +154,10 @@ theater-seat-booking/
 
 | Script | Purpose |
 |---|---|
-| `docker compose up -d` | Start Postgres + Adminer (port 8081) |
+| `./dev-bootstrap.sh` | **Full stack dev**: start Docker (Postgres/RustFS/Adminer) + run backend, worker, frontend in parallel |
+| `docker compose up -d` | Start Postgres + Adminer (port 8081) + RustFS (port 9000/9001) |
 | `./dev-reset-db.sh` | **Full reset**: drop schema → re-apply all migrations → seed demo data |
-| `./dev-reset-s3.sh` | **Reset S3**: wipe and recreate `theater-documents` bucket in MinIO |
+| `./dev-reset-s3.sh` | **Reset S3**: wipe and recreate `theater-documents` bucket in S3 storage |
 | `./dev-backend.sh` | Start Rust API on port 3000 (hot-reloads with `cargo-watch` if installed) |
 | `./dev-queue-worker.sh` | Start the booking queue worker (polls every 1s, processes holds) |
 | `./dev-frontend.sh` | Start Vite dev server on port 5173 (proxies `/api` to backend) |

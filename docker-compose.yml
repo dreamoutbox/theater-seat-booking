@@ -92,14 +92,16 @@ services:
       - theater_net
 
   minio:
-    image: minio/minio
-    command: server /data --console-address ":9001"
+    image: rustfs/rustfs:latest
     restart: always
     ports:
       - "9000:9000"
       - "9001:9001"
     environment:
       TZ: Asia/Bangkok
+      RUSTFS_ACCESS_KEY: miniominio
+      RUSTFS_SECRET_KEY: miniominio
+      RUSTFS_CONSOLE_ENABLE: "true"
       MINIO_ROOT_USER: miniominio
       MINIO_ROOT_PASSWORD: miniominio
     volumes:
@@ -126,6 +128,6 @@ services:
       - FORWARD_TO=http://host.docker.internal:3000/api/webhooks/stripe
     networks:
       - theater_net
-    restart: always
+    # restart: always
     extra_hosts:
       - "host.docker.internal:host-gateway"

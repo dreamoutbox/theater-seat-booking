@@ -8,43 +8,20 @@
       </div>
 
       <v-form @submit.prevent="handleLogin">
-        <v-text-field
-          v-model="email"
-          label="Email Address"
-          type="email"
-          variant="outlined"
-          density="comfortable"
-          prepend-inner-icon="mdi-email-outline"
-          class="mb-3"
-          required
-        ></v-text-field>
+        <v-text-field v-model="email" label="Email Address" type="email" variant="outlined" density="comfortable"
+          prepend-inner-icon="mdi-email-outline" class="mb-3" required></v-text-field>
 
-        <v-text-field
-          v-model="password"
-          label="Password"
-          type="password"
-          variant="outlined"
-          density="comfortable"
-          prepend-inner-icon="mdi-lock-outline"
-          class="mb-4"
-          required
-        ></v-text-field>
+        <v-text-field v-model="password" label="Password" type="password" variant="outlined" density="comfortable"
+          prepend-inner-icon="mdi-lock-outline" class="mb-4" required></v-text-field>
 
-        <v-btn
-          type="submit"
-          color="amber-darken-1"
-          variant="flat"
-          block
-          size="large"
-          class="font-weight-bold text-none mb-4"
-          :loading="authStore.loading"
-        >
+        <v-btn type="submit" color="amber-darken-1" variant="flat" block size="large"
+          class="font-weight-bold text-none mb-4" :loading="authStore.loading">
           Sign In
         </v-btn>
       </v-form>
 
       <div class="text-center text-caption text-grey mb-6">
-        Don't have an account? 
+        Don't have an account?
         <router-link to="/register" class="text-amber-darken-1 font-weight-bold text-decoration-none">
           Sign up
         </router-link>
@@ -58,14 +35,8 @@
           Quick Demo Accounts
         </div>
         <div class="d-flex flex-column gap-2">
-          <v-btn
-            v-for="acc in demoAccounts"
-            :key="acc.email"
-            variant="tonal"
-            size="small"
-            class="text-none justify-start px-3"
-            @click="quickLogin(acc.email, acc.password)"
-          >
+          <v-btn v-for="acc in demoAccounts" :key="acc.email" variant="tonal" size="small"
+            class="text-none justify-start px-3" @click="quickLogin(acc.email, acc.password)">
             <v-chip size="x-small" :color="acc.color" class="mr-2 font-weight-bold">
               {{ acc.role }}
             </v-chip>
@@ -73,6 +44,7 @@
           </v-btn>
         </div>
       </div>
+
     </v-card>
 
     <v-snackbar v-model="snackbar.show" :color="snackbar.color" timeout="3000">
