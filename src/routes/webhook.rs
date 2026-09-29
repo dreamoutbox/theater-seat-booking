@@ -1,5 +1,5 @@
 use axum::{Json, extract::State, http::StatusCode};
-use repository::{OrderRepository, SeatBookingRepository, TicketRepository};
+use repository::{OrderRepository, SeatBookingRepository, SequenceRepository, TicketRepository};
 use serde_json::Value;
 
 use crate::routes::AppState;
@@ -142,6 +142,25 @@ pub async fn stripe_webhook(
                                 Json(serde_json::json!({ "error": e.to_string() })),
                             )
                         })?;
+
+                    // Assign sequential Thai tax invoice running number (INV-YYYYMM-XXXXX)
+                    if let Ok(Some(ev_id)) =
+                        OrderRepository::find_event_id_by_order_id(&mut *tx, oid).await
+                    {
+                        let period = chrono::Utc::now().format("%Y%m").to_string();
+                        if let Ok(tax_invoice_number) = SequenceRepository::next_running_number(
+                            &mut *tx, ev_id, "order", "INV", &period,
+                        )
+                        .await
+                        {
+                            let _ = OrderRepository::update_tax_invoice_number(
+                                &mut *tx,
+                                oid,
+                                &tax_invoice_number,
+                            )
+                            .await;
+                        }
+                    }
 
                     TicketRepository::create_tickets_for_paid_order(&mut *tx, oid)
                         .await

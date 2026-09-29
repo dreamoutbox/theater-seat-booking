@@ -612,6 +612,7 @@ impl PdfService {
         total_price_cents: i64,
         status: &str,
         seats: &[OrderSeatReceiptItem],
+        tax_invoice_number: Option<&str>,
     ) -> Result<Vec<u8>, String> {
         let mut doc = Document::with_version("1.5");
         let pages_id = doc.new_object_id();
@@ -700,12 +701,16 @@ impl PdfService {
             vec![0.85.into(), 0.45.into(), 0.0.into()],
         ));
         operations.push(Operation::new("Td", vec![340.into(), 788.into()]));
-        let short_id = if order_id.to_string().len() >= 8 {
-            &order_id.to_string()[..8]
+        let ref_text = if let Some(inv_no) = tax_invoice_number {
+            format!("Tax Inv/Receipt: {}", inv_no)
         } else {
-            "CONFIRMED"
+            let short_id = if order_id.to_string().len() >= 8 {
+                &order_id.to_string()[..8]
+            } else {
+                "CONFIRMED"
+            };
+            format!("Order: #{}", short_id.to_uppercase())
         };
-        let ref_text = format!("Order: #{}", short_id.to_uppercase());
         operations.push(Operation::new(
             "Tj",
             vec![Object::string_literal(ref_text).into()],
@@ -770,9 +775,14 @@ impl PdfService {
         ));
         operations.push(Operation::new("Tf", vec!["F_MONO".into(), 8.0.into()]));
         operations.push(Operation::new("Td", vec![85.into(), 0.into()]));
+        let display_ref = if let Some(inv_no) = tax_invoice_number {
+            format!("{} (#{})", inv_no, &order_id.to_string()[..8])
+        } else {
+            format!("#{}", order_id)
+        };
         operations.push(Operation::new(
             "Tj",
-            vec![Object::string_literal(format!("#{}", order_id)).into()],
+            vec![Object::string_literal(display_ref).into()],
         ));
         operations.push(Operation::new("ET", vec![]));
 

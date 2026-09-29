@@ -248,6 +248,7 @@ pub struct OrderDetailRow {
     pub organizer_tax_address: Option<String>,
     pub organizer_tax_email: Option<String>,
     pub organizer_tax_phone: Option<String>,
+    pub tax_invoice_number: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -274,6 +275,7 @@ pub struct OrderDetail {
     pub organizer_tax_address: Option<String>,
     pub organizer_tax_email: Option<String>,
     pub organizer_tax_phone: Option<String>,
+    pub tax_invoice_number: Option<String>,
     pub created_at: DateTime<Utc>,
     pub seats: Vec<OrderSeatDetail>,
 }
@@ -361,6 +363,7 @@ pub struct Refund {
     pub stripe_refund_id: Option<String>,
     pub refunded_by: Option<Uuid>,
     pub reason: Option<String>,
+    pub refund_number: Option<String>,
     pub created_at: DateTime<Utc>,
 }
 
@@ -383,9 +386,19 @@ pub struct RefundDetail {
     pub refunded_by: Option<Uuid>,
     pub refunded_by_email: Option<String>,
     pub reason: Option<String>,
+    pub refund_number: Option<String>,
     pub created_at: DateTime<Utc>,
     pub ticket_ids: Vec<Uuid>,
     pub items: Vec<RefundTicketItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct DocumentSequence {
+    pub scope_id: Uuid,
+    pub doc_type: String,
+    pub period: String,
+    pub last_number: i64,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]

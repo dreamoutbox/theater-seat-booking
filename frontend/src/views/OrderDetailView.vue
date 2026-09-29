@@ -35,9 +35,12 @@
       <!-- Order Header -->
       <div class="d-flex flex-wrap justify-space-between align-start gap-4 mb-6">
         <div>
-          <div class="d-flex align-center gap-2 mb-2">
+          <div class="d-flex align-center gap-2 mb-2 flex-wrap">
             <span class="text-caption text-grey font-weight-mono text-uppercase">Order Reference</span>
-            <span class="text-caption font-weight-mono text-amber-darken-1 font-weight-bold">#{{ order.id }}</span>
+            <span class="text-caption font-weight-mono text-grey">#{{ order.id.substring(0, 8) }}</span>
+            <v-chip v-if="order.tax_invoice_number" size="small" color="amber-darken-1" variant="tonal" class="font-weight-bold font-mono">
+              Tax Invoice: {{ order.tax_invoice_number }}
+            </v-chip>
           </div>
           <div class="d-flex align-center gap-5 flex-wrap mb-2">
             <h1 class="text-h4 font-weight-bold text-white mb-0 mr-5">
@@ -237,6 +240,9 @@
             <tr v-for="r in refunds" :key="r.id">
               <td class="py-3 align-middle">
                 <div class="font-weight-mono text-caption text-red-accent-2 font-weight-bold">
+                  {{ r.refund_number || ('#' + r.id.slice(0, 8)) }}
+                </div>
+                <div v-if="r.refund_number" class="text-caption text-grey font-weight-mono">
                   #{{ r.id.slice(0, 8) }}
                 </div>
                 <div class="text-caption text-grey">
@@ -644,9 +650,9 @@
           </div>
           <div class="text-right">
             <h2 class="receipt-title text-uppercase font-bold text-dark mb-1">OFFICIAL TAX RECEIPT</h2>
-            <div class="font-mono text-small font-bold">Receipt No: REC-{{ order.id.substring(0, 8).toUpperCase() }}-{{
-              new
-                Date(order.created_at).getFullYear() }}</div>
+            <div class="font-mono text-small font-bold">
+              Tax Invoice No: {{ order.tax_invoice_number || ('REC-' + order.id.substring(0, 8).toUpperCase() + '-' + new Date(order.created_at).getFullYear()) }}
+            </div>
             <div class="text-small text-muted">Date: {{ formatDate(order.created_at) }}</div>
             <div class="text-small text-muted">Ref: {{ order.stripe_payment_intent_id || 'PAID' }}</div>
           </div>

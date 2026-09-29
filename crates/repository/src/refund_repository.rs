@@ -14,11 +14,12 @@ impl RefundRepository {
         stripe_refund_id: Option<&str>,
         refunded_by: Uuid,
         reason: Option<&str>,
+        refund_number: Option<&str>,
     ) -> Result<Refund, sqlx::Error> {
         sqlx::query_as(
-            "INSERT INTO refunds (id, order_id, amount_cents, stripe_refund_id, refunded_by, reason)
-             VALUES ($1, $2, $3, $4, $5, $6)
-             RETURNING id, order_id, amount_cents, stripe_refund_id, refunded_by, reason, created_at",
+            "INSERT INTO refunds (id, order_id, amount_cents, stripe_refund_id, refunded_by, reason, refund_number)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING id, order_id, amount_cents, stripe_refund_id, refunded_by, reason, refund_number, created_at",
         )
         .bind(id)
         .bind(order_id)
@@ -26,6 +27,7 @@ impl RefundRepository {
         .bind(stripe_refund_id)
         .bind(refunded_by)
         .bind(reason)
+        .bind(refund_number)
         .fetch_one(executor)
         .await
     }
@@ -61,6 +63,7 @@ impl RefundRepository {
             refunded_by: Option<Uuid>,
             refunded_by_email: Option<String>,
             reason: Option<String>,
+            refund_number: Option<String>,
             created_at: chrono::DateTime<chrono::Utc>,
             items: sqlx::types::Json<Vec<RefundTicketItem>>,
         }
@@ -68,7 +71,7 @@ impl RefundRepository {
         let refunds: Vec<RefundRow> = sqlx::query_as(
             "SELECT 
                 r.id, r.order_id, r.amount_cents, r.stripe_refund_id, r.refunded_by,
-                u.email AS refunded_by_email, r.reason, r.created_at,
+                u.email AS refunded_by_email, r.reason, r.refund_number, r.created_at,
                 COALESCE(
                     json_agg(
                         json_build_object(
@@ -91,7 +94,7 @@ impl RefundRepository {
              LEFT JOIN zones z ON z.id = s.zone_id
              LEFT JOIN order_seats os ON os.seat_booking_id = t.seat_booking_id
              WHERE r.order_id = $1
-             GROUP BY r.id, r.order_id, r.amount_cents, r.stripe_refund_id, r.refunded_by, u.email, r.reason, r.created_at
+             GROUP BY r.id, r.order_id, r.amount_cents, r.stripe_refund_id, r.refunded_by, u.email, r.reason, r.refund_number, r.created_at
              ORDER BY r.created_at DESC",
         )
         .bind(order_id)
@@ -110,6 +113,7 @@ impl RefundRepository {
                 refunded_by: r.refunded_by,
                 refunded_by_email: r.refunded_by_email,
                 reason: r.reason,
+                refund_number: r.refund_number,
                 created_at: r.created_at,
                 ticket_ids,
                 items,

@@ -5,8 +5,8 @@ use axum::{
 };
 use repository::{
     EventRepository, OrderDetail, OrderRepository, RefundDetail, RefundRepository,
-    SeatBookingRepository, SeatChangeRepository, SeatRepository, TicketRepository,
-    TicketSeatChangeDetail, UserRole,
+    SeatBookingRepository, SeatChangeRepository, SeatRepository, SequenceRepository,
+    TicketRepository, TicketSeatChangeDetail, UserRole,
 };
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -272,6 +272,7 @@ pub async fn list_orders(
             organizer_tax_address: o.organizer_tax_address,
             organizer_tax_email: o.organizer_tax_email,
             organizer_tax_phone: o.organizer_tax_phone,
+            tax_invoice_number: o.tax_invoice_number,
             created_at: o.created_at,
             seats,
         });
@@ -359,6 +360,7 @@ pub async fn get_order(
         organizer_tax_address: o.organizer_tax_address,
         organizer_tax_email: o.organizer_tax_email,
         organizer_tax_phone: o.organizer_tax_phone,
+        tax_invoice_number: o.tax_invoice_number,
         created_at: o.created_at,
         seats,
     }))
@@ -422,6 +424,47 @@ pub async fn confirm_mock_order(
 
     // 2. Mark order as paid
     OrderRepository::update_status(&mut *tx, order_id, "paid")
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    // 2.1 Assign sequential Thai tax invoice running number (INV-YYYYMM-XXXXX)
+    let event_id = OrderRepository::find_event_id_by_order_id(&mut *tx, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Showtime/Event not found for order" })),
+            )
+        })?;
+
+    let period = chrono::Utc::now().format("%Y%m").to_string();
+    let tax_invoice_number = SequenceRepository::next_running_number(
+        &mut *tx,
+        event_id,
+        "order",
+        "INV",
+        &period,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": format!("Failed to generate tax running number: {e}") })),
+        )
+    })?;
+
+    OrderRepository::update_tax_invoice_number(&mut *tx, order_id, &tax_invoice_number)
         .await
         .map_err(|e| {
             (
@@ -752,7 +795,38 @@ pub async fn refund_order(
         _ => None,
     };
 
-    // 7. Save refund record
+    // 7. Save refund record with sequential Thai tax credit note running number (CN-YYYYMM-XXXXX)
+    let event_id = OrderRepository::find_event_id_by_order_id(&mut *tx, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": "Showtime/Event not found for order" })),
+            )
+        })?;
+
+    let period = chrono::Utc::now().format("%Y%m").to_string();
+    let refund_number = SequenceRepository::next_running_number(
+        &mut *tx,
+        event_id,
+        "refund",
+        "CN",
+        &period,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": format!("Failed to generate refund running number: {e}") })),
+        )
+    })?;
+
     let refund_id = Uuid::new_v4();
     RefundRepository::save(
         &mut *tx,
@@ -762,6 +836,7 @@ pub async fn refund_order(
         stripe_refund_id.as_deref(),
         auth_user.id,
         payload.reason.as_deref(),
+        Some(&refund_number),
     )
     .await
     .map_err(|e| {
@@ -1218,6 +1293,7 @@ pub async fn change_seat(
         organizer_tax_address: order_detail.organizer_tax_address,
         organizer_tax_email: order_detail.organizer_tax_email,
         organizer_tax_phone: order_detail.organizer_tax_phone,
+        tax_invoice_number: order_detail.tax_invoice_number,
         created_at: order_detail.created_at,
         seats,
     }))
@@ -1312,6 +1388,7 @@ pub async fn generate_and_upload_order_pdf(
         order.total_amount_cents,
         &order.status,
         &seat_items,
+        order.tax_invoice_number.as_deref(),
     )?;
 
     let s3_key = format!("orders/{}/receipt.pdf", order_id);

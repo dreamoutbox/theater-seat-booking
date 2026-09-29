@@ -70,7 +70,7 @@ impl OrderRepository {
                     o.billing_name, o.tax_id, o.billing_address,
                     e.tax_business_name as organizer_tax_business_name, e.tax_id as organizer_tax_id,
                     e.tax_address as organizer_tax_address, e.tax_email as organizer_tax_email,
-                    e.tax_phone as organizer_tax_phone, o.created_at
+                    e.tax_phone as organizer_tax_phone, o.tax_invoice_number, o.created_at
              FROM orders o
              JOIN users u ON u.id = o.user_id
              JOIN showtimes s ON s.id = o.showtime_id
@@ -93,7 +93,7 @@ impl OrderRepository {
                     o.billing_name, o.tax_id, o.billing_address,
                     e.tax_business_name as organizer_tax_business_name, e.tax_id as organizer_tax_id,
                     e.tax_address as organizer_tax_address, e.tax_email as organizer_tax_email,
-                    e.tax_phone as organizer_tax_phone, o.created_at
+                    e.tax_phone as organizer_tax_phone, o.tax_invoice_number, o.created_at
              FROM orders o
              JOIN users u ON u.id = o.user_id
              JOIN showtimes s ON s.id = o.showtime_id
@@ -118,7 +118,7 @@ impl OrderRepository {
                     o.billing_name, o.tax_id, o.billing_address,
                     e.tax_business_name as organizer_tax_business_name, e.tax_id as organizer_tax_id,
                     e.tax_address as organizer_tax_address, e.tax_email as organizer_tax_email,
-                    e.tax_phone as organizer_tax_phone, o.created_at
+                    e.tax_phone as organizer_tax_phone, o.tax_invoice_number, o.created_at
              FROM orders o
              JOIN users u ON u.id = o.user_id
              JOIN showtimes s ON s.id = o.showtime_id
@@ -143,7 +143,7 @@ impl OrderRepository {
                     o.billing_name, o.tax_id, o.billing_address,
                     e.tax_business_name as organizer_tax_business_name, e.tax_id as organizer_tax_id,
                     e.tax_address as organizer_tax_address, e.tax_email as organizer_tax_email,
-                    e.tax_phone as organizer_tax_phone, o.created_at
+                    e.tax_phone as organizer_tax_phone, o.tax_invoice_number, o.created_at
              FROM orders o
              JOIN users u ON u.id = o.user_id
              JOIN showtimes s ON s.id = o.showtime_id
@@ -168,7 +168,7 @@ impl OrderRepository {
                     o.billing_name, o.tax_id, o.billing_address,
                     e.tax_business_name as organizer_tax_business_name, e.tax_id as organizer_tax_id,
                     e.tax_address as organizer_tax_address, e.tax_email as organizer_tax_email,
-                    e.tax_phone as organizer_tax_phone, o.created_at
+                    e.tax_phone as organizer_tax_phone, o.tax_invoice_number, o.created_at
              FROM orders o
              JOIN users u ON u.id = o.user_id
              JOIN showtimes s ON s.id = o.showtime_id
@@ -405,5 +405,33 @@ impl OrderRepository {
         .execute(executor)
         .await?;
         Ok(())
+    }
+
+    pub async fn update_tax_invoice_number<'e, E: PgExecutor<'e>>(
+        executor: E,
+        id: Uuid,
+        tax_invoice_number: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE orders SET tax_invoice_number = $1 WHERE id = $2")
+            .bind(tax_invoice_number)
+            .bind(id)
+            .execute(executor)
+            .await?;
+        Ok(())
+    }
+
+    pub async fn find_event_id_by_order_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        order_id: Uuid,
+    ) -> Result<Option<Uuid>, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT s.event_id 
+             FROM orders o 
+             JOIN showtimes s ON s.id = o.showtime_id 
+             WHERE o.id = $1",
+        )
+        .bind(order_id)
+        .fetch_optional(executor)
+        .await
     }
 }

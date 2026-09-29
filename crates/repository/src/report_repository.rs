@@ -118,8 +118,8 @@ impl ReportRepository {
         Ok(count.0)
     }
 
-    pub async fn save(
-        pool: &PgPool,
+    pub async fn save<'e, E: sqlx::PgExecutor<'e>>(
+        executor: E,
         report: &EventFinancialReport,
     ) -> Result<EventFinancialReport, sqlx::Error> {
         sqlx::query_as::<_, EventFinancialReport>(
@@ -160,7 +160,7 @@ impl ReportRepository {
         .bind(report.tickets_refunded)
         .bind(report.attendance_rate_percent)
         .bind(&report.report_data)
-        .fetch_one(pool)
+        .fetch_one(executor)
         .await
     }
 }

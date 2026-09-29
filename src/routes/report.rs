@@ -6,7 +6,7 @@ use axum::{
 use chrono::Utc;
 use repository::{
     AnalyticsRepository, EventFinancialReport, EventFinancialReportDetail, EventRepository,
-    ReportRepository, UserRepository, UserRole,
+    ReportRepository, SequenceRepository, UserRepository, UserRole,
 };
 use serde::Serialize;
 use uuid::Uuid;
@@ -207,15 +207,29 @@ pub async fn generate_event_report(
         "Primary Cinema Administration".to_string()
     };
 
-    // Calculate total report count for sequence number
-    let count = ReportRepository::count_by_event_id(&state.pool, event_id)
-        .await
-        .unwrap_or(0);
+    // Generate sequential Thai tax report running number (FIN-YYYYMM-XXXXX) in transaction
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
 
-    let year = now.format("%Y");
-    let month = now.format("%m");
-    let seq_num = count + 1;
-    let statement_ref = format!("FIN-{year}-{month}-{seq_num:03}");
+    let period = now.format("%Y%m").to_string();
+    let statement_ref = SequenceRepository::next_running_number(
+        &mut *tx,
+        event_id,
+        "report",
+        "FIN",
+        &period,
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": format!("Failed to generate statement reference: {e}") })),
+        )
+    })?;
 
     // Tax calculation: standard 10% withholding
     let tax_withholding_cents = (metrics.net_profit_cents * 10) / 100;
@@ -270,7 +284,7 @@ pub async fn generate_event_report(
         report_data: snapshot_data,
     };
 
-    let saved = ReportRepository::save(&state.pool, &new_report)
+    let saved = ReportRepository::save(&mut *tx, &new_report)
         .await
         .map_err(|e| {
             (
@@ -278,6 +292,13 @@ pub async fn generate_event_report(
                 Json(serde_json::json!({ "error": format!("Failed to save report: {e}") })),
             )
         })?;
+
+    tx.commit().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
 
     let report_detail = EventFinancialReportDetail {
         id: saved.id,

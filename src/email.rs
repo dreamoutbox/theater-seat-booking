@@ -232,6 +232,12 @@ Theater Booking Team
 
         let pdf_filename = format!("receipt_{}.pdf", order.id);
 
+        let short_id = order.id.to_string();
+        let fallback_label = format!("Order #{}", &short_id[..8]);
+        let order_ref_label = order
+            .tax_invoice_number
+            .as_deref()
+            .unwrap_or(&fallback_label);
         let email = Message::builder()
             .from(
                 self.smtp_from_email
@@ -242,9 +248,9 @@ Theater Booking Team
                 .parse()
                 .map_err(|e| format!("Invalid recipient address '{recipient_email}': {e}"))?)
             .subject(format!(
-                "🎟️ Order Receipt & Tickets: {} (Order #{})",
+                "🎟️ Order Receipt & Tickets: {} ({})",
                 order.event_title,
-                &order.id.to_string()[..8]
+                order_ref_label
             ))
             .multipart(
                 MultiPart::mixed()

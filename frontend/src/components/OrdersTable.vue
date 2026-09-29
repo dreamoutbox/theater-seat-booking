@@ -117,7 +117,7 @@
       <v-table theme="dark" class="orders-table">
         <thead>
           <tr>
-            <th class="text-left font-weight-bold">Order ID</th>
+            <th class="text-left font-weight-bold">Order / Tax Inv No</th>
             <th v-if="scope === 'all'" class="text-left font-weight-bold">Customer</th>
             <th class="text-left font-weight-bold">Event & Theater</th>
             <th class="text-left font-weight-bold">Showtime</th>
@@ -137,6 +137,9 @@
             <!-- Order ID & Date -->
             <td class="py-3">
               <div class="font-weight-mono text-caption text-amber-darken-1 font-weight-bold">
+                {{ order.tax_invoice_number || ('#' + order.id.substring(0, 8)) }}
+              </div>
+              <div v-if="order.tax_invoice_number" class="text-caption text-grey font-weight-mono">
                 #{{ order.id.substring(0, 8) }}
               </div>
               <div class="text-caption text-grey">
@@ -404,6 +407,7 @@ const filteredOrders = computed(() => {
     const q = searchQuery.value.trim().toLowerCase();
     list = list.filter((o) => {
       const matchId = o.id.toLowerCase().includes(q);
+      const matchTaxInv = (o.tax_invoice_number || '').toLowerCase().includes(q);
       const matchEmail = (o.user_email || '').toLowerCase().includes(q);
       const matchEvent = (o.event_title || '').toLowerCase().includes(q);
       const matchTheater = (o.theater_name || '').toLowerCase().includes(q);
@@ -415,7 +419,7 @@ const filteredOrders = computed(() => {
           s.zone_name.toLowerCase().includes(q)
       );
 
-      return matchId || matchEmail || matchEvent || matchTheater || matchStatus || matchDate || matchSeats;
+      return matchId || matchTaxInv || matchEmail || matchEvent || matchTheater || matchStatus || matchDate || matchSeats;
     });
   }
 
