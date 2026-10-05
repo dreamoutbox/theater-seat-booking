@@ -76,7 +76,7 @@ async fn seed_users(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn seed_theater_and_shows(pool: &PgPool) -> Result<(), Box<dyn std::error::Error>> {
-    // 1. Theater
+    // 1. Theater (physical venue)
     let theater_id = match TheaterRepository::find_by_name(pool, "Grand Horizon Cinema").await? {
         Some(t) => t.id,
         None => {
@@ -91,47 +91,7 @@ async fn seed_theater_and_shows(pool: &PgPool) -> Result<(), Box<dyn std::error:
     };
     println!("  Theater ID: {}", theater_id);
 
-    // 2. Zones
-    let vip_zone_id: Uuid = get_or_create_zone(pool, theater_id, "VIP", 3000, "#f59e0b").await?;
-    let premium_zone_id: Uuid =
-        get_or_create_zone(pool, theater_id, "Premium", 2000, "#6366f1").await?;
-    let standard_zone_id: Uuid =
-        get_or_create_zone(pool, theater_id, "Standard", 1000, "#14b8a6").await?;
-
-    println!("  Zones configured: VIP ($30.00), Premium ($20.00), Standard ($10.00)");
-
-    // 3. Seats (5 rows: A=VIP, B & C=Premium, D & E=Standard; 10 seats each = 50 seats)
-    let rows = vec![
-        ("A", vip_zone_id),
-        ("B", premium_zone_id),
-        ("C", premium_zone_id),
-        ("D", standard_zone_id),
-        ("E", standard_zone_id),
-    ];
-
-    let mut seats_created = 0;
-    for (row_label, zone_id) in rows {
-        for seat_number in 1..=10 {
-            let seat_exists = SeatRepository::exists_by_theater_id_and_row_label_and_seat_number(
-                pool,
-                theater_id,
-                row_label,
-                seat_number,
-            )
-            .await?;
-
-            if !seat_exists {
-                SeatRepository::upsert(pool, theater_id, zone_id, row_label, seat_number).await?;
-                seats_created += 1;
-            }
-        }
-    }
-    println!(
-        "  Seats seeded: {} new seats created (50 total in grid)",
-        seats_created
-    );
-
-    // 4. Events
+    // 2. Events
     let organizer_opt = UserRepository::find_by_email(pool, "organizer@theater.local").await?;
     let organizer_id = organizer_opt.map(|u| u.id);
 
@@ -147,6 +107,31 @@ async fn seed_theater_and_shows(pool: &PgPool) -> Result<(), Box<dyn std::error:
         GatekeeperRepository::assign(pool, event1_id, gatekeeper.id, organizer_id).await?;
         GatekeeperRepository::assign(pool, event2_id, gatekeeper.id, organizer_id).await?;
     }
+
+    // 3. Seed Event 1 Seat Map (5 rows: A=VIP, B & C=Premium, D & E=Standard; 10 seats each = 50 seats)
+    seed_event_seat_map(
+        pool,
+        event1_id,
+        vec![
+            ("VIP", 3000, "#f59e0b", vec!["A"]),
+            ("Premium", 2000, "#6366f1", vec!["B", "C"]),
+            ("Standard", 1000, "#14b8a6", vec!["D", "E"]),
+        ],
+        10,
+    )
+    .await?;
+
+    // 4. Seed Event 2 Seat Map (independent layout: 3 rows: A=VIP, B & C=Standard; 8 seats each = 24 seats)
+    seed_event_seat_map(
+        pool,
+        event2_id,
+        vec![
+            ("VIP Front", 3500, "#f59e0b", vec!["A"]),
+            ("General Seating", 1500, "#10b981", vec!["B", "C"]),
+        ],
+        8,
+    )
+    .await?;
 
     // 5. Showtimes
     let now = Utc::now();
@@ -171,18 +156,41 @@ async fn seed_theater_and_shows(pool: &PgPool) -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-async fn get_or_create_zone(
+async fn seed_event_seat_map(
     pool: &PgPool,
-    theater_id: Uuid,
-    name: &str,
-    price_cents: i64,
-    color: &str,
-) -> Result<Uuid, sqlx::Error> {
-    if let Some(zone) = ZoneRepository::find_by_theater_id_and_name(pool, theater_id, name).await? {
-        Ok(zone.id)
-    } else {
-        ZoneRepository::save(pool, theater_id, name, price_cents, color).await
+    event_id: Uuid,
+    zones_def: Vec<(&str, i64, &str, Vec<&str>)>,
+    seats_per_row: i32,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let mut seats_created = 0;
+    for (name, price_cents, color, rows) in zones_def {
+        let zone_id = match ZoneRepository::find_by_event_id_and_name(pool, event_id, name).await? {
+            Some(z) => z.id,
+            None => ZoneRepository::save(pool, event_id, name, price_cents, color).await?,
+        };
+
+        for row_label in rows {
+            for seat_number in 1..=seats_per_row {
+                let seat_exists = SeatRepository::exists_by_event_id_and_row_label_and_seat_number(
+                    pool,
+                    event_id,
+                    row_label,
+                    seat_number,
+                )
+                .await?;
+
+                if !seat_exists {
+                    SeatRepository::upsert(pool, event_id, zone_id, row_label, seat_number).await?;
+                    seats_created += 1;
+                }
+            }
+        }
     }
+    println!(
+        "  Event {}: seeded {} new seats into map",
+        event_id, seats_created
+    );
+    Ok(())
 }
 
 async fn get_or_create_event(

@@ -82,6 +82,14 @@ pub fn create_router(state: AppState) -> Router {
             "/showtimes/{id}",
             axum::routing::put(theater::update_showtime).delete(theater::delete_showtime),
         )
+        .route(
+            "/events/{id}/layout",
+            get(theater::get_event_layout).put(theater::save_event_layout),
+        )
+        .route(
+            "/events/{id}/booked-seats",
+            get(theater::get_event_booked_seats),
+        )
         .route("/showtimes/{id}/seats", get(theater::get_showtime_seats))
         .route("/theaters/{id}/seats", get(theater::get_theater_seats))
         .route(

@@ -5,7 +5,7 @@ use axum::{
 };
 use chrono::{DateTime, Utc};
 use repository::{
-    BookedSeatInfo, Event, EventRepository, SaveLayoutPayload, SeatRepository, ShowtimeDetail,
+    BookedSeatInfo, Event, EventLayout, EventRepository, SaveLayoutPayload, SeatRepository, ShowtimeDetail,
     ShowtimeRepository, Theater, TheaterLayout, TheaterRepository, UserRole, ZoneRepository,
 };
 use serde::Deserialize;
@@ -584,26 +584,9 @@ pub async fn get_showtime_seats(
 ) -> Result<Json<Vec<SeatWithStatus>>, (StatusCode, Json<serde_json::Value>)> {
     let current_user_id = opt_user.0.map(|u| u.id);
 
-    let theater_id = ShowtimeRepository::find_theater_id_by_id(&state.pool, showtime_id)
-        .await
-        .map_err(|e| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(serde_json::json!({ "error": e.to_string() })),
-            )
-        })?;
-
-    let Some(theater_id) = theater_id else {
-        return Err((
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({ "error": "Showtime not found" })),
-        ));
-    };
-
-    let seats = SeatRepository::find_seats_with_status_by_theater_id(
+    let seats = SeatRepository::find_seats_with_status_by_showtime_id(
         &state.pool,
-        theater_id,
-        Some(showtime_id),
+        showtime_id,
         current_user_id,
     )
     .await
@@ -912,6 +895,319 @@ pub async fn get_theater_booked_seats(
     })?;
 
     let booked = SeatRepository::find_booked_seats_by_theater_id(&state.pool, theater_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    Ok(Json(booked))
+}
+
+pub async fn get_event_layout(
+    Path(event_id): Path<Uuid>,
+    State(state): State<AppState>,
+) -> Result<Json<EventLayout>, (StatusCode, Json<serde_json::Value>)> {
+    let event = EventRepository::find_by_id(&state.pool, event_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Event not found" })),
+            )
+        })?;
+
+    let zones = ZoneRepository::find_by_event_id(&state.pool, event_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let seats = SeatRepository::find_by_event_id(&state.pool, event_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    Ok(Json(EventLayout {
+        event,
+        zones,
+        seats,
+    }))
+}
+
+pub async fn save_event_layout(
+    Path(event_id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+    Json(payload): Json<SaveLayoutPayload>,
+) -> Result<Json<EventLayout>, (StatusCode, Json<serde_json::Value>)> {
+    check_role(
+        &auth_user,
+        &[UserRole::Admin, UserRole::Staff, UserRole::EventOrganizer],
+    )
+    .map_err(|_e| {
+        (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Unauthorized" })),
+        )
+    })?;
+
+    let event = EventRepository::find_by_id(&state.pool, event_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Event not found" })),
+            )
+        })?;
+
+    // Ownership check: EventOrganizer can only edit layouts for events they own
+    if auth_user.role == UserRole::EventOrganizer && event.owner_id != Some(auth_user.id) {
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "You do not own this event" })),
+        ));
+    }
+
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // 1. Sync zones
+    let mut valid_zone_ids = std::collections::HashSet::new();
+    for zone_item in &payload.zones {
+        let zone_name = zone_item.name.trim();
+        if zone_name.is_empty() {
+            continue;
+        }
+
+        let zone_color = zone_item.color.as_deref().unwrap_or("#14b8a6");
+
+        let zone_id = match zone_item.id {
+            Some(existing_id) => {
+                let updated = ZoneRepository::update(
+                    &mut *tx,
+                    existing_id,
+                    event_id,
+                    zone_name,
+                    zone_item.price_cents,
+                    zone_color,
+                )
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({ "error": e.to_string() })),
+                    )
+                })?;
+
+                if updated {
+                    existing_id
+                } else {
+                    ZoneRepository::save_with_id(
+                        &mut *tx,
+                        existing_id,
+                        event_id,
+                        zone_name,
+                        zone_item.price_cents,
+                        zone_color,
+                    )
+                    .await
+                    .map_err(|e| {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(serde_json::json!({ "error": e.to_string() })),
+                        )
+                    })?
+                }
+            }
+            None => ZoneRepository::save(
+                &mut *tx,
+                event_id,
+                zone_name,
+                zone_item.price_cents,
+                zone_color,
+            )
+            .await
+            .map_err(|e| {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(serde_json::json!({ "error": e.to_string() })),
+                )
+            })?,
+        };
+
+        valid_zone_ids.insert(zone_id);
+    }
+
+    // 2. Sync seats
+    let mut current_seat_keys = std::collections::HashSet::new();
+
+    for seat_item in &payload.seats {
+        let row_label = seat_item.row_label.trim().to_uppercase();
+        if row_label.is_empty() || seat_item.seat_number <= 0 {
+            continue;
+        }
+
+        // Validate zone_id is valid
+        if !valid_zone_ids.contains(&seat_item.zone_id) {
+            let zone_exists = ZoneRepository::exists_by_id_and_event_id(
+                &mut *tx,
+                seat_item.zone_id,
+                event_id,
+            )
+            .await
+            .unwrap_or(false);
+
+            if !zone_exists {
+                tx.rollback().await.ok();
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": format!(
+                            "Invalid zone id {} for seat {}{}",
+                            seat_item.zone_id, row_label, seat_item.seat_number
+                        )
+                    })),
+                ));
+            }
+        }
+
+        current_seat_keys.insert((row_label.clone(), seat_item.seat_number));
+
+        // Upsert seat on (event_id, row_label, seat_number)
+        SeatRepository::upsert(
+            &mut *tx,
+            event_id,
+            seat_item.zone_id,
+            &row_label,
+            seat_item.seat_number,
+        )
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+    }
+
+    // 3. Remove seats that are no longer in the payload
+    let existing_seats = SeatRepository::find_all_keys_by_event_id(&mut *tx, event_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    for (seat_id, r_label, s_num) in existing_seats {
+        if !current_seat_keys.contains(&(r_label.clone(), s_num)) {
+            // Check if seat has active bookings or tickets
+            let has_bookings = SeatRepository::has_active_bookings_or_orders(&mut *tx, seat_id)
+                .await
+                .unwrap_or(false);
+
+            if has_bookings {
+                tx.rollback().await.ok();
+                return Err((
+                    StatusCode::BAD_REQUEST,
+                    Json(serde_json::json!({
+                        "error": format!(
+                            "Cannot remove seat Row {}, Seat {} because it has active customer bookings or tickets.",
+                            r_label, s_num
+                        )
+                    })),
+                ));
+            }
+
+            SeatRepository::delete_by_id(&mut *tx, seat_id)
+                .await
+                .map_err(|e| {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        Json(serde_json::json!({ "error": e.to_string() })),
+                    )
+                })?;
+        }
+    }
+
+    tx.commit().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    let zones = ZoneRepository::find_by_event_id(&state.pool, event_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let seats = SeatRepository::find_by_event_id(&state.pool, event_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    tracing::info!(event_id = %event_id, seats_count = seats.len(), zones_count = zones.len(), "Event layout updated successfully");
+
+    Ok(Json(EventLayout {
+        event,
+        zones,
+        seats,
+    }))
+}
+
+pub async fn get_event_booked_seats(
+    Path(event_id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<Json<Vec<BookedSeatInfo>>, (StatusCode, Json<serde_json::Value>)> {
+    check_role(
+        &auth_user,
+        &[UserRole::Admin, UserRole::Staff, UserRole::EventOrganizer],
+    )
+    .map_err(|_e| {
+        (
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Unauthorized" })),
+        )
+    })?;
+
+    let booked = SeatRepository::find_booked_seats_by_event_id(&state.pool, event_id)
         .await
         .map_err(|e| {
             (

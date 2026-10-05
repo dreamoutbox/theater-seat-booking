@@ -18,6 +18,8 @@ echo "=========================================="
 echo "🚀 Executing Playwright E2E Tests..."
 echo "=========================================="
 
+WORKER=1
+
 cd frontend
 
-pnpm exec playwright test "$@"
+pnpm exec playwright test --workers=$WORKER "$@"
