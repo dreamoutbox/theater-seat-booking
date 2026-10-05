@@ -113,7 +113,7 @@ pub async fn create_order(
     // 4. Create Stripe PaymentIntent
     let stripe_res = state
         .stripe
-        .create_payment_intent(total_amount_cents, "usd", &order_id.to_string())
+        .create_payment_intent(total_amount_cents, &order_id.to_string())
         .await
         .map_err(|e| {
             (
@@ -424,7 +424,6 @@ pub async fn create_checkout_session(
         .stripe
         .create_checkout_session(
             order.total_amount_cents,
-            "usd",
             &order_id.to_string(),
             order.user_email.as_deref(),
             &order.event_title,

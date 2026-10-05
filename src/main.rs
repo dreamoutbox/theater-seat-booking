@@ -32,7 +32,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_migrations(&pool).await?;
     tracing::info!("Database schema migrations verified and up to date.");
 
-    let stripe = Arc::new(StripeService::new(config.stripe_secret_key.clone()));
+    let stripe = Arc::new(StripeService::new(
+        config.stripe_secret_key.clone(),
+        config.stripe_currency.clone(),
+    ));
     let s3 = Arc::new(S3Service::new(&config).await);
     let email = Arc::new(EmailService::new(&config));
 

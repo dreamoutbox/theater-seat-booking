@@ -18,21 +18,26 @@ pub struct StripeCheckoutSessionResult {
 
 pub struct StripeService {
     secret_key: String,
+    currency: String,
     client: Client,
 }
 
 impl StripeService {
-    pub fn new(secret_key: String) -> Self {
+    pub fn new(secret_key: String, currency: String) -> Self {
         Self {
             secret_key,
+            currency,
             client: Client::new(),
         }
+    }
+
+    pub fn currency(&self) -> &str {
+        &self.currency
     }
 
     pub async fn create_payment_intent(
         &self,
         amount_cents: i64,
-        currency: &str,
         order_id: &str,
     ) -> Result<StripePaymentIntentResult, String> {
         if self.secret_key.is_empty() {
@@ -42,7 +47,7 @@ impl StripeService {
         // Call real Stripe API via HTTP POST
         let params = [
             ("amount", amount_cents.to_string()),
-            ("currency", currency.to_string()),
+            ("currency", self.currency.clone()),
             ("metadata[order_id]", order_id.to_string()),
             ("automatic_payment_methods[enabled]", "true".to_string()),
         ];
@@ -88,7 +93,6 @@ impl StripeService {
     pub async fn create_checkout_session(
         &self,
         amount_cents: i64,
-        currency: &str,
         order_id: &str,
         customer_email: Option<&str>,
         event_title: &str,
@@ -103,7 +107,7 @@ impl StripeService {
         let quantity_str = "1";
         let mut params = vec![
             ("mode", "payment"),
-            ("line_items[0][price_data][currency]", currency),
+            ("line_items[0][price_data][currency]", self.currency.as_str()),
             ("line_items[0][price_data][unit_amount]", &amount_str),
             ("line_items[0][price_data][product_data][name]", event_title),
             ("line_items[0][quantity]", quantity_str),

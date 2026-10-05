@@ -10,6 +10,7 @@ pub struct AppConfig {
     pub max_bookings_per_user: i64,
     pub stripe_secret_key: String,
     pub stripe_webhook_secret: String,
+    pub stripe_currency: String,
     pub s3_endpoint: String,
     pub s3_access_key: String,
     pub s3_secret_key: String,
@@ -52,6 +53,7 @@ impl AppConfig {
                 .unwrap_or_else(|_| "sk_test_mock_key_for_poc".to_string()),
             stripe_webhook_secret: env::var("STRIPE_WEBHOOK_SECRET")
                 .unwrap_or_else(|_| "whsec_mock_key_for_poc".to_string()),
+            stripe_currency: parse_currency(env::var("STRIPE_CURRENCY").ok()),
             s3_endpoint: env::var("S3_ENDPOINT")
                 .unwrap_or_else(|_| "http://127.0.0.1:9000".to_string()),
             s3_access_key: env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "miniominio".to_string()),
@@ -77,5 +79,31 @@ impl AppConfig {
             smtp_from_email: env::var("SMTP_FROM_EMAIL")
                 .unwrap_or_else(|_| "Theater Booking <noreply@theaterbooking.local>".to_string()),
         }
+    }
+}
+
+pub(crate) fn parse_currency(raw: Option<String>) -> String {
+    raw.map(|s| s.trim().to_lowercase())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "thb".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_currency_defaults_to_thb() {
+        assert_eq!(parse_currency(None), "thb");
+        assert_eq!(parse_currency(Some(String::new())), "thb");
+        assert_eq!(parse_currency(Some("   ".to_string())), "thb");
+    }
+
+    #[test]
+    fn test_parse_currency_normalizes_to_lowercase() {
+        assert_eq!(parse_currency(Some("USD".to_string())), "usd");
+        assert_eq!(parse_currency(Some("  EUR  ".to_string())), "eur");
+        assert_eq!(parse_currency(Some("thb".to_string())), "thb");
+        assert_eq!(parse_currency(Some("THB".to_string())), "thb");
     }
 }
