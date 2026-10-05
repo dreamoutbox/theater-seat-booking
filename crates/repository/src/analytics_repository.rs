@@ -108,7 +108,7 @@ impl AnalyticsRepository {
                 th.id AS theater_id,
                 th.name AS theater_name,
                 st.starts_at,
-                (SELECT COUNT(*) FROM seats s WHERE s.theater_id = th.id) AS total_seats,
+                (SELECT COUNT(*) FROM seats s WHERE s.event_id = e.id) AS total_seats,
                 COALESCE((
                     SELECT COUNT(*)
                     FROM tickets t

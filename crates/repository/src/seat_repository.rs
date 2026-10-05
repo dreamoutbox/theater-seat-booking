@@ -6,6 +6,46 @@ use crate::models::{BookedSeatInfo, Seat, SeatWithStatus};
 pub struct SeatRepository;
 
 impl SeatRepository {
+    pub async fn find_booked_seats_by_event_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        event_id: Uuid,
+    ) -> Result<Vec<BookedSeatInfo>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT 
+                s.id AS seat_id,
+                sb.id AS seat_booking_id,
+                s.row_label,
+                s.seat_number,
+                sb.showtime_id,
+                os.order_id,
+                e.title AS event_title,
+                st.starts_at,
+                sb.status,
+                u.email AS user_email
+             FROM seats s
+             JOIN seat_bookings sb ON sb.seat_id = s.id 
+                AND (
+                    (sb.status = 'held' AND sb.expires_at > now())
+                    OR (
+                        sb.status = 'confirmed' 
+                        AND EXISTS (
+                            SELECT 1 FROM tickets t 
+                            WHERE t.seat_booking_id = sb.id AND t.status = 'active'
+                        )
+                    )
+                )
+             JOIN showtimes st ON st.id = sb.showtime_id
+             JOIN events e ON e.id = st.event_id
+             LEFT JOIN order_seats os ON os.seat_booking_id = sb.id
+             LEFT JOIN users u ON u.id = sb.user_id
+             WHERE s.event_id = $1
+             ORDER BY s.row_label ASC, s.seat_number ASC, st.starts_at ASC",
+        )
+        .bind(event_id)
+        .fetch_all(executor)
+        .await
+    }
+
     pub async fn find_booked_seats_by_theater_id<'e, E: PgExecutor<'e>>(
         executor: E,
         theater_id: Uuid,
@@ -70,12 +110,28 @@ impl SeatRepository {
         .fetch_one(executor)
         .await
     }
+
+    pub async fn find_by_event_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        event_id: Uuid,
+    ) -> Result<Vec<Seat>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT id, event_id, theater_id, zone_id, row_label, seat_number
+             FROM seats
+             WHERE event_id = $1
+             ORDER BY row_label ASC, seat_number ASC",
+        )
+        .bind(event_id)
+        .fetch_all(executor)
+        .await
+    }
+
     pub async fn find_by_theater_id<'e, E: PgExecutor<'e>>(
         executor: E,
         theater_id: Uuid,
     ) -> Result<Vec<Seat>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT id, theater_id, zone_id, row_label, seat_number
+            "SELECT id, event_id, theater_id, zone_id, row_label, seat_number
              FROM seats
              WHERE theater_id = $1
              ORDER BY row_label ASC, seat_number ASC",
@@ -83,6 +139,119 @@ impl SeatRepository {
         .bind(theater_id)
         .fetch_all(executor)
         .await
+    }
+
+    pub async fn find_seats_with_status_by_event_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        event_id: Uuid,
+        showtime_id: Option<Uuid>,
+        current_user_id: Option<Uuid>,
+    ) -> Result<Vec<SeatWithStatus>, sqlx::Error> {
+        let query_str = "
+            SELECT
+                s.id,
+                s.event_id,
+                s.theater_id,
+                s.zone_id,
+                z.name AS zone_name,
+                z.color AS zone_color,
+                z.price_cents,
+                s.row_label,
+                s.seat_number,
+                CASE
+                    WHEN sb.status = 'confirmed' THEN 'confirmed'
+                    WHEN sb.status = 'held' AND sb.expires_at > now() THEN 'held'
+                    ELSE 'available'
+                END AS status,
+                CASE
+                    WHEN sb.id IS NOT NULL 
+                         AND (sb.status = 'confirmed' OR (sb.status = 'held' AND sb.expires_at > now()))
+                         AND sb.user_id = $3 THEN true
+                    ELSE false
+                END AS is_mine,
+                CASE
+                    WHEN sb.status = 'held' AND sb.expires_at > now() THEN sb.expires_at
+                    ELSE NULL
+                END AS held_expires_at,
+                CASE
+                    WHEN sb.id IS NOT NULL 
+                         AND (sb.status = 'confirmed' OR (sb.status = 'held' AND sb.expires_at > now()))
+                         AND sb.user_id = $3 THEN sb.id
+                    ELSE NULL
+                END AS seat_booking_id
+            FROM seats s
+            JOIN zones z ON z.id = s.zone_id
+            LEFT JOIN seat_bookings sb 
+                ON sb.seat_id = s.id 
+                AND sb.showtime_id = $2
+                AND sb.status IN ('held', 'confirmed')
+                AND (sb.status = 'confirmed' OR sb.expires_at > now())
+            WHERE s.event_id = $1
+            ORDER BY s.row_label ASC, s.seat_number ASC
+        ";
+
+        sqlx::query_as(query_str)
+            .bind(event_id)
+            .bind(showtime_id)
+            .bind(current_user_id)
+            .fetch_all(executor)
+            .await
+    }
+
+    pub async fn find_seats_with_status_by_showtime_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        showtime_id: Uuid,
+        current_user_id: Option<Uuid>,
+    ) -> Result<Vec<SeatWithStatus>, sqlx::Error> {
+        let query_str = "
+            SELECT
+                s.id,
+                s.event_id,
+                s.theater_id,
+                s.zone_id,
+                z.name AS zone_name,
+                z.color AS zone_color,
+                z.price_cents,
+                s.row_label,
+                s.seat_number,
+                CASE
+                    WHEN sb.status = 'confirmed' THEN 'confirmed'
+                    WHEN sb.status = 'held' AND sb.expires_at > now() THEN 'held'
+                    ELSE 'available'
+                END AS status,
+                CASE
+                    WHEN sb.id IS NOT NULL 
+                         AND (sb.status = 'confirmed' OR (sb.status = 'held' AND sb.expires_at > now()))
+                         AND sb.user_id = $2 THEN true
+                    ELSE false
+                END AS is_mine,
+                CASE
+                    WHEN sb.status = 'held' AND sb.expires_at > now() THEN sb.expires_at
+                    ELSE NULL
+                END AS held_expires_at,
+                CASE
+                    WHEN sb.id IS NOT NULL 
+                         AND (sb.status = 'confirmed' OR (sb.status = 'held' AND sb.expires_at > now()))
+                         AND sb.user_id = $2 THEN sb.id
+                    ELSE NULL
+                END AS seat_booking_id
+            FROM showtimes st
+            JOIN seats s ON s.event_id = st.event_id
+            JOIN zones z ON z.id = s.zone_id
+            LEFT JOIN seat_bookings sb 
+                ON sb.seat_id = s.id 
+                AND sb.showtime_id = st.id
+                AND sb.status IN ('held', 'confirmed')
+                AND (sb.status = 'confirmed' OR sb.expires_at > now())
+            WHERE st.id = $1
+            ORDER BY s.row_label ASC, s.seat_number ASC
+        ";
+
+        sqlx::query_as(query_str)
+            .bind(showtime_id)
+            .bind(current_user_id)
+            .fetch_all(executor)
+            .await
     }
 
     pub async fn find_seats_with_status_by_theater_id<'e, E: PgExecutor<'e>>(
@@ -94,6 +263,7 @@ impl SeatRepository {
         let query_str = "
             SELECT
                 s.id,
+                s.event_id,
                 s.theater_id,
                 s.zone_id,
                 z.name AS zone_name,
@@ -151,6 +321,25 @@ impl SeatRepository {
             .await
     }
 
+    pub async fn exists_by_event_id_and_row_label_and_seat_number<'e, E: PgExecutor<'e>>(
+        executor: E,
+        event_id: Uuid,
+        row_label: &str,
+        seat_number: i32,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar(
+            "SELECT EXISTS(
+                SELECT 1 FROM seats
+                WHERE event_id = $1 AND row_label = $2 AND seat_number = $3
+            )",
+        )
+        .bind(event_id)
+        .bind(row_label)
+        .bind(seat_number)
+        .fetch_one(executor)
+        .await
+    }
+
     pub async fn exists_by_theater_id_and_row_label_and_seat_number<'e, E: PgExecutor<'e>>(
         executor: E,
         theater_id: Uuid,
@@ -172,6 +361,28 @@ impl SeatRepository {
 
     pub async fn upsert<'e, E: PgExecutor<'e>>(
         executor: E,
+        event_id: Uuid,
+        zone_id: Uuid,
+        row_label: &str,
+        seat_number: i32,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "INSERT INTO seats (event_id, zone_id, row_label, seat_number)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (event_id, row_label, seat_number)
+             DO UPDATE SET zone_id = EXCLUDED.zone_id",
+        )
+        .bind(event_id)
+        .bind(zone_id)
+        .bind(row_label)
+        .bind(seat_number)
+        .execute(executor)
+        .await?;
+        Ok(())
+    }
+
+    pub async fn upsert_for_theater<'e, E: PgExecutor<'e>>(
+        executor: E,
         theater_id: Uuid,
         zone_id: Uuid,
         row_label: &str,
@@ -190,6 +401,20 @@ impl SeatRepository {
         .execute(executor)
         .await?;
         Ok(())
+    }
+
+    pub async fn find_all_keys_by_event_id<'e, E: PgExecutor<'e>>(
+        executor: E,
+        event_id: Uuid,
+    ) -> Result<Vec<(Uuid, String, i32)>, sqlx::Error> {
+        sqlx::query_as(
+            "SELECT id, row_label, seat_number
+             FROM seats
+             WHERE event_id = $1",
+        )
+        .bind(event_id)
+        .fetch_all(executor)
+        .await
     }
 
     pub async fn find_all_keys_by_theater_id<'e, E: PgExecutor<'e>>(
@@ -211,7 +436,7 @@ impl SeatRepository {
         id: Uuid,
     ) -> Result<Option<crate::models::SeatWithZoneInfo>, sqlx::Error> {
         sqlx::query_as(
-            "SELECT s.id, s.theater_id, s.zone_id, s.row_label, s.seat_number, z.name AS zone_name, z.price_cents
+            "SELECT s.id, s.event_id, s.theater_id, s.zone_id, s.row_label, s.seat_number, z.name AS zone_name, z.price_cents
              FROM seats s
              JOIN zones z ON z.id = s.zone_id
              WHERE s.id = $1",

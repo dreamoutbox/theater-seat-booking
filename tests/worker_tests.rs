@@ -37,26 +37,28 @@ async fn test_scenario_1_same_seat_same_showtime_conflict() -> Result<(), Box<dy
         .execute(&pool)
         .await?;
 
+    let event_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO events (id, title) VALUES ($1, 'Event 1')")
+        .bind(event_id)
+        .execute(&pool)
+        .await?;
+
     let zone_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO zones (id, theater_id, name, price_cents) VALUES ($1, $2, 'Zone A', 2000)",
+        "INSERT INTO zones (id, event_id, theater_id, name, price_cents) VALUES ($1, $2, $3, 'Zone A', 2000)",
     )
     .bind(zone_id)
+    .bind(event_id)
     .bind(theater_id)
     .execute(&pool)
     .await?;
 
     let seat_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO seats (id, theater_id, zone_id, row_label, seat_number) VALUES ($1, $2, $3, 'Z', 99)")
+    sqlx::query("INSERT INTO seats (id, event_id, theater_id, zone_id, row_label, seat_number) VALUES ($1, $2, $3, $4, 'Z', 99)")
         .bind(seat_id)
+        .bind(event_id)
         .bind(theater_id)
         .bind(zone_id)
-        .execute(&pool)
-        .await?;
-
-    let event_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO events (id, title) VALUES ($1, 'Event 1')")
-        .bind(event_id)
         .execute(&pool)
         .await?;
 
@@ -155,26 +157,28 @@ async fn test_scenario_2_same_seat_different_showtimes_success()
         .execute(&pool)
         .await?;
 
+    let event_id = Uuid::new_v4();
+    sqlx::query("INSERT INTO events (id, title) VALUES ($1, 'Event 2')")
+        .bind(event_id)
+        .execute(&pool)
+        .await?;
+
     let zone_id = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO zones (id, theater_id, name, price_cents) VALUES ($1, $2, 'Zone B', 1500)",
+        "INSERT INTO zones (id, event_id, theater_id, name, price_cents) VALUES ($1, $2, $3, 'Zone B', 1500)",
     )
     .bind(zone_id)
+    .bind(event_id)
     .bind(theater_id)
     .execute(&pool)
     .await?;
 
     let seat_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO seats (id, theater_id, zone_id, row_label, seat_number) VALUES ($1, $2, $3, 'Y', 88)")
+    sqlx::query("INSERT INTO seats (id, event_id, theater_id, zone_id, row_label, seat_number) VALUES ($1, $2, $3, $4, 'Y', 88)")
         .bind(seat_id)
+        .bind(event_id)
         .bind(theater_id)
         .bind(zone_id)
-        .execute(&pool)
-        .await?;
-
-    let event_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO events (id, title) VALUES ($1, 'Event 2')")
-        .bind(event_id)
         .execute(&pool)
         .await?;
 

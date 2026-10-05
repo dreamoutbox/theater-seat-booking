@@ -63,7 +63,8 @@ pub struct Theater {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Zone {
     pub id: Uuid,
-    pub theater_id: Uuid,
+    pub event_id: Uuid,
+    pub theater_id: Option<Uuid>,
     pub name: String,
     pub price_cents: i64,
     pub color: Option<String>,
@@ -72,10 +73,18 @@ pub struct Zone {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Seat {
     pub id: Uuid,
-    pub theater_id: Uuid,
+    pub event_id: Uuid,
+    pub theater_id: Option<Uuid>,
     pub zone_id: Uuid,
     pub row_label: String,
     pub seat_number: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventLayout {
+    pub event: Event,
+    pub zones: Vec<Zone>,
+    pub seats: Vec<Seat>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -110,7 +119,8 @@ pub struct SaveLayoutPayload {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SeatWithStatus {
     pub id: Uuid,
-    pub theater_id: Uuid,
+    pub event_id: Option<Uuid>,
+    pub theater_id: Option<Uuid>,
     pub zone_id: Uuid,
     pub zone_name: String,
     pub zone_color: Option<String>,
@@ -452,7 +462,8 @@ pub struct TicketSeatChangeDetail {
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct SeatWithZoneInfo {
     pub id: Uuid,
-    pub theater_id: Uuid,
+    pub event_id: Option<Uuid>,
+    pub theater_id: Option<Uuid>,
     pub zone_id: Uuid,
     pub row_label: String,
     pub seat_number: i32,
