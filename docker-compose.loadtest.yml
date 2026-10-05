@@ -1,0 +1,20 @@
+networks:
+  theater_net:
+    name: theater_net
+    external: true
+
+services:
+  loadtest:
+    image: dreamoutbox/theater-seat-booking-loadtest:latest
+    pull_policy: never
+    container_name: theater-loadtest
+    networks:
+      - theater_net
+    environment:
+      - TARGET_URL=${TARGET_URL:-http://backend:3000/api}
+      - VUS=${VUS:-1000}
+      - DURATION=${DURATION:-30s}
+      - SHOWTIME_ID=${SHOWTIME_ID:-}
+      - JWT_SECRET=${JWT_SECRET:-theater_booking_poc_jwt_secret_key_1234567890_super_secure}
+    volumes:
+      - ./loadtest:/loadtest
