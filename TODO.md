@@ -21,6 +21,8 @@
 
 - [x] environment variable to set currency to use in stripe.
 
+- [ ] add Dockerfile and docker compose. use cargo chef.
+
 - [ ] loadtest. simulate 1000+ users sale for big event. skip stripe payment (to prevent rate limit).
 
 - [ ] frontend remove test logins info

@@ -14,27 +14,12 @@
 
       <!-- Controls / Event Filter Dropdown -->
       <div class="d-flex align-center gap-3 flex-wrap">
-        <v-select
-          v-model="selectedEventId"
-          :items="eventOptions"
-          item-title="title"
-          item-value="id"
-          label="Filter by Event"
-          variant="outlined"
-          density="compact"
-          hide-details
-          theme="dark"
-          style="min-width: 240px;"
-          @update:model-value="fetchDashboardData"
-        ></v-select>
+        <v-select v-model="selectedEventId" :items="eventOptions" item-title="title" item-value="id"
+          label="Filter by Event" variant="outlined" density="compact" hide-details theme="dark"
+          style="min-width: 240px;" @update:model-value="fetchDashboardData"></v-select>
 
-        <v-btn
-          prepend-icon="mdi-refresh"
-          variant="outlined"
-          size="small"
-          :loading="loading"
-          @click="fetchDashboardData"
-        >
+        <v-btn prepend-icon="mdi-refresh" variant="outlined" size="small" :loading="loading"
+          @click="fetchDashboardData">
           Refresh
         </v-btn>
       </div>
@@ -65,7 +50,7 @@
               </v-avatar>
             </div>
             <div class="text-h4 font-weight-black text-white font-weight-mono">
-              ${{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}
+              {{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}
             </div>
             <div class="text-caption text-grey mt-1">Total revenue from all ticket sales</div>
           </v-card>
@@ -81,7 +66,7 @@
               </v-avatar>
             </div>
             <div class="text-h4 font-weight-black text-red-accent-2 font-weight-mono">
-              ${{ ((metrics.total_refunds_cents || 0) / 100).toFixed(2) }}
+              {{ ((metrics.total_refunds_cents || 0) / 100).toFixed(2) }}
             </div>
             <div class="text-caption text-grey mt-1">
               {{ metrics.refunded_tickets || 0 }} {{ (metrics.refunded_tickets === 1) ? 'ticket' : 'tickets' }} refunded
@@ -99,7 +84,7 @@
               </v-avatar>
             </div>
             <div class="text-h4 font-weight-black text-amber-darken-1 font-weight-mono">
-              ${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}
+              {{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}
             </div>
             <div class="text-caption text-grey mt-1">Gross sales minus total refunds</div>
           </v-card>
@@ -152,14 +137,8 @@
             <div class="text-h4 font-weight-black text-white font-weight-mono">
               {{ metrics.attendance_rate_percent || 0 }}%
             </div>
-            <v-progress-linear
-              :model-value="metrics.attendance_rate_percent || 0"
-              color="amber-darken-1"
-              bg-color="grey-darken-3"
-              height="6"
-              rounded
-              class="mt-2"
-            ></v-progress-linear>
+            <v-progress-linear :model-value="metrics.attendance_rate_percent || 0" color="amber-darken-1"
+              bg-color="grey-darken-3" height="6" rounded class="mt-2"></v-progress-linear>
           </v-card>
         </v-col>
       </v-row>
@@ -217,15 +196,9 @@
                       {{ s.total_seats > 0 ? Math.round((s.sold_seats / s.total_seats) * 100) : 0 }}%
                     </v-chip>
                   </div>
-                  <v-progress-linear
-                    :model-value="s.total_seats > 0 ? (s.sold_seats / s.total_seats) * 100 : 0"
-                    color="teal"
-                    bg-color="grey-darken-3"
-                    height="4"
-                    rounded
-                    class="mt-1"
-                    style="max-width: 140px;"
-                  ></v-progress-linear>
+                  <v-progress-linear :model-value="s.total_seats > 0 ? (s.sold_seats / s.total_seats) * 100 : 0"
+                    color="teal" bg-color="grey-darken-3" height="4" rounded class="mt-1"
+                    style="max-width: 140px;"></v-progress-linear>
                 </td>
 
                 <!-- Checked-In -->
@@ -248,18 +221,18 @@
 
                 <!-- Gross -->
                 <td class="text-right font-weight-mono text-white">
-                  ${{ (s.gross_cents / 100).toFixed(2) }}
+                  {{ (s.gross_cents / 100).toFixed(2) }}
                 </td>
 
                 <!-- Refunds -->
                 <td class="text-right font-weight-mono text-red-accent-2">
-                  <span v-if="s.refunded_cents > 0">-${{ (s.refunded_cents / 100).toFixed(2) }}</span>
-                  <span v-else class="text-grey">$0.00</span>
+                  <span v-if="s.refunded_cents > 0">-{{ (s.refunded_cents / 100).toFixed(2) }}</span>
+                  <span v-else class="text-grey">0.00</span>
                 </td>
 
                 <!-- Net -->
                 <td class="text-right font-weight-mono font-weight-bold text-amber-darken-1">
-                  ${{ (s.net_cents / 100).toFixed(2) }}
+                  {{ (s.net_cents / 100).toFixed(2) }}
                 </td>
               </tr>
             </tbody>

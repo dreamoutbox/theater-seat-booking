@@ -193,6 +193,12 @@ impl PdfService {
         ));
         operations.push(Operation::new("ET", vec![]));
 
+        let currency = report
+            .report_data
+            .get("currency")
+            .and_then(|v| v.as_str())
+            .unwrap_or("THB");
+
         operations.push(Operation::new("BT", vec![]));
         operations.push(Operation::new("Tf", vec!["F_BOLD".into(), 9.into()]));
         operations.push(Operation::new("Td", vec![340.into(), 750.into()]));
@@ -204,7 +210,7 @@ impl PdfService {
         operations.push(Operation::new("Td", vec![60.into(), 0.into()]));
         operations.push(Operation::new(
             "Tj",
-            vec![Object::string_literal("USD ($)").into()],
+            vec![Object::string_literal(currency).into()],
         ));
         operations.push(Operation::new("ET", vec![]));
 
@@ -273,7 +279,7 @@ impl PdfService {
         operations.push(Operation::new("Td", vec![110.into(), 0.into()]));
         operations.push(Operation::new(
             "Tj",
-            vec![Object::string_literal("Amount (USD)").into()],
+            vec![Object::string_literal(format!("Amount ({currency})")).into()],
         ));
         operations.push(Operation::new("ET", vec![]));
 
@@ -281,11 +287,11 @@ impl PdfService {
         let row_height = 20.0;
         let mut curr_y = tbl1_y - 20.0;
 
-        let gross_str = format!("${:.2}", (report.gross_sales_cents as f64) / 100.0);
-        let refund_str = format!("-${:.2}", (report.total_refunds_cents as f64) / 100.0);
-        let net_profit_str = format!("${:.2}", (report.net_profit_cents as f64) / 100.0);
-        let tax_str = format!("-${:.2}", (report.tax_withholding_cents as f64) / 100.0);
-        let net_settle_str = format!("${:.2}", (report.net_settlement_cents as f64) / 100.0);
+        let gross_str = format!("{:.2}", (report.gross_sales_cents as f64) / 100.0);
+        let refund_str = format!("-{:.2}", (report.total_refunds_cents as f64) / 100.0);
+        let net_profit_str = format!("{:.2}", (report.net_profit_cents as f64) / 100.0);
+        let tax_str = format!("-{:.2}", (report.tax_withholding_cents as f64) / 100.0);
+        let net_settle_str = format!("{:.2}", (report.net_settlement_cents as f64) / 100.0);
 
         let lines = vec![
             (
@@ -479,7 +485,7 @@ impl PdfService {
             operations.push(Operation::new(
                 "Tj",
                 vec![
-                    Object::string_literal(format!("${:.2}", (st.net_cents as f64) / 100.0)).into(),
+                    Object::string_literal(format!("{:.2}", (st.net_cents as f64) / 100.0)).into(),
                 ],
             ));
             operations.push(Operation::new("ET", vec![]));

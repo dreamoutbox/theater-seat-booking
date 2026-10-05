@@ -24,6 +24,7 @@ pub struct EventReportsListResponse {
     pub can_generate: bool,
     pub cooldown_remaining_seconds: i64,
     pub latest_report_at: Option<chrono::DateTime<Utc>>,
+    pub currency: String,
 }
 
 /// GET /api/events/:id/reports
@@ -99,6 +100,7 @@ pub async fn list_event_reports(
         can_generate,
         cooldown_remaining_seconds,
         latest_report_at,
+        currency: state.config.stripe_currency.to_uppercase(),
     }))
 }
 
@@ -237,6 +239,7 @@ pub async fn generate_event_report(
 
     let snapshot_data = serde_json::json!({
         "statement_ref": statement_ref,
+        "currency": state.config.stripe_currency.to_uppercase(),
         "generated_at": now,
         "generated_by": auth_user.id,
         "generated_by_email": auth_user.email,
@@ -388,6 +391,16 @@ pub async fn get_report_by_id(
                     Json(serde_json::json!({ "error": "Access denied to view report" })),
                 ));
             }
+        }
+    }
+
+    let mut report = report;
+    if report.report_data.get("currency").is_none() {
+        if let Some(obj) = report.report_data.as_object_mut() {
+            obj.insert(
+                "currency".to_string(),
+                serde_json::Value::String(state.config.stripe_currency.to_uppercase()),
+            );
         }
     }
 

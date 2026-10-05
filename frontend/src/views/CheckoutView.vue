@@ -3,13 +3,8 @@
     <!-- Top Bar with Back Link -->
     <div class="d-flex align-center justify-space-between mb-6">
       <div class="d-flex align-center gap-3">
-        <v-btn
-          icon="mdi-arrow-left"
-          variant="text"
-          color="amber-darken-1"
-          :to="`/showtimes/${showtimeId}/booking`"
-          title="Back to Seat Selection"
-        ></v-btn>
+        <v-btn icon="mdi-arrow-left" variant="text" color="amber-darken-1" :to="`/showtimes/${showtimeId}/booking`"
+          title="Back to Seat Selection"></v-btn>
         <div>
           <h1 class="text-h4 font-weight-black text-white">Checkout & Ticket Registration</h1>
           <p class="text-subtitle-2 text-grey mb-0">
@@ -30,16 +25,11 @@
       <v-icon icon="mdi-seat-passenger" size="64" color="grey" class="mb-4"></v-icon>
       <h2 class="text-h5 font-weight-bold text-white mb-2">No Active Seat Holds Found</h2>
       <p class="text-grey mb-6" style="max-width: 500px; margin: 0 auto;">
-        You don't have any seats held for this showtime, or your seat hold expired. Please return to the seat map to pick your seats.
+        You don't have any seats held for this showtime, or your seat hold expired. Please return to the seat map to
+        pick your seats.
       </p>
-      <v-btn
-        color="amber-darken-1"
-        variant="flat"
-        size="large"
-        class="text-none font-weight-bold"
-        prepend-icon="mdi-seat-outline"
-        :to="`/showtimes/${showtimeId}/booking`"
-      >
+      <v-btn color="amber-darken-1" variant="flat" size="large" class="text-none font-weight-bold"
+        prepend-icon="mdi-seat-outline" :to="`/showtimes/${showtimeId}/booking`">
         Return to Seat Map
       </v-btn>
     </v-card>
@@ -72,47 +62,30 @@
               Enter the name and contact phone for the person using each ticket pass at entry gate.
             </p>
 
-            <div
-              v-for="(seat, idx) in heldSeats"
-              :key="seat.id"
-              class="pa-4 rounded-lg bg-surface-variant border mb-4"
-            >
+            <div v-for="(seat, idx) in heldSeats" :key="seat.id" class="pa-4 rounded-lg bg-surface-variant border mb-4">
               <div class="d-flex justify-space-between align-center mb-3">
                 <div class="d-flex align-center gap-2">
-                  <v-chip size="small" :color="seat.zone_color || 'amber-darken-1'" variant="flat" class="font-weight-bold">
+                  <v-chip size="small" :color="seat.zone_color || 'amber-darken-1'" variant="flat"
+                    class="font-weight-bold">
                     Row {{ seat.row_label }}, Seat {{ seat.seat_number }}
                   </v-chip>
                   <span class="text-caption text-grey font-weight-bold">{{ seat.zone_name }}</span>
                 </div>
                 <span class="text-body-2 font-weight-bold font-weight-mono text-white">
-                  ${{ (seat.price_cents / 100).toFixed(2) }}
+                  {{ (seat.price_cents / 100).toFixed(2) }}
                 </span>
               </div>
 
               <v-row dense>
                 <v-col cols="12" sm="6">
-                  <v-text-field
-                    v-model="attendees[seat.id].name"
-                    :label="`Attendee ${idx + 1} Full Name *`"
-                    placeholder="e.g. John Doe"
-                    variant="outlined"
-                    density="comfortable"
-                    required
-                    :rules="[v => !!v || 'Attendee name is required']"
-                    prepend-inner-icon="mdi-account"
-                  ></v-text-field>
+                  <v-text-field v-model="attendees[seat.id].name" :label="`Attendee ${idx + 1} Full Name *`"
+                    placeholder="e.g. John Doe" variant="outlined" density="comfortable" required
+                    :rules="[v => !!v || 'Attendee name is required']" prepend-inner-icon="mdi-account"></v-text-field>
                 </v-col>
                 <v-col cols="12" sm="6">
-                  <v-text-field
-                    v-model="attendees[seat.id].phone"
-                    :label="`Attendee ${idx + 1} Mobile Phone *`"
-                    placeholder="e.g. +1 555-019-2834"
-                    variant="outlined"
-                    density="comfortable"
-                    required
-                    :rules="[v => !!v || 'Attendee phone is required']"
-                    prepend-inner-icon="mdi-phone"
-                  ></v-text-field>
+                  <v-text-field v-model="attendees[seat.id].phone" :label="`Attendee ${idx + 1} Mobile Phone *`"
+                    placeholder="e.g. +1 555-019-2834" variant="outlined" density="comfortable" required
+                    :rules="[v => !!v || 'Attendee phone is required']" prepend-inner-icon="mdi-phone"></v-text-field>
                 </v-col>
               </v-row>
             </div>
@@ -125,14 +98,8 @@
                 <v-icon icon="mdi-file-document-outline" color="teal-accent-3"></v-icon>
                 <span class="text-h6 font-weight-bold text-white">Tax Invoice & Billing Information</span>
               </div>
-              <v-checkbox
-                v-model="includeTaxInfo"
-                label="Request Tax Invoice"
-                color="amber-darken-1"
-                hide-details
-                density="compact"
-                class="font-weight-bold"
-              ></v-checkbox>
+              <v-checkbox v-model="includeTaxInfo" label="Request Tax Invoice" color="amber-darken-1" hide-details
+                density="compact" class="font-weight-bold"></v-checkbox>
             </div>
             <p class="text-caption text-grey mb-4">
               Optional corporate or personal tax identification to be printed on your official tax invoice.
@@ -142,39 +109,20 @@
               <div v-if="includeTaxInfo" class="pt-2">
                 <v-row dense>
                   <v-col cols="12" sm="7">
-                    <v-text-field
-                      v-model="billingForm.billing_name"
-                      label="Company / Individual Tax Name *"
-                      placeholder="e.g. Acme Corporation or Jane Doe"
-                      variant="outlined"
-                      density="comfortable"
-                      prepend-inner-icon="mdi-domain"
-                      class="mb-3"
-                    ></v-text-field>
+                    <v-text-field v-model="billingForm.billing_name" label="Company / Individual Tax Name *"
+                      placeholder="e.g. Acme Corporation or Jane Doe" variant="outlined" density="comfortable"
+                      prepend-inner-icon="mdi-domain" class="mb-3"></v-text-field>
                   </v-col>
                   <v-col cols="12" sm="5">
-                    <v-text-field
-                      v-model="billingForm.tax_id"
-                      label="Tax ID / VAT Registration No. *"
-                      placeholder="e.g. US-987654321"
-                      variant="outlined"
-                      density="comfortable"
-                      prepend-inner-icon="mdi-card-account-details-outline"
-                      class="mb-3"
-                    ></v-text-field>
+                    <v-text-field v-model="billingForm.tax_id" label="Tax ID / VAT Registration No. *"
+                      placeholder="e.g. US-987654321" variant="outlined" density="comfortable"
+                      prepend-inner-icon="mdi-card-account-details-outline" class="mb-3"></v-text-field>
                   </v-col>
                 </v-row>
 
-                <v-textarea
-                  v-model="billingForm.billing_address"
-                  label="Registered Billing Address"
-                  placeholder="e.g. 500 5th Ave, Suite 1200, New York, NY 10110"
-                  variant="outlined"
-                  density="comfortable"
-                  rows="2"
-                  prepend-inner-icon="mdi-map-marker-outline"
-                  class="mb-3"
-                ></v-textarea>
+                <v-textarea v-model="billingForm.billing_address" label="Registered Billing Address"
+                  placeholder="e.g. 500 5th Ave, Suite 1200, New York, NY 10110" variant="outlined"
+                  density="comfortable" rows="2" prepend-inner-icon="mdi-map-marker-outline" class="mb-3"></v-textarea>
               </div>
             </v-expand-transition>
           </v-card>
@@ -188,11 +136,8 @@
 
           <!-- Line items -->
           <div class="d-flex flex-column gap-2 mb-4">
-            <div
-              v-for="seat in heldSeats"
-              :key="seat.id"
-              class="d-flex justify-space-between align-center py-2 border-bottom"
-            >
+            <div v-for="seat in heldSeats" :key="seat.id"
+              class="d-flex justify-space-between align-center py-2 border-bottom">
               <div>
                 <span class="text-body-2 font-weight-bold text-white">
                   Seat {{ seat.row_label }}{{ seat.seat_number }}
@@ -203,7 +148,7 @@
                 </div>
               </div>
               <span class="text-body-2 font-weight-mono font-weight-bold text-white">
-                ${{ (seat.price_cents / 100).toFixed(2) }}
+                {{ (seat.price_cents / 100).toFixed(2) }}
               </span>
             </div>
           </div>
@@ -211,11 +156,11 @@
           <!-- Price Calculations -->
           <div class="d-flex justify-space-between align-center mb-2 text-caption text-grey">
             <span>Seats Subtotal ({{ heldSeats.length }}):</span>
-            <span class="font-weight-mono">${{ (totalCents / 100).toFixed(2) }}</span>
+            <span class="font-weight-mono">{{ (totalCents / 100).toFixed(2) }}</span>
           </div>
           <div class="d-flex justify-space-between align-center mb-3 text-caption text-grey">
             <span>Merchant & Processing Fee:</span>
-            <span class="text-success font-weight-bold">$0.00 (Included)</span>
+            <span class="text-success font-weight-bold">0.00 (Included)</span>
           </div>
 
           <v-divider class="my-4"></v-divider>
@@ -223,22 +168,14 @@
           <div class="d-flex justify-space-between align-center mb-6">
             <span class="text-h6 font-weight-bold text-white">Total Due:</span>
             <span class="text-h4 font-weight-black text-amber-darken-1 font-weight-mono">
-              ${{ (totalCents / 100).toFixed(2) }}
+              {{ (totalCents / 100).toFixed(2) }}
             </span>
           </div>
 
           <!-- Pay & Confirm Button -->
-          <v-btn
-            color="amber-darken-1"
-            variant="flat"
-            block
-            size="x-large"
-            class="text-none font-weight-bold mb-3"
-            :loading="paying"
-            prepend-icon="mdi-credit-card-check"
-            @click="handleCompletePayment"
-          >
-            Pay & Confirm (${{ (totalCents / 100).toFixed(2) }})
+          <v-btn color="amber-darken-1" variant="flat" block size="x-large" class="text-none font-weight-bold mb-3"
+            :loading="paying" prepend-icon="mdi-credit-card-check" @click="handleCompletePayment">
+            Pay & Confirm ({{ (totalCents / 100).toFixed(2) }})
           </v-btn>
 
           <div class="text-caption text-grey text-center">
@@ -415,9 +352,11 @@ onMounted(() => {
 .gap-2 {
   gap: 8px;
 }
+
 .gap-3 {
   gap: 12px;
 }
+
 .border-bottom {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }

@@ -27,7 +27,8 @@
                   <div class="d-flex align-center gap-2 mb-1">
                     <span class="text-caption text-grey font-weight-mono text-uppercase">FINANCIAL STATEMENTS & TAX
                       FILINGS</span>
-                    <span class="text-caption font-weight-mono text-amber-darken-1 font-weight-bold">#{{ event.id }}</span>
+                    <span class="text-caption font-weight-mono text-amber-darken-1 font-weight-bold">#{{ event.id
+                      }}</span>
                   </div>
                   <h1 class="text-h4 font-weight-bold text-white mb-2">
                     {{ event.title }}
@@ -42,8 +43,8 @@
               <!-- Action / Cooldown Button -->
               <div class="d-flex align-center gap-2">
                 <v-btn color="amber-darken-1" variant="flat" size="default" prepend-icon="mdi-calculator-variant"
-                  class="text-none font-weight-bold" :loading="generating" :disabled="!canGenerate && !authStore.isAdmin && !authStore.isStaff"
-                  @click="generateReport">
+                  class="text-none font-weight-bold" :loading="generating"
+                  :disabled="!canGenerate && !authStore.isAdmin && !authStore.isStaff" @click="generateReport">
                   <span v-if="canGenerate || authStore.isAdmin || authStore.isStaff">Generate Report Snapshot</span>
                   <span v-else>Cooldown: {{ formattedCooldown }}</span>
                 </v-btn>
@@ -75,7 +76,7 @@
                     </v-avatar>
                   </div>
                   <div class="text-h5 font-weight-black text-white font-weight-mono">
-                    ${{ ((latestReport.gross_sales_cents || 0) / 100).toFixed(2) }}
+                    {{ ((latestReport.gross_sales_cents || 0) / 100).toFixed(2) }}
                   </div>
                   <div class="text-caption text-grey mt-1">Total customer purchases</div>
                 </v-card>
@@ -91,7 +92,7 @@
                     </v-avatar>
                   </div>
                   <div class="text-h5 font-weight-black text-red-accent-2 font-weight-mono">
-                    ${{ ((latestReport.total_refunds_cents || 0) / 100).toFixed(2) }}
+                    {{ ((latestReport.total_refunds_cents || 0) / 100).toFixed(2) }}
                   </div>
                   <div class="text-caption text-grey mt-1">
                     {{ latestReport.tickets_refunded || 0 }} tickets refunded
@@ -110,7 +111,7 @@
                     </v-avatar>
                   </div>
                   <div class="text-h5 font-weight-black text-amber-darken-1 font-weight-mono">
-                    ${{ ((latestReport.net_settlement_cents || 0) / 100).toFixed(2) }}
+                    {{ ((latestReport.net_settlement_cents || 0) / 100).toFixed(2) }}
                   </div>
                   <div class="text-caption text-grey mt-1">After 10% tax withholding</div>
                 </v-card>
@@ -200,17 +201,17 @@
 
                   <!-- Gross Revenue -->
                   <td class="text-right font-mono font-weight-bold text-white">
-                    ${{ ((rep.gross_sales_cents || 0) / 100).toFixed(2) }}
+                    {{ ((rep.gross_sales_cents || 0) / 100).toFixed(2) }}
                   </td>
 
                   <!-- Tax -->
                   <td class="text-right font-mono text-grey">
-                    ${{ ((rep.tax_withholding_cents || 0) / 100).toFixed(2) }}
+                    {{ ((rep.tax_withholding_cents || 0) / 100).toFixed(2) }}
                   </td>
 
                   <!-- Net Settlement -->
                   <td class="text-right font-mono font-weight-bold text-amber-darken-1">
-                    ${{ ((rep.net_settlement_cents || 0) / 100).toFixed(2) }}
+                    {{ ((rep.net_settlement_cents || 0) / 100).toFixed(2) }}
                   </td>
 
                   <!-- Attendance -->

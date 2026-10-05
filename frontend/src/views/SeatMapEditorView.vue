@@ -69,7 +69,7 @@
               <div v-for="zone in draftZones" :key="zone.id" class="d-flex align-center gap-1 zone-legend-badge">
                 <div class="zone-color-dot" :style="{ background: getZoneColorHex(zone.name) }"></div>
                 <span class="text-caption text-white font-weight-bold" style="font-size: 11px;">{{ zone.name }}</span>
-                <span class="text-caption text-grey font-weight-mono" style="font-size: 10px;">(${{ (zone.price_cents /
+                <span class="text-caption text-grey font-weight-mono" style="font-size: 10px;">({{ (zone.price_cents /
                   100).toFixed(2) }})</span>
               </div>
             </div>
@@ -192,7 +192,7 @@
                       }"
                       :title="isSeatLocked(slot.seat)
                         ? `🔒 LOCKED: Row ${slot.rowLabel}, Seat ${slot.seatNumber} is booked in '${getBookedSeatInfo(slot.seat)?.event_title || 'Show'}' (${getBookedSeatInfo(slot.seat)?.order_id ? 'Order #' + getBookedSeatInfo(slot.seat).order_id.substring(0, 8) : 'Held'}) • Drag to reassign • Right-click to view order`
-                        : `Row ${slot.rowLabel}, Seat ${slot.seatNumber} (${getZoneName(slot.seat.zone_id)} - $${(getZonePrice(slot.seat.zone_id) / 100).toFixed(2)}) • Drag to move`"
+                        : `Row ${slot.rowLabel}, Seat ${slot.seatNumber} (${getZoneName(slot.seat.zone_id)} - ${(getZonePrice(slot.seat.zone_id) / 100).toFixed(2)}) • Drag to move`"
                       :data-row="slot.rowLabel" :data-seat="slot.seatNumber"
                       @contextmenu.prevent.stop="handleSeatContextMenu($event, slot.seat)">
                       <span class="seat-number-label">{{ slot.seatNumber }}</span>
@@ -312,7 +312,7 @@
               REASSIGN ZONE
             </label>
             <v-select v-model="bulkZoneId" :items="draftZones"
-              :item-title="item => `${item.name} ($${(item.price_cents / 100).toFixed(2)})`" item-value="id"
+              :item-title="item => `${item.name} (${(item.price_cents / 100).toFixed(2)})`" item-value="id"
               variant="outlined" density="compact" hide-details placeholder="Select Zone..."
               :disabled="selectedSeatKeys.size === 0" class="mb-1"></v-select>
             <v-btn color="indigo-darken-1" variant="flat" block size="x-small" class="text-none font-weight-bold"
@@ -404,7 +404,7 @@
           </v-row>
 
           <v-select v-model="gridDialog.zoneId" label="Default Zone" :items="draftZones"
-            :item-title="item => `${item.name} ($${(item.price_cents / 100).toFixed(2)})`" item-value="id"
+            :item-title="item => `${item.name} (${(item.price_cents / 100).toFixed(2)})`" item-value="id"
             variant="outlined" density="comfortable" class="mb-3"></v-select>
 
           <v-radio-group v-model="gridDialog.mode" inline density="compact">
@@ -441,7 +441,7 @@
           <v-text-field v-model.number="singleSeatDialog.seatNumber" label="Seat Number (1–100)" type="number" min="1"
             max="100" variant="outlined" density="comfortable" class="mb-2"></v-text-field>
           <v-select v-model="singleSeatDialog.zoneId" label="Zone Tier" :items="draftZones"
-            :item-title="item => `${item.name} ($${(item.price_cents / 100).toFixed(2)})`" item-value="id"
+            :item-title="item => `${item.name} (${(item.price_cents / 100).toFixed(2)})`" item-value="id"
             variant="outlined" density="comfortable"></v-select>
         </v-card-text>
         <v-card-actions class="pa-4 pt-0">
@@ -488,8 +488,8 @@
                     hide-details></v-text-field>
                 </td>
                 <td>
-                  <v-text-field :model-value="(z.price_cents / 100).toFixed(2)" prefix="$" type="number" step="0.50"
-                    min="0" variant="outlined" density="compact" hide-details
+                  <v-text-field :model-value="(z.price_cents / 100).toFixed(2)" type="number" step="0.50" min="0"
+                    variant="outlined" density="compact" hide-details
                     @update:model-value="val => z.price_cents = Math.round(parseFloat(val || 0) * 100)"></v-text-field>
                 </td>
                 <td class="py-2">
@@ -562,7 +562,7 @@
               <span class="text-caption text-grey">
                 Reassign booking for <strong>{{ changeSeatDialog.eventTitle }}</strong>
                 <span v-if="changeSeatDialog.userEmail" class="ml-1 text-grey-lighten-1">({{ changeSeatDialog.userEmail
-                }})</span>
+                  }})</span>
                 <span v-if="changeSeatDialog.orderId" class="ml-1 text-amber-accent-2 font-mono">• Order #{{
                   changeSeatDialog.orderId.substring(0, 8) }}</span>
               </span>
@@ -601,7 +601,7 @@
                   Row {{ changeSeatDialog.newSeat.row_label }}, Seat {{ changeSeatDialog.newSeat.seat_number }}
                 </span>
                 <span class="text-caption text-grey">
-                  ({{ changeSeatDialog.newSeat.zone_name }} - ${{ (changeSeatDialog.newSeat.price_cents /
+                  ({{ changeSeatDialog.newSeat.zone_name }} - {{ (changeSeatDialog.newSeat.price_cents /
                     100).toFixed(2)
                   }})
                 </span>
@@ -667,14 +667,14 @@
                 </div>
                 <div class="text-caption text-grey mt-1">
                   <span v-if="changeSeatDialog.isFreeUpgrade">
-                    Order total remains <strong>${{ ((changeSeatDialog.oldSeat?.price_cents || 0) / 100).toFixed(2)
-                    }}</strong>.
+                    Order total remains <strong>{{ ((changeSeatDialog.oldSeat?.price_cents || 0) / 100).toFixed(2)
+                      }}</strong>.
                     No extra charge will be billed to the customer.
                   </span>
                   <span v-else>
-                    Order total will be updated to <strong>${{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2)
-                    }}</strong>
-                    (+${{ (((changeSeatDialog.newSeat.price_cents || 0) - (changeSeatDialog.oldSeat?.price_cents || 0))
+                    Order total will be updated to <strong>{{ (changeSeatDialog.newSeat.price_cents / 100).toFixed(2)
+                      }}</strong>
+                    (+{{ (((changeSeatDialog.newSeat.price_cents || 0) - (changeSeatDialog.oldSeat?.price_cents || 0))
                       /
                       100).toFixed(2) }} price difference).
                   </span>

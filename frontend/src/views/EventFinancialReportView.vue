@@ -68,7 +68,7 @@
               <th class="text-left bg-light-gray" style="width: 18%;">Event Title:</th>
               <td style="width: 32%;" class="font-bold">{{ event?.title }}</td>
               <th class="text-left bg-light-gray" style="width: 22%;">Accounting Currency:</th>
-              <td style="width: 28%;" class="font-bold font-mono">USD ($)</td>
+              <td style="width: 28%;" class="font-bold font-mono">{{ currency }}</td>
             </tr>
             <tr>
               <th class="text-left bg-light-gray">Event ID:</th>
@@ -92,7 +92,7 @@
             <tr>
               <th class="text-left">Revenue & Expense Breakdown Line Items</th>
               <th class="text-center" style="width: 140px;">Quantity / Units</th>
-              <th class="text-right" style="width: 180px;">Amount (USD)</th>
+              <th class="text-right" style="width: 180px;">Amount ({{ currency }})</th>
             </tr>
           </thead>
           <tbody>
@@ -102,7 +102,7 @@
                 <div class="text-small text-muted">Total value of all customer orders placed and paid</div>
               </td>
               <td class="text-center font-mono">{{ metrics.total_tickets_created || 0 }} Tickets Issued</td>
-              <td class="text-right font-mono font-bold">${{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}</td>
+              <td class="text-right font-mono font-bold">{{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}</td>
             </tr>
             <tr class="row-danger">
               <td>
@@ -110,7 +110,7 @@
                 <div class="text-small text-muted">Returned seat bookings and reversed charges</div>
               </td>
               <td class="text-center font-mono text-danger">{{ metrics.refunded_tickets || 0 }} Tickets Refunded</td>
-              <td class="text-right font-mono font-bold text-danger">-${{ ((metrics.total_refunds_cents || 0) /
+              <td class="text-right font-mono font-bold text-danger">-{{ ((metrics.total_refunds_cents || 0) /
                 100).toFixed(2) }}</td>
             </tr>
             <tr class="row-highlight bg-light-gray">
@@ -119,7 +119,7 @@
                 <div class="text-small text-muted">Gross sales revenue minus refunded transactions</div>
               </td>
               <td class="text-center font-mono">{{ metrics.active_tickets || 0 }} Active Tickets</td>
-              <td class="text-right font-mono font-bold">${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}</td>
+              <td class="text-right font-mono font-bold">{{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}</td>
             </tr>
             <tr>
               <td>
@@ -127,7 +127,7 @@
                 <div class="text-small text-muted">Estimated entertainment & business transaction tax liability</div>
               </td>
               <td class="text-center font-mono text-muted">Standard Rate</td>
-              <td class="text-right font-mono font-bold text-muted">-${{ (((metrics.net_profit_cents || 0) * 0.10) /
+              <td class="text-right font-mono font-bold text-muted">- {{ (((metrics.net_profit_cents || 0) * 0.10) /
                 100).toFixed(2) }}</td>
             </tr>
             <tr class="row-total">
@@ -137,7 +137,7 @@
               </td>
               <td class="text-center font-mono text-large font-bold">100% Cleared</td>
               <td class="text-right font-mono text-large font-bold text-primary">
-                ${{ (((metrics.net_profit_cents || 0) * 0.90) / 100).toFixed(2) }}
+                {{ (((metrics.net_profit_cents || 0) * 0.90) / 100).toFixed(2) }}
               </td>
             </tr>
           </tbody>
@@ -169,7 +169,7 @@
               <td class="text-center font-mono">{{ st.total_seats || 0 }}</td>
               <td class="text-center font-mono font-bold">{{ st.sold_seats || 0 }}</td>
               <td class="text-center font-mono text-success">{{ st.used_tickets || 0 }}</td>
-              <td class="text-right font-mono font-bold">${{ ((st.net_cents || 0) / 100).toFixed(2) }}</td>
+              <td class="text-right font-mono font-bold">{{ ((st.net_cents || 0) / 100).toFixed(2) }}</td>
             </tr>
             <tr v-if="showtimes.length === 0">
               <td colspan="6" class="text-center text-muted py-3">No showtimes recorded for this event.</td>
@@ -181,7 +181,7 @@
               <td class="text-center font-mono">{{ totalCapacity }}</td>
               <td class="text-center font-mono">{{ metrics.active_tickets || 0 }}</td>
               <td class="text-center font-mono text-success">{{ metrics.used_tickets || 0 }}</td>
-              <td class="text-right font-mono">${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}</td>
+              <td class="text-right font-mono">{{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}</td>
             </tr>
           </tfoot>
         </table>
@@ -248,6 +248,7 @@ const error = ref(null);
 const event = ref(null);
 const showtimes = ref([]);
 const organizerEmail = ref('');
+const currency = ref('THB');
 const reportGeneratedAt = ref(new Date());
 const rawStatementRef = ref('');
 
@@ -327,6 +328,7 @@ async function loadReportData() {
       reportGeneratedAt.value = new Date(rep.generated_at);
 
       const snap = rep.report_data || {};
+      currency.value = snap.currency || 'THB';
       event.value = snap.event || { id: rep.event_id, title: 'Event' };
       organizerEmail.value = snap.organizer_email || rep.generated_by_email || '';
       metrics.value = snap.metrics || {
@@ -348,6 +350,7 @@ async function loadReportData() {
         rawStatementRef.value = latest.statement_ref;
         reportGeneratedAt.value = new Date(latest.generated_at);
         const snap = latest.report_data || {};
+        currency.value = snap.currency || reportsRes.data.currency || 'THB';
         event.value = snap.event || { id: latest.event_id, title: 'Event' };
         organizerEmail.value = snap.organizer_email || latest.generated_by_email || '';
         metrics.value = snap.metrics || {};
@@ -365,6 +368,7 @@ async function loadReportData() {
           return;
         }
         event.value = found;
+        currency.value = analyticsRes.data.currency || 'THB';
         metrics.value = analyticsRes.data.metrics || {};
         showtimes.value = analyticsRes.data.showtimes || [];
         reportGeneratedAt.value = new Date();

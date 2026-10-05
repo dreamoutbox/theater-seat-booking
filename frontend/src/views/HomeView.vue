@@ -62,13 +62,13 @@
             <!-- Pricing Tiers -->
             <div class="d-flex flex-wrap gap-2 mb-5">
               <v-chip size="x-small" variant="outlined" color="amber-lighten-2" class="font-weight-bold">
-                VIP $25.00
+                VIP 25.00
               </v-chip>
               <v-chip size="x-small" variant="outlined" color="indigo-lighten-2" class="font-weight-bold">
-                Premium $18.00
+                Premium 18.00
               </v-chip>
               <v-chip size="x-small" variant="outlined" color="teal-lighten-2" class="font-weight-bold">
-                Standard $12.00
+                Standard 12.00
               </v-chip>
             </div>
 

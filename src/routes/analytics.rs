@@ -23,6 +23,7 @@ pub struct DashboardQuery {
 pub struct DashboardResponse {
     pub metrics: EventDashboardMetrics,
     pub showtimes: Vec<ShowtimeDashboardRow>,
+    pub currency: String,
 }
 
 pub async fn get_dashboard_data(
@@ -100,5 +101,9 @@ pub async fn get_dashboard_data(
         )
     })?;
 
-    Ok(Json(DashboardResponse { metrics, showtimes }))
+    Ok(Json(DashboardResponse {
+        metrics,
+        showtimes,
+        currency: state.config.stripe_currency.to_uppercase(),
+    }))
 }

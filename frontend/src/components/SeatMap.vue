@@ -12,7 +12,7 @@
         <span class="text-grey-lighten-1">
           {{ zone.name }}
           <span v-if="zone.price_cents !== undefined" class="text-grey font-weight-mono ml-1" style="font-size: 11px;">
-            (${{ (zone.price_cents / 100).toFixed(2) }})
+            ({{ (zone.price_cents / 100).toFixed(2) }})
           </span>
         </span>
       </div>
@@ -325,7 +325,7 @@ function getSeatTooltip(seat) {
   if (seat.status === 'held') {
     return `Seat ${seat.row_label}${seat.seat_number} - Currently reserved by another customer`;
   }
-  return `Row ${seat.row_label}, Seat ${seat.seat_number} • ${seat.zone_name} ($${price})`;
+  return `Row ${seat.row_label}, Seat ${seat.seat_number} • ${seat.zone_name} (${price})`;
 }
 
 async function fetchSeats() {

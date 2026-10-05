@@ -116,7 +116,7 @@
 
                   <div class="d-flex align-center gap-2">
                     <span class="font-weight-mono font-weight-bold text-body-2 text-white">
-                      ${{ (seat.price_cents / 100).toFixed(2) }}
+                      {{ (seat.price_cents / 100).toFixed(2) }}
                     </span>
                     <!-- Cancel button hidden when order is pending -->
                     <v-btn v-if="!pendingOrder" icon="mdi-close" size="x-small" color="red-lighten-2" variant="text"
@@ -135,11 +135,11 @@
 
               <div class="d-flex justify-space-between align-center mb-2 text-caption text-grey">
                 <span>Seats Subtotal ({{ myHeldSeats.length }}):</span>
-                <span class="font-weight-mono">${{ (totalCheckoutCents / 100).toFixed(2) }}</span>
+                <span class="font-weight-mono">{{ (totalCheckoutCents / 100).toFixed(2) }}</span>
               </div>
               <div class="d-flex justify-space-between align-center mb-3 text-caption text-grey">
                 <span>Processing & Fees:</span>
-                <span class="text-success font-weight-bold">$0.00 (Included)</span>
+                <span class="text-success font-weight-bold">0.00 (Included)</span>
               </div>
 
               <v-divider class="my-3"></v-divider>
@@ -147,7 +147,7 @@
               <div class="d-flex justify-space-between align-center mb-4">
                 <span class="text-body-1 font-weight-bold text-white">Total Due:</span>
                 <span class="text-h5 font-weight-black text-amber-darken-1 font-weight-mono">
-                  ${{ (totalCheckoutCents / 100).toFixed(2) }}
+                  {{ (totalCheckoutCents / 100).toFixed(2) }}
                 </span>
               </div>
             </template>
@@ -163,7 +163,7 @@
             </v-btn>
             <v-btn v-else color="amber-darken-1" variant="flat" block size="large" class="text-none font-weight-bold"
               :disabled="myHeldSeats.length === 0" prepend-icon="mdi-cart-arrow-right" @click="goToCheckout">
-              {{ myHeldSeats.length === 0 ? 'Select Seats to Book' : `Proceed to Checkout ($${(totalCheckoutCents /
+              {{ myHeldSeats.length === 0 ? 'Select Seats to Book' : `Proceed to Checkout (${(totalCheckoutCents /
                 100).toFixed(2)})` }}
             </v-btn>
             <div class="text-caption text-grey text-center mt-2">

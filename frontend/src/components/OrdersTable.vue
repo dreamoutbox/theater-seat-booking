@@ -134,15 +134,15 @@
             <td>
               <div v-if="order.refunded_amount_cents > 0">
                 <span class="font-weight-bold font-weight-mono text-white">
-                  ${{ ((order.total_amount_cents - order.refunded_amount_cents) / 100).toFixed(2) }}
+                  {{ ((order.total_amount_cents - order.refunded_amount_cents) / 100).toFixed(2) }}
                 </span>
                 <div class="text-caption text-grey">
-                  <span class="text-decoration-line-through">${{ (order.total_amount_cents / 100).toFixed(2) }}</span>
-                  <span class="text-red-accent-2 ml-1">(-${{ (order.refunded_amount_cents / 100).toFixed(2) }})</span>
+                  <span class="text-decoration-line-through">{{ (order.total_amount_cents / 100).toFixed(2) }}</span>
+                  <span class="text-red-accent-2 ml-1">(-{{ (order.refunded_amount_cents / 100).toFixed(2) }})</span>
                 </div>
               </div>
               <span v-else class="font-weight-bold font-weight-mono text-white">
-                ${{ (order.total_amount_cents / 100).toFixed(2) }}
+                {{ (order.total_amount_cents / 100).toFixed(2) }}
               </span>
             </td>
 

@@ -26,7 +26,7 @@
                 <div class="d-flex align-center gap-2 mb-1">
                   <span class="text-caption text-grey font-weight-mono text-uppercase">EVENT REFERENCE</span>
                   <span class="text-caption font-weight-mono text-amber-darken-1 font-weight-bold">#{{ event.id
-                  }}</span>
+                    }}</span>
                 </div>
                 <h1 class="text-h4 font-weight-bold text-white mb-2">
                   {{ event.title }}
@@ -40,14 +40,8 @@
                     <v-icon start icon="mdi-account-lock-outline" size="14"></v-icon>
                     Personal Limit: {{ event.max_seats_per_user || 10 }} seats / customer
                   </v-chip>
-                  <v-btn
-                    variant="tonal"
-                    size="small"
-                    color="amber-darken-1"
-                    prepend-icon="mdi-calendar-clock"
-                    class="font-weight-bold text-none ml-2"
-                    :to="`/manage/events/${event.id}/showtimes`"
-                  >
+                  <v-btn variant="tonal" size="small" color="amber-darken-1" prepend-icon="mdi-calendar-clock"
+                    class="font-weight-bold text-none ml-2" :to="`/manage/events/${event.id}/showtimes`">
                     {{ eventShowtimes.length }} {{ eventShowtimes.length === 1 ?
                       'Showtime session' : 'Showtime sessions' }}
                     <v-icon end icon="mdi-chevron-right" size="14"></v-icon>
@@ -82,7 +76,7 @@
                     </v-avatar>
                   </div>
                   <div class="text-h5 font-weight-black text-white font-weight-mono">
-                    ${{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}
+                    {{ ((metrics.gross_sales_cents || 0) / 100).toFixed(2) }}
                   </div>
                   <div class="text-caption text-grey mt-1">Total ticket sales revenue</div>
                 </v-card>
@@ -98,7 +92,7 @@
                     </v-avatar>
                   </div>
                   <div class="text-h5 font-weight-black text-red-accent-2 font-weight-mono">
-                    ${{ ((metrics.total_refunds_cents || 0) / 100).toFixed(2) }}
+                    {{ ((metrics.total_refunds_cents || 0) / 100).toFixed(2) }}
                   </div>
                   <div class="text-caption text-grey mt-1">
                     {{ metrics.refunded_tickets || 0 }} {{ (metrics.refunded_tickets === 1) ? 'ticket' : 'tickets' }}
@@ -117,7 +111,7 @@
                     </v-avatar>
                   </div>
                   <div class="text-h5 font-weight-black text-amber-darken-1 font-weight-mono">
-                    ${{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}
+                    {{ ((metrics.net_profit_cents || 0) / 100).toFixed(2) }}
                   </div>
                   <div class="text-caption text-grey mt-1">Gross sales minus refunds</div>
                 </v-card>
