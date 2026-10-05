@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "=========================================="
-echo "🔄 Resetting Database & Running Migrations..."
+echo "Resetting Database & Running Migrations..."
 echo "=========================================="
 
 # Load environment variables if .env exists
@@ -23,7 +23,7 @@ echo "Database URL: ${DATABASE_URL}"
 echo "🧹 Dropping and recreating public schema..."
 if command -v psql &> /dev/null; then
     psql "$DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;" > /dev/null 2>&1 || {
-        echo "⚠️  Direct psql failed, trying docker compose..."
+        echo "Direct psql failed, trying docker compose..."
         docker compose -f docker-compose.base.yml exec -T postgres psql -U postgres -d postgres -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;"
     }
 else
@@ -31,12 +31,12 @@ else
     docker compose -f docker-compose.base.yml exec -T postgres psql -U postgres -d postgres -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;"
 fi
 
-echo "✅ Database schema reset successfully."
+echo "Database schema reset successfully."
 
 # 2. Run SQLx migrations and seed sample data
-echo "🌱 Running migrations and seeding sample data..."
+echo "Running migrations and seeding sample data..."
 cargo run --bin seed
 
 echo "=========================================="
-echo "✨ Database reset and migrations complete!"
+echo "Database reset and migrations complete!"
 echo "=========================================="

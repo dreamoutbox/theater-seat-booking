@@ -39,7 +39,24 @@ export const options = {
 };
 
 function base64url(str) {
-  return encoding.b64encode(str, 'rawurl');
+  try {
+    return encoding.b64encode(str, 'rawurl');
+  } catch (e) {
+    return encoding.b64encode(str, 'std').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+}
+
+function signHmacSha256(secret, data) {
+  try {
+    return crypto.hmac('sha256', secret, data, 'base64rawurl');
+  } catch (e) {
+    try {
+      return crypto.hmac('sha256', secret, data, 'base64url');
+    } catch (e2) {
+      const b64 = crypto.hmac('sha256', secret, data, 'base64');
+      return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+  }
 }
 
 function makeJwt(userId, email, secret) {
@@ -53,7 +70,7 @@ function makeJwt(userId, email, secret) {
       exp: now + 86400,
     })
   );
-  const signature = crypto.hmac('sha256', secret, `${header}.${payload}`, 'rawurl');
+  const signature = signHmacSha256(secret, `${header}.${payload}`);
   return `${header}.${payload}.${signature}`;
 }
 
@@ -124,7 +141,7 @@ export default function () {
   });
 
   // If active booking limit reached or validation error, pause and retry
-  if (holdRes.status !== 200) {
+  if (holdRes.status !== 200 && holdRes.status !== 202) {
     seatsHeldConflict.add(1);
     sleep(0.5);
     return;

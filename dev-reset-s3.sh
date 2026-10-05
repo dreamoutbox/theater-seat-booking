@@ -5,7 +5,7 @@ set -e
 cd "$(dirname "$0")"
 
 echo "=========================================="
-echo "🪣 Resetting MinIO S3 Object Storage..."
+echo "Resetting MinIO S3 Object Storage..."
 echo "=========================================="
 
 # Load environment variables if .env exists
@@ -36,18 +36,18 @@ reset_s3_bucket() {
 
 # 1. Check if MinIO container is running via docker compose
 if docker compose -f docker-compose.base.yml ps minio --status running --format json 2>/dev/null | grep -q "minio"; then
-    echo "🧹 Wiping and recreating S3 bucket '${S3_BUCKET}' inside S3 container..."
+    echo "Wiping and recreating S3 bucket '${S3_BUCKET}' inside S3 container..."
     reset_s3_bucket
-    echo "✅ S3 bucket '${S3_BUCKET}' recreated successfully."
+    echo "S3 bucket '${S3_BUCKET}' recreated successfully."
 else
-    echo "⚠️  S3 container not running via docker compose"
+    echo "S3 container not running via docker compose"
     echo "Attempting to start S3 service..."
     docker compose -f docker-compose.base.yml up -d minio
     sleep 2
     reset_s3_bucket
-    echo "✅ S3 service started and bucket '${S3_BUCKET}' created."
+    echo "S3 service started and bucket '${S3_BUCKET}' created."
 fi
 
 echo "=========================================="
-echo "✨ S3 storage reset complete!"
+echo "S3 storage reset complete!"
 echo "=========================================="
