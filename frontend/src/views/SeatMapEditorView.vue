@@ -12,10 +12,10 @@
             <v-icon icon="mdi-seat-passenger" color="amber-darken-1" size="30" class="header-seat-icon mr-1"></v-icon>
             <span>Seat Map Editor</span>
           </h1>
-          <v-chip v-if="currentTheaterName" size="small" color="indigo-lighten-2" variant="tonal"
+          <v-chip v-if="displayTitle" size="small" color="indigo-lighten-2" variant="tonal"
             class="font-weight-bold ml-1 theater-chip">
-            <v-icon start icon="mdi-theater" size="14"></v-icon>
-            {{ currentTheaterName }}
+            <v-icon start :icon="isEventScope ? 'mdi-filmstrip' : 'mdi-theater'" size="14"></v-icon>
+            {{ displayTitle }}
           </v-chip>
           <v-chip v-if="isModified" size="x-small" color="amber-darken-1" variant="flat"
             class="font-weight-bold ml-1 unsaved-chip">
@@ -742,23 +742,34 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 
+const isEventScope = computed(() => route.path.includes('/events/') || route.name === 'EventSeatMapEditor');
+const selectedEventId = ref(null);
+const selectedTheaterId = ref(null);
+
 function goBack() {
   if (window.history.length > 1) {
     router.back();
+  } else if (isEventScope.value && selectedEventId.value) {
+    router.push(`/manage/events/${selectedEventId.value}`);
   } else {
-    router.push('/manage/theaters');
+    router.push('/manage/events');
   }
 }
 
 const theaters = ref([]);
-const selectedTheaterId = ref(null);
 const loading = ref(false);
 const saving = ref(false);
 
-const originalLayout = ref({ theater: null, zones: [], seats: [] });
+const originalLayout = ref({ theater: null, event: null, zones: [], seats: [] });
 const currentTheaterName = computed(() => {
   const t = theaters.value.find(item => item.id === selectedTheaterId.value);
   return t ? t.name : originalLayout.value.theater?.name || '';
+});
+const displayTitle = computed(() => {
+  if (isEventScope.value) {
+    return originalLayout.value.event?.title || 'Event Seat Map';
+  }
+  return currentTheaterName.value;
 });
 const draftZones = ref([]);
 const draftSeats = ref([]);
@@ -1899,15 +1910,24 @@ function discardChanges() {
 }
 
 async function fetchLayout() {
-  if (!selectedTheaterId.value) return;
+  if (isEventScope.value && !selectedEventId.value) return;
+  if (!isEventScope.value && !selectedTheaterId.value) return;
+
   loading.value = true;
   clearSelection();
   slotElementMap.clear();
 
   try {
+    const layoutUrl = isEventScope.value
+      ? `/events/${selectedEventId.value}/layout`
+      : `/theaters/${selectedTheaterId.value}/layout`;
+    const bookedUrl = isEventScope.value
+      ? `/events/${selectedEventId.value}/booked-seats`
+      : `/theaters/${selectedTheaterId.value}/booked-seats`;
+
     const [res, bookedRes] = await Promise.all([
-      api.get(`/theaters/${selectedTheaterId.value}/layout`),
-      api.get(`/theaters/${selectedTheaterId.value}/booked-seats`).catch(() => ({ data: [] })),
+      api.get(layoutUrl),
+      api.get(bookedUrl).catch(() => ({ data: [] })),
     ]);
     originalLayout.value = res.data;
     bookedSeats.value = bookedRes.data || [];
@@ -1918,14 +1938,15 @@ async function fetchLayout() {
       bulkZoneId.value = draftZones.value[0].id;
     }
   } catch (err) {
-    showToast('Failed to load theater seat layout', 'error');
+    showToast('Failed to load seat layout', 'error');
   } finally {
     loading.value = false;
   }
 }
 
 async function saveLayout() {
-  if (!selectedTheaterId.value) return;
+  if (isEventScope.value && !selectedEventId.value) return;
+  if (!isEventScope.value && !selectedTheaterId.value) return;
   saving.value = true;
 
   try {
@@ -1944,7 +1965,11 @@ async function saveLayout() {
       })),
     };
 
-    const res = await api.put(`/theaters/${selectedTheaterId.value}/layout`, payload);
+    const putUrl = isEventScope.value
+      ? `/events/${selectedEventId.value}/layout`
+      : `/theaters/${selectedTheaterId.value}/layout`;
+
+    const res = await api.put(putUrl, payload);
     originalLayout.value = res.data;
     draftZones.value = JSON.parse(JSON.stringify(res.data.zones || []));
     draftSeats.value = JSON.parse(JSON.stringify(res.data.seats || []));
@@ -1962,18 +1987,25 @@ onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeyDown);
 
   try {
-    const theatersRes = await api.get('/theaters');
-    theaters.value = theatersRes.data;
+    if (isEventScope.value) {
+      selectedEventId.value = route.params.id;
+      if (selectedEventId.value) {
+        await fetchLayout();
+      }
+    } else {
+      const theatersRes = await api.get('/theaters');
+      theaters.value = theatersRes.data;
 
-    const routeTheaterId = route.params.id;
-    if (routeTheaterId && theaters.value.some(t => t.id === routeTheaterId)) {
-      selectedTheaterId.value = routeTheaterId;
-    } else if (theaters.value.length > 0) {
-      selectedTheaterId.value = theaters.value[0].id;
-    }
+      const routeTheaterId = route.params.id;
+      if (routeTheaterId && theaters.value.some(t => t.id === routeTheaterId)) {
+        selectedTheaterId.value = routeTheaterId;
+      } else if (theaters.value.length > 0) {
+        selectedTheaterId.value = theaters.value[0].id;
+      }
 
-    if (selectedTheaterId.value) {
-      await fetchLayout();
+      if (selectedTheaterId.value) {
+        await fetchLayout();
+      }
     }
   } catch (err) {
     showToast('Failed to initialize editor', 'error');

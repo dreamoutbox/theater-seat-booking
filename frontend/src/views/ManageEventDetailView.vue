@@ -11,7 +11,7 @@
 
     <div v-else-if="event" class="manage-layout-body">
       <!-- Sidebar (Flush Left) -->
-      <EventSidebar :event="event" active-item="overview" @open-seat-map="openTheaterSeatMapSelector" />
+      <EventSidebar :event="event" active-item="overview" />
 
       <!-- Main Content Column (Right) -->
       <main class="manage-main-content">
@@ -180,25 +180,6 @@
       </main>
     </div>
 
-    <!-- Theater Selector Dialog for Seat Map Editor -->
-    <v-dialog v-model="theaterSelectorDialog.show" max-width="450">
-      <v-card theme="dark" class="rounded-xl pa-4">
-        <v-card-title class="text-h6 font-weight-bold">Select Theater Hall</v-card-title>
-        <v-card-text>
-          <div class="text-caption text-grey mb-4">Choose a theater to open the interactive Seat Map Editor.</div>
-          <v-select v-model="theaterSelectorDialog.theaterId" label="Theater" :items="theaters" item-title="name"
-            item-value="id" variant="outlined" density="comfortable"></v-select>
-        </v-card-text>
-        <v-card-actions class="pa-4 pt-0">
-          <v-btn variant="text" @click="theaterSelectorDialog.show = false">Cancel</v-btn>
-          <v-spacer></v-spacer>
-          <v-btn color="indigo-darken-1" variant="flat" class="font-weight-bold text-none"
-            :disabled="!theaterSelectorDialog.theaterId" @click="goToSeatMapEditor">
-            Open Editor
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
 
     <!-- Delete Confirmation Dialog -->
     <v-dialog v-model="deleteDialog.show" max-width="420">
@@ -274,10 +255,6 @@ const eventShowtimes = computed(() => {
     .sort((a, b) => new Date(a.starts_at) - new Date(b.starts_at));
 });
 
-const theaterSelectorDialog = ref({
-  show: false,
-  theaterId: null,
-});
 
 const deleteDialog = ref({
   show: false,
@@ -353,20 +330,6 @@ function openDeleteEventDialog() {
   };
 }
 
-function openTheaterSeatMapSelector() {
-  const defaultTheaterId = eventShowtimes.value[0]?.theater_id || theaters.value[0]?.id || null;
-  theaterSelectorDialog.value = {
-    show: true,
-    theaterId: defaultTheaterId,
-  };
-}
-
-function goToSeatMapEditor() {
-  if (theaterSelectorDialog.value.theaterId) {
-    theaterSelectorDialog.value.show = false;
-    router.push(`/manage/theaters/${theaterSelectorDialog.value.theaterId}/seat-map`);
-  }
-}
 
 async function confirmDelete() {
   deleteDialog.value.deleting = true;

@@ -43,11 +43,11 @@
 
       <!-- Seat Map Editor -->
       <li class="sidebar-nav-item">
-        <button type="button" class="sidebar-nav-link" :class="{ active: activeItem === 'seat-map' }"
-          @click="handleSeatMapClick">
+        <router-link :to="event ? `/manage/events/${event.id}/seat-map` : '/manage/seat-map'" class="sidebar-nav-link"
+          :class="{ active: activeItem === 'seat-map' }">
           <v-icon icon="mdi-seat-passenger" size="18" class="sidebar-icon"></v-icon>
           <span class="sidebar-label">Seat Map Editor</span>
-        </button>
+        </router-link>
       </li>
 
       <!-- Orders -->
@@ -110,9 +110,6 @@
 </template>
 
 <script setup>
-import { useAttrs } from 'vue';
-import { useRouter } from 'vue-router';
-
 const props = defineProps({
   event: {
     type: Object,
@@ -123,18 +120,6 @@ const props = defineProps({
     default: 'overview',
   },
 });
-
-const emit = defineEmits(['open-seat-map']);
-const attrs = useAttrs();
-const router = useRouter();
-
-function handleSeatMapClick() {
-  if (attrs.onOpenSeatMap || attrs['onOpen-seat-map']) {
-    emit('open-seat-map');
-  } else {
-    router.push('/manage/seat-map');
-  }
-}
 </script>
 
 <style scoped>

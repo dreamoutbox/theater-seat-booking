@@ -128,6 +128,13 @@ const routes = [
     meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
   },
   {
+    path: '/manage/events/:id/seat-map',
+    name: 'EventSeatMapEditor',
+    component: SeatMapEditorView,
+    props: true,
+    meta: { requiresAuth: true, roles: ['admin', 'staff', 'event_organizer'] },
+  },
+  {
     path: '/manage/seat-map',
     name: 'SeatMapEditor',
     component: SeatMapEditorView,

@@ -82,7 +82,7 @@
             v-for="theater in paginatedTheaters"
             :key="theater.id"
             class="clickable-row"
-            @click="goToSeatMapEditor(theater.id)"
+            @click="openEditTheaterDialog(theater)"
           >
             <!-- Name -->
             <td class="py-3">
@@ -92,7 +92,7 @@
                 </v-avatar>
                 <div>
                   <div class="font-weight-bold text-body-1 text-white">{{ theater.name }}</div>
-                  <div class="text-caption text-grey">Click to open Seat Map Editor</div>
+                  <div class="text-caption text-grey">Click to edit venue details</div>
                 </div>
               </div>
             </td>
@@ -115,16 +115,6 @@
             <!-- Actions -->
             <td class="text-right">
               <div class="d-flex align-center justify-end gap-1" @click.stop>
-                <v-btn
-                  variant="tonal"
-                  size="small"
-                  color="indigo-lighten-2"
-                  prepend-icon="mdi-seat-passenger"
-                  class="text-none font-weight-bold"
-                  :to="`/manage/theaters/${theater.id}/seat-map`"
-                >
-                  Edit Seat Map
-                </v-btn>
                 <v-btn
                   icon="mdi-pencil"
                   size="small"
@@ -309,9 +299,6 @@ const deleteDialog = ref({
   deleting: false,
 });
 
-function goToSeatMapEditor(theaterId) {
-  router.push(`/manage/theaters/${theaterId}/seat-map`);
-}
 
 const filteredTheaters = computed(() => {
   if (!searchQuery.value || !searchQuery.value.trim()) {
