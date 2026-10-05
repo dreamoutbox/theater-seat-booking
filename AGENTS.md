@@ -144,6 +144,7 @@ theater-seat-booking/
 | `./dev-backend.sh` | Start Rust API on port 3000 (hot-reloads with `cargo-watch` if installed) |
 | `./dev-queue-worker.sh` | Start the booking queue worker (polls every 1s, processes holds) |
 | `./dev-frontend.sh` | Start Vite dev server on port 5173 (proxies `/api` to backend) |
+| `./dev-loadtest.sh` | Run k6 load test container simulating 1000+ concurrent ticket buyers |
 | `cargo check --workspace` | Verify all crates compile without errors |
 | `cargo run --bin seed` | Re-seed demo data (idempotent, skips existing) |
 | `./test-e2e.sh` | Reset database & run all Playwright E2E tests (supports flags e.g. `--headed`, `--ui`) |
@@ -167,6 +168,7 @@ All read from `.env` (loaded by `dotenvy`) with safe defaults for local dev:
 | `MAX_BOOKINGS_PER_USER` | `4` | Max active held seats per user globally |
 | `STRIPE_SECRET_KEY` | `sk_test_mock_key_for_poc` | Stripe API key |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_mock_key_for_poc` | Stripe webhook signing secret |
+| `STRIPE_SKIP_PAYMENT` | `false` | When true, mock payments and skip outbound Stripe API requests |
 | `STRIPE_CURRENCY` | `thb` | Three-letter ISO currency code for Stripe charges (e.g. `thb`, `usd`, `eur`) |
 | `RUST_LOG` | `info,theater_seat_booking=debug` | Tracing filter |
 | `S3_ENDPOINT` | `http://127.0.0.1:9000` | MinIO S3 endpoint |
@@ -484,6 +486,7 @@ All routes are prefixed with `/api`.
 21. **Event Organizer Order Scoping** — `GET /orders` & `GET /orders/:id` strictly scoped by event ownership for `event_organizer` role and added `?event_id=...` query filtering
 22. **Email Delivery with PDF Pass Attachments** — Asynchronous SMTP order confirmation emails powered by `lettre` with rich HTML + plaintext receipts and attached PDF ticket passes sent upon mock and Stripe payments
 23. **Event-Owned Seat Maps & Layout Isolation** — Zones and seats are linked to `events.id`, separating layouts completely across events. Added `/api/events/:id/layout` (with strict organizer ownership authorization) and `/api/events/:id/booked-seats`.
+24. **k6 Load Testing Suite & Bypass Stripe Rate Limiting** — High-concurrency ticket sale simulation for 1,000+ virtual users against a 1,200-seat mega event. Added `STRIPE_SKIP_PAYMENT` config flag, restored mock payment confirmation at `POST /orders/:id/confirm-mock`, high-capacity deterministic seeder `seed_loadtest`, k6 scenario in `loadtest/`, Docker container setup, and `./dev-loadtest.sh` wrapper script with automatic DB/S3 reset and image pre-building.
 
 ### Frontend
 

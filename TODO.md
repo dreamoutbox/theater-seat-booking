@@ -23,7 +23,7 @@
 
 - [x] add Dockerfile and docker compose. use cargo chef.
 
-- [ ] loadtest. simulate 1000+ users sale for big event. skip stripe payment (to prevent rate limit).
+- [x] loadtest. simulate 1000+ users sale for big event. skip stripe payment (to prevent rate limit).
 
 - [x] frontend remove test logins info
 
