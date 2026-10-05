@@ -17,7 +17,7 @@
 
 - [x] move Scheduled Showtimes to new page & add link to left sidebar panel.
 
-- [ ] event 2 can edit event 1 seat map editor. should separate it.
+- [x] event 2 can edit event 1 seat map editor. should separate it.
 
 - [ ] remove Auth Dual-Mode. use only `Authorization: Bearer` header.
 

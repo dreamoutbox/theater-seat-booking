@@ -410,6 +410,9 @@ All routes are prefixed with `/api`.
 | POST | `/events` | Elevated | Create event with optional owner_id |
 | PUT | `/events/:id` | Elevated | Update event (organizer = own only) |
 | DELETE | `/events/:id` | Elevated | Delete event (organizer = own only) |
+| GET | `/events/:id/layout` | Optional | Get event-owned seat layout (zones & seats) |
+| PUT | `/events/:id/layout` | Elevated | Save event-owned seat layout (organizer = own only) |
+| GET | `/events/:id/booked-seats` | Elevated | List booked seats for an event across showtimes |
 | GET/POST | `/showtimes` | Optional/Elevated | List or create showtimes |
 | PUT/DELETE | `/showtimes/:id` | Elevated | Update or delete showtime |
 | GET | `/showtimes/:id/seats` | Optional | Get seats with availability for a showtime |
@@ -496,6 +499,7 @@ All routes are prefixed with `/api`.
 20. **Financial & Tax Report Snapshotting** — Snapshot API endpoints (`/events/:id/reports` & `/events/:id/reports/generate`) with role-based cooldowns (0s for Admin/Staff, 5m for Event Organizers) and S3 PDF uploads
 21. **Event Organizer Order Scoping** — `GET /orders` & `GET /orders/:id` strictly scoped by event ownership for `event_organizer` role and added `?event_id=...` query filtering
 22. **Email Delivery with PDF Pass Attachments** — Asynchronous SMTP order confirmation emails powered by `lettre` with rich HTML + plaintext receipts and attached PDF ticket passes sent upon mock and Stripe payments
+23. **Event-Owned Seat Maps & Layout Isolation** — Zones and seats are linked to `events.id`, separating layouts completely across events. Added `/api/events/:id/layout` (with strict organizer ownership authorization) and `/api/events/:id/booked-seats`.
 
 ### Frontend
 
@@ -517,6 +521,7 @@ All routes are prefixed with `/api`.
 16. **Event Financial Reports List View** (`/manage/events/:id/financial-reports`) — Historical snapshot list, live KPI snapshot cards, inline button cooldown timer, and direct PDF streaming links
 17. **Event Settings & Tax Info View** (`/manage/events/:id/settings`) — Configurable seat limits and business tax entity profile for customer receipts & tax statements
 18. **Scheduled Showtimes View** (`/manage/events/:id/showtimes`) — Dedicated showtimes management view with session scheduling, theater selection, customer seat map links, and hall layout editor triggers
+19. **Event-Scoped Seat Map Editor Navigation** — Direct route `/manage/events/:id/seat-map` accessible from Event Sidebar; new events start with empty canvas without layout selection dialogs; theaters decoupled from seat editing.
 
 ---
 
