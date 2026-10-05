@@ -1,23 +1,6 @@
 # AGENTS.md — Theater Seat Booking Project Guide
 
-> This document is the authoritative guide for AI coding agents working on this codebase.
-> Read this **entire file** before making any change.
-
----
-
-## Table of Contents
-
-1. [Project Overview](#1-project-overview)
-2. [Tech Stack](#2-tech-stack)
-3. [Project Structure](#3-project-structure)
-4. [Development Scripts](#4-development-scripts)
-5. [Environment Variables](#5-environment-variables)
-6. [Backend: Rust Coding Patterns](#6-backend-rust-coding-patterns)
-7. [Frontend: Vue Coding Patterns](#7-frontend-vue-coding-patterns)
-8. [Database Schema](#8-database-schema)
-9. [API Route Reference](#9-api-route-reference)
-10. [Feature History (What Has Been Done)](#10-feature-history-what-has-been-done)
-11. [Critical Cautions for AI Agents](#11-critical-cautions-for-ai-agents)
+This document is the authoritative guide for AI coding agents working on this codebase.
 
 ---
 

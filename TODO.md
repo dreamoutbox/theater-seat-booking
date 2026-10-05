@@ -19,14 +19,16 @@
 
 - [x] event 2 can edit event 1 seat map editor. should separate it.
 
-- [ ] remove Auth Dual-Mode. use only `Authorization: Bearer` header.
+- [ ] environment variable to set currency to use in stripe.
 
-- [ ] use THB instead of USD
-
-- [ ] loadtest. simulate 1000+ users sale for big event. 
-      skip stripe payment to prevent rate limit.
+- [ ] loadtest. simulate 1000+ users sale for big event. skip stripe payment (to prevent rate limit).
 
 - [ ] frontend remove test logins info
 
 - [ ] send email use outbox with send email worker
 
+---
+
+# BACKLOG
+
+- [ ] remove Auth Dual-Mode. use only `Authorization: Bearer` header.
