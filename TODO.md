@@ -19,11 +19,14 @@
 
 - [ ] event 2 can edit event 1 seat map editor. should separate it.
 
-- [ ] send email use outbox with send email worker
-
-- [ ] frontend remove test logins info
+- [ ] remove Auth Dual-Mode. use only `Authorization: Bearer` header.
 
 - [ ] use THB instead of USD
 
 - [ ] loadtest. simulate 1000+ users sale for big event. 
       skip stripe payment to prevent rate limit.
+
+- [ ] frontend remove test logins info
+
+- [ ] send email use outbox with send email worker
+

@@ -562,11 +562,8 @@ When an `event_organizer` calls `GET /events`, they only see events they own (`o
 ### Always Add Crate Dependencies Before Using Them
 If you use a new crate macro or type (e.g., `tracing::`, `rand::`, `chrono::`) in `crates/repository`, add it to `crates/repository/Cargo.toml`. The repository crate has its own `Cargo.toml` separate from the root workspace.
 
-### Commit After Each Phase
-Run `git add . && git commit -m "..."` after each logical phase of work. Use conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`.
-
 ### Response Format
-All API responses are JSON. Error responses: `{ "error": "message string" }`. Success responses return the relevant struct or `{ "success": true, "message": "..." }`.
+All API responses are JSON. Error responses: `{ "error": "message string" }`. Success responses return the relevant struct or status 200 with json body `{ "message": "..." }`.
 
 ### Playwright Tests: Seat & Account Isolation for Parallel Execution
 When writing end-to-end Playwright tests:

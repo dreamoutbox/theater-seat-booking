@@ -21,21 +21,20 @@
 
         <div class="d-flex align-center gap-2">
           <!-- Showtime Switcher Menu -->
-          <v-menu>
+          <!-- <v-menu>
             <template #activator="{ props }">
               <v-btn v-bind="props" variant="outlined" size="small" prepend-icon="mdi-swap-horizontal">
                 Switch Showtime
               </v-btn>
             </template>
-            <v-list density="compact" bg-color="#1e222d">
-              <v-list-item v-for="s in allShowtimes" :key="s.id" :to="`/booking/${s.id}`"
-                :active="s.id === props.showtimeId">
-                <v-list-item-title class="text-caption">
-                  {{ s.event_title }} — {{ formatDate(s.starts_at) }}
-                </v-list-item-title>
-              </v-list-item>
-            </v-list>
-          </v-menu>
+<v-list density="compact" bg-color="#1e222d">
+  <v-list-item v-for="s in allShowtimes" :key="s.id" :to="`/booking/${s.id}`" :active="s.id === props.showtimeId">
+    <v-list-item-title class="text-caption">
+      {{ s.event_title }} — {{ formatDate(s.starts_at) }}
+    </v-list-item-title>
+  </v-list-item>
+</v-list>
+</v-menu> -->
         </div>
       </div>
     </v-card>
