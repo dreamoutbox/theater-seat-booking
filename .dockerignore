@@ -1,0 +1,9 @@
+.git/
+.agents/
+target/
+frontend/
+.env
+*.log
+docker-stripe-cli/
+scripts/
+tests/

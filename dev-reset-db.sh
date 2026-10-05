@@ -24,11 +24,11 @@ echo "🧹 Dropping and recreating public schema..."
 if command -v psql &> /dev/null; then
     psql "$DATABASE_URL" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;" > /dev/null 2>&1 || {
         echo "⚠️  Direct psql failed, trying docker compose..."
-        docker compose exec -T postgres psql -U postgres -d postgres -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;"
+        docker compose -f docker-compose.base.yml exec -T postgres psql -U postgres -d postgres -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;"
     }
 else
     echo "Using docker compose to reset schema..."
-    docker compose exec -T postgres psql -U postgres -d postgres -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;"
+    docker compose -f docker-compose.base.yml exec -T postgres psql -U postgres -d postgres -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres; GRANT ALL ON SCHEMA public TO public;"
 fi
 
 echo "✅ Database schema reset successfully."
