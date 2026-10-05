@@ -52,3 +52,7 @@ path = "src/bin/queue_worker.rs"
 [[bin]]
 name = "seed"
 path = "src/bin/seed.rs"
+
+[[bin]]
+name = "seed_loadtest"
+path = "src/bin/seed_loadtest.rs"
