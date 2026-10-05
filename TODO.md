@@ -19,7 +19,7 @@
 
 - [x] event 2 can edit event 1 seat map editor. should separate it.
 
-- [ ] environment variable to set currency to use in stripe.
+- [x] environment variable to set currency to use in stripe.
 
 - [ ] loadtest. simulate 1000+ users sale for big event. skip stripe payment (to prevent rate limit).
 

@@ -167,6 +167,7 @@ All read from `.env` (loaded by `dotenvy`) with safe defaults for local dev:
 | `MAX_BOOKINGS_PER_USER` | `4` | Max active held seats per user globally |
 | `STRIPE_SECRET_KEY` | `sk_test_mock_key_for_poc` | Stripe API key |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_mock_key_for_poc` | Stripe webhook signing secret |
+| `STRIPE_CURRENCY` | `thb` | Three-letter ISO currency code for Stripe charges (e.g. `thb`, `usd`, `eur`) |
 | `RUST_LOG` | `info,theater_seat_booking=debug` | Tracing filter |
 | `S3_ENDPOINT` | `http://127.0.0.1:9000` | MinIO S3 endpoint |
 | `S3_ACCESS_KEY` | `miniominio` | S3 Access Key |
