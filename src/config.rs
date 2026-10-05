@@ -17,6 +17,7 @@ pub struct AppConfig {
     pub s3_bucket: String,
     pub s3_region: String,
     pub smtp_host: Option<String>,
+    pub stripe_skip_payment: bool,
     pub smtp_port: u16,
     pub smtp_username: Option<String>,
     pub smtp_password: Option<String>,
@@ -54,6 +55,7 @@ impl AppConfig {
             stripe_webhook_secret: env::var("STRIPE_WEBHOOK_SECRET")
                 .unwrap_or_else(|_| "whsec_mock_key_for_poc".to_string()),
             stripe_currency: parse_currency(env::var("STRIPE_CURRENCY").ok()),
+            stripe_skip_payment: parse_bool_flag(env::var("STRIPE_SKIP_PAYMENT").ok()),
             s3_endpoint: env::var("S3_ENDPOINT")
                 .unwrap_or_else(|_| "http://127.0.0.1:9000".to_string()),
             s3_access_key: env::var("S3_ACCESS_KEY").unwrap_or_else(|_| "miniominio".to_string()),
@@ -88,6 +90,14 @@ pub(crate) fn parse_currency(raw: Option<String>) -> String {
         .unwrap_or_else(|| "thb".to_string())
 }
 
+pub(crate) fn parse_bool_flag(raw: Option<String>) -> bool {
+    raw.map(|s| {
+        let trimmed = s.trim();
+        trimmed.eq_ignore_ascii_case("true") || trimmed == "1"
+    })
+    .unwrap_or(false)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -105,5 +115,16 @@ mod tests {
         assert_eq!(parse_currency(Some("  EUR  ".to_string())), "eur");
         assert_eq!(parse_currency(Some("thb".to_string())), "thb");
         assert_eq!(parse_currency(Some("THB".to_string())), "thb");
+    }
+
+    #[test]
+    fn test_parse_bool_flag() {
+        assert!(parse_bool_flag(Some("true".to_string())));
+        assert!(parse_bool_flag(Some("TRUE".to_string())));
+        assert!(parse_bool_flag(Some("1".to_string())));
+        assert!(!parse_bool_flag(Some("false".to_string())));
+        assert!(!parse_bool_flag(Some("0".to_string())));
+        assert!(!parse_bool_flag(Some("".to_string())));
+        assert!(!parse_bool_flag(None));
     }
 }

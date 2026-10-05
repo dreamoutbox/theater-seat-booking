@@ -27,10 +27,10 @@
         </router-link>
       </div>
 
-      <v-divider class="my-4"></v-divider>
+      <!-- <v-divider class="my-4"></v-divider> -->
 
       <!-- Quick Demo Logins -->
-      <div class="mb-2">
+      <!-- <div class="mb-2">
         <div class="text-caption text-grey font-weight-bold mb-2 text-center text-uppercase">
           Quick Demo Accounts
         </div>
@@ -43,7 +43,7 @@
             <span class="text-caption">{{ acc.email }}</span>
           </v-btn>
         </div>
-      </div>
+      </div> -->
 
     </v-card>
 

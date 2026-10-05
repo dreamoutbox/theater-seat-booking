@@ -366,6 +366,169 @@ pub async fn get_order(
     }))
 }
 
+/// Common logic to mark order paid, confirm seat bookings, assign tax invoice running number, and create tickets
+pub async fn complete_paid_order(
+    tx: &mut sqlx::PgConnection,
+    order_id: Uuid,
+) -> Result<(), String> {
+    OrderRepository::update_status(&mut *tx, order_id, "paid")
+        .await
+        .map_err(|e| format!("Failed to update order status: {e}"))?;
+
+    SeatBookingRepository::update_status_by_order_id(&mut *tx, order_id, "confirmed")
+        .await
+        .map_err(|e| format!("Failed to confirm seat bookings: {e}"))?;
+
+    if let Ok(Some(ev_id)) = OrderRepository::find_event_id_by_order_id(&mut *tx, order_id).await {
+        let period = chrono::Utc::now().format("%Y%m").to_string();
+        if let Ok(tax_invoice_number) =
+            SequenceRepository::next_running_number(&mut *tx, ev_id, "order", "INV", &period).await
+        {
+            let _ =
+                OrderRepository::update_tax_invoice_number(&mut *tx, order_id, &tax_invoice_number)
+                    .await;
+        }
+    }
+
+    TicketRepository::create_tickets_for_paid_order(&mut *tx, order_id)
+        .await
+        .map_err(|e| format!("Failed to generate tickets: {e}"))?;
+
+    Ok(())
+}
+
+#[derive(Debug, Serialize)]
+pub struct ConfirmMockOrderResponse {
+    pub success: bool,
+    pub order_id: Uuid,
+    pub status: String,
+    pub message: String,
+}
+
+pub async fn confirm_mock_order(
+    Path(order_id): Path<Uuid>,
+    auth_user: AuthenticatedUser,
+    State(state): State<AppState>,
+) -> Result<Json<ConfirmMockOrderResponse>, (StatusCode, Json<serde_json::Value>)> {
+    let mut tx = state.pool.begin().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // 1. Fetch order details to verify authorization & current status
+    let order_opt = OrderRepository::find_order_detail_by_id(&mut *tx, order_id)
+        .await
+        .map_err(|e| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({ "error": e.to_string() })),
+            )
+        })?;
+
+    let order = match order_opt {
+        Some(o) => o,
+        None => {
+            tx.rollback().await.ok();
+            return Err((
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({ "error": "Order not found" })),
+            ));
+        }
+    };
+
+    let is_admin_or_staff = auth_user.role == UserRole::Admin || auth_user.role == UserRole::Staff;
+    if !is_admin_or_staff && order.user_id != auth_user.id {
+        tx.rollback().await.ok();
+        return Err((
+            StatusCode::FORBIDDEN,
+            Json(serde_json::json!({ "error": "Access denied to this order" })),
+        ));
+    }
+
+    if order.status == "paid" {
+        tx.rollback().await.ok();
+        return Ok(Json(ConfirmMockOrderResponse {
+            success: true,
+            order_id,
+            status: "paid".to_string(),
+            message: "Order is already paid".to_string(),
+        }));
+    }
+
+    if order.status != "pending_payment" {
+        tx.rollback().await.ok();
+        return Err((
+            StatusCode::BAD_REQUEST,
+            Json(serde_json::json!({
+                "error": format!("Cannot confirm order with status '{}'", order.status)
+            })),
+        ));
+    }
+
+    // 2. Log mock payment event
+    let mock_event_id = format!("evt_mock_{}", Uuid::new_v4());
+    OrderRepository::save_payment_event(
+        &mut *tx,
+        &mock_event_id,
+        Some(order_id),
+        "payment_intent.succeeded",
+    )
+    .await
+    .map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    // 3. Complete payment state transition
+    complete_paid_order(&mut *tx, order_id).await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e })),
+        )
+    })?;
+
+    tx.commit().await.map_err(|e| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({ "error": e.to_string() })),
+        )
+    })?;
+
+    tracing::info!(order_id = %order_id, user_id = %auth_user.id, "Order confirmed via mock payment");
+
+    // Spawn async task for PDF generation & email delivery if SMTP configured
+    if state.email.is_configured() {
+        let post_pay_state = state.clone();
+        tokio::spawn(async move {
+            match generate_and_upload_order_pdf(&post_pay_state, order_id).await {
+                Ok(pdf_bytes) => {
+                    if let Err(e) = post_pay_state
+                        .email
+                        .send_order_confirmation(&post_pay_state.pool, order_id, pdf_bytes)
+                        .await
+                    {
+                        tracing::warn!("Failed to send confirmation email in mock payment: {e}");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to generate order PDF in mock payment: {e}");
+                }
+            }
+        });
+    }
+
+    Ok(Json(ConfirmMockOrderResponse {
+        success: true,
+        order_id,
+        status: "paid".to_string(),
+        message: "Payment confirmed successfully".to_string(),
+    }))
+}
+
 #[derive(Debug, Serialize)]
 pub struct CreateCheckoutSessionResponse {
     pub checkout_url: String,

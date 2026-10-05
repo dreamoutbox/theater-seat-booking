@@ -1,8 +1,9 @@
 use axum::{Json, extract::State, http::StatusCode};
-use repository::{OrderRepository, SeatBookingRepository, SequenceRepository, TicketRepository};
+use repository::{OrderRepository, SeatBookingRepository};
 use serde_json::Value;
 
 use crate::routes::AppState;
+use crate::routes::order::complete_paid_order;
 
 pub async fn stripe_webhook(
     State(state): State<AppState>,
@@ -151,51 +152,12 @@ pub async fn stripe_webhook(
                     })?;
 
                 if current_status.as_deref() == Some("pending_payment") {
-                    OrderRepository::update_status(&mut *tx, oid, "paid")
-                        .await
-                        .map_err(|e| {
-                            (
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                Json(serde_json::json!({ "error": e.to_string() })),
-                            )
-                        })?;
-
-                    SeatBookingRepository::update_status_by_order_id(&mut *tx, oid, "confirmed")
-                        .await
-                        .map_err(|e| {
-                            (
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                Json(serde_json::json!({ "error": e.to_string() })),
-                            )
-                        })?;
-
-                    // Assign sequential Thai tax invoice running number (INV-YYYYMM-XXXXX)
-                    if let Ok(Some(ev_id)) =
-                        OrderRepository::find_event_id_by_order_id(&mut *tx, oid).await
-                    {
-                        let period = chrono::Utc::now().format("%Y%m").to_string();
-                        if let Ok(tax_invoice_number) = SequenceRepository::next_running_number(
-                            &mut *tx, ev_id, "order", "INV", &period,
+                    complete_paid_order(&mut *tx, oid).await.map_err(|e| {
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            Json(serde_json::json!({ "error": e })),
                         )
-                        .await
-                        {
-                            let _ = OrderRepository::update_tax_invoice_number(
-                                &mut *tx,
-                                oid,
-                                &tax_invoice_number,
-                            )
-                            .await;
-                        }
-                    }
-
-                    TicketRepository::create_tickets_for_paid_order(&mut *tx, oid)
-                        .await
-                        .map_err(|e| {
-                            (
-                                StatusCode::INTERNAL_SERVER_ERROR,
-                                Json(serde_json::json!({ "error": format!("Failed to generate tickets: {e}") })),
-                            )
-                        })?;
+                    })?;
 
                     tracing::info!(order_id = %oid, event_type = %event_type, "Payment confirmed; seats confirmed and tickets created.");
                 } else {

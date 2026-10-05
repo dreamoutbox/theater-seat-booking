@@ -89,14 +89,14 @@ import { useRouter } from 'vue-router';
 const authStore = useAuthStore();
 const router = useRouter();
 
-const demoAccounts = [
-  { label: 'Admin', email: 'admin@theater.local', password: 'admin123', role: 'admin' },
-  { label: 'Staff', email: 'staff@theater.local', password: 'staff123', role: 'staff' },
-  { label: 'Organizer', email: 'organizer@theater.local', password: 'organizer123', role: 'event_organizer' },
-  { label: 'Gatekeeper', email: 'gatekeeper@theater.local', password: 'gatekeeper123', role: 'gatekeeper' },
-  { label: 'Customer 1 (Alice)', email: 'alice@customer.local', password: 'customer123', role: 'customer' },
-  { label: 'Customer 2 (Bob)', email: 'bob@customer.local', password: 'customer123', role: 'customer' },
-];
+// const demoAccounts = [
+//   { label: 'Admin', email: 'admin@theater.local', password: 'admin123', role: 'admin' },
+//   { label: 'Staff', email: 'staff@theater.local', password: 'staff123', role: 'staff' },
+//   { label: 'Organizer', email: 'organizer@theater.local', password: 'organizer123', role: 'event_organizer' },
+//   { label: 'Gatekeeper', email: 'gatekeeper@theater.local', password: 'gatekeeper123', role: 'gatekeeper' },
+//   { label: 'Customer 1 (Alice)', email: 'alice@customer.local', password: 'customer123', role: 'customer' },
+//   { label: 'Customer 2 (Bob)', email: 'bob@customer.local', password: 'customer123', role: 'customer' },
+// ];
 
 function formatRole(role) {
   if (!role) return '';

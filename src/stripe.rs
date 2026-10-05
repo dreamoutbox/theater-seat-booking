@@ -1,5 +1,6 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StripePaymentIntentResult {
@@ -19,14 +20,16 @@ pub struct StripeCheckoutSessionResult {
 pub struct StripeService {
     secret_key: String,
     currency: String,
+    skip_payment: bool,
     client: Client,
 }
 
 impl StripeService {
-    pub fn new(secret_key: String, currency: String) -> Self {
+    pub fn new(secret_key: String, currency: String, skip_payment: bool) -> Self {
         Self {
             secret_key,
             currency,
+            skip_payment,
             client: Client::new(),
         }
     }
@@ -35,11 +38,26 @@ impl StripeService {
         &self.currency
     }
 
+    pub fn skip_payment(&self) -> bool {
+        self.skip_payment || self.secret_key.starts_with("sk_test_mock")
+    }
+
     pub async fn create_payment_intent(
         &self,
         amount_cents: i64,
         order_id: &str,
     ) -> Result<StripePaymentIntentResult, String> {
+        if self.skip_payment() {
+            let mock_id = format!("pi_mock_{}", Uuid::new_v4());
+            let mock_secret = format!("{mock_id}_secret_{}", Uuid::new_v4());
+            return Ok(StripePaymentIntentResult {
+                id: mock_id,
+                client_secret: mock_secret,
+                amount: amount_cents,
+                status: "requires_payment_method".to_string(),
+            });
+        }
+
         if self.secret_key.is_empty() {
             return Err("Stripe secret key is not configured".to_string());
         }
@@ -99,6 +117,16 @@ impl StripeService {
         success_url: &str,
         cancel_url: &str,
     ) -> Result<StripeCheckoutSessionResult, String> {
+        if self.skip_payment() {
+            let mock_id = format!("cs_mock_{}", Uuid::new_v4());
+            let mock_pi = format!("pi_mock_{}", Uuid::new_v4());
+            return Ok(StripeCheckoutSessionResult {
+                id: mock_id.clone(),
+                url: format!("{success_url}?session_id={mock_id}"),
+                payment_intent: Some(mock_pi),
+            });
+        }
+
         if self.secret_key.is_empty() {
             return Err("Stripe secret key is not configured".to_string());
         }
@@ -165,6 +193,10 @@ impl StripeService {
         amount_cents: i64,
         reason: Option<&str>,
     ) -> Result<String, String> {
+        if self.skip_payment() || payment_intent_id.starts_with("pi_mock_") {
+            return Ok(format!("re_mock_{}", Uuid::new_v4()));
+        }
+
         if self.secret_key.is_empty() {
             return Err("Stripe secret key is not configured".to_string());
         }
@@ -223,6 +255,10 @@ impl StripeService {
         &self,
         order_id: &str,
     ) -> Result<Option<String>, String> {
+        if self.skip_payment() {
+            return Ok(None);
+        }
+
         if self.secret_key.is_empty() {
             return Ok(None);
         }
@@ -261,5 +297,35 @@ impl StripeService {
             .map_err(|e| format!("Failed to parse Stripe search response: {e}"))?;
 
         Ok(search_res.data.into_iter().next().map(|item| item.id))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_skip_payment_flag() {
+        let mock_service = StripeService::new("sk_test_mock_123".into(), "thb".into(), false);
+        assert!(mock_service.skip_payment());
+
+        let skip_service = StripeService::new("sk_live_123456".into(), "thb".into(), true);
+        assert!(skip_service.skip_payment());
+
+        let live_service = StripeService::new("sk_live_123456".into(), "thb".into(), false);
+        assert!(!live_service.skip_payment());
+    }
+
+    #[tokio::test]
+    async fn test_create_payment_intent_when_skip_payment() {
+        let service = StripeService::new("sk_test_mock_key".into(), "thb".into(), false);
+        let res = service
+            .create_payment_intent(5000, "00000000-0000-0000-0000-000000000001")
+            .await
+            .expect("mock payment intent succeeds");
+
+        assert!(res.id.starts_with("pi_mock_"));
+        assert!(res.client_secret.contains("pi_mock_"));
+        assert_eq!(res.amount, 5000);
     }
 }

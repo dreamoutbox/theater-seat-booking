@@ -25,7 +25,7 @@
 
 - [ ] loadtest. simulate 1000+ users sale for big event. skip stripe payment (to prevent rate limit).
 
-- [ ] frontend remove test logins info
+- [x] frontend remove test logins info
 
 ---
 
