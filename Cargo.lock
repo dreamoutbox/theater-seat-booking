@@ -2587,7 +2587,7 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "repository"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "chrono",
  "rand",
@@ -3375,7 +3375,7 @@ dependencies = [
 
 [[package]]
 name = "theater-seat-booking"
-version = "1.0.1"
+version = "1.0.2"
 dependencies = [
  "argon2",
  "aws-config",
