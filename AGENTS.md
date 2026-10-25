@@ -148,6 +148,7 @@ theater-seat-booking/
 | `cargo check --workspace` | Verify all crates compile without errors |
 | `cargo run --bin seed` | Re-seed demo data (idempotent, skips existing) |
 | `./test-e2e.sh` | Reset database & run all Playwright E2E tests (supports flags e.g. `--headed`, `--ui`) |
+| `./release.sh <major/minor/patch>` | Bump workspace and package versions, commit, tag (optional `--push`) |
 
 > **IMPORTANT**: Always run `cargo check --workspace` after backend changes.
 > **Do NOT run tests automatically** — the user runs tests manually and reports results.

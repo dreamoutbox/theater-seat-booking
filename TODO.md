@@ -27,6 +27,14 @@
 
 - [x] frontend remove test logins info
 
+- [ ] seat update poll only update necessary data to prevent large payloads send from server.
+    ```
+    data_received: 7.5 GB in 64s (117 MB/s) is unusually high for a booking app. 
+    You may be returning large payloads (seat maps? full order objects?) 
+    in hot-path responses. 
+    Worth checking response sizes on the high-traffic endpoints.
+    ```
+
 ---
 
 # BACKLOG
@@ -34,3 +42,11 @@
 - [ ] send email use outbox with send email worker
 
 - [ ] remove Auth Dual-Mode. use only `Authorization: Bearer` header.
+
+---
+
+# Phase 2:
+
+- [ ] upgrade to event ticket selling website. custom zone & custom seats layout.
+
+- [ ] custom seat layout. add gap between seats. don't skip number.

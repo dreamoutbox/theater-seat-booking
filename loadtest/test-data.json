@@ -1,7 +1,7 @@
 {
-  "event_id": "d3ff0938-c936-4538-9083-d98c199b9ab6",
-  "showtime_id": "5e94cddd-1240-4362-91bf-51a73f61f264",
-  "theater_id": "f4a441f5-060a-4993-937a-2406a3be961f",
+  "event_id": "82dce0ed-8457-4f70-81e2-2d69d051c84f",
+  "showtime_id": "8b846445-bf4e-45bf-8768-7b1121ed63c4",
+  "theater_id": "8591aec3-ca1e-4e28-9738-e881381154b0",
   "total_seats": 1200,
   "user_count": 1200,
   "jwt_secret": "theater_booking_poc_jwt_secret_key_1234567890_super_secure",
