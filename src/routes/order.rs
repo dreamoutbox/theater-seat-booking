@@ -576,7 +576,7 @@ pub async fn create_checkout_session(
         ));
     }
 
-    let base_url = "http://localhost:5173";
+    let base_url = state.config.frontend_base_url.trim_end_matches('/');
     let success_url = format!("{base_url}/orders/{order_id}?payment=success");
     let cancel_url = format!(
         "{base_url}/showtimes/{}/booking?payment=cancelled&order_id={order_id}",

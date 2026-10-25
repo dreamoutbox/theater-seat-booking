@@ -120,9 +120,10 @@ impl StripeService {
         if self.skip_payment() {
             let mock_id = format!("cs_mock_{}", Uuid::new_v4());
             let mock_pi = format!("pi_mock_{}", Uuid::new_v4());
+            let separator = if success_url.contains('?') { '&' } else { '?' };
             return Ok(StripeCheckoutSessionResult {
                 id: mock_id.clone(),
-                url: format!("{success_url}?session_id={mock_id}"),
+                url: format!("{success_url}{separator}session_id={mock_id}"),
                 payment_intent: Some(mock_pi),
             });
         }

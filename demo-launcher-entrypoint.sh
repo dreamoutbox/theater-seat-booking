@@ -9,6 +9,7 @@ RUN_GROUP="theater"
 GITHUB_REPO="${GITHUB_REPO:-dreamoutbox/theater-seat-booking}"
 RELEASE_TAG="${RELEASE_TAG:-latest}"
 PORT="${PORT:-3000}"
+FRONTEND_BASE_URL="${FRONTEND_BASE_URL:-http://localhost:${PORT}}"
 DATABASE_URL="${DATABASE_URL:-postgres://postgres:example@localhost:5432/postgres}"
 S3_ENDPOINT="${S3_ENDPOINT:-http://127.0.0.1:9000}"
 S3_ACCESS_KEY="${S3_ACCESS_KEY:-miniominio}"
@@ -305,6 +306,7 @@ setup_environment_config() {
   cat <<EOF > "${target_dir}/.env"
 RUST_LOG=${RUST_LOG}
 PORT=${PORT}
+FRONTEND_BASE_URL=${FRONTEND_BASE_URL}
 DATABASE_URL=${DATABASE_URL}
 JWT_SECRET=${JWT_SECRET}
 HOLD_TTL_SECONDS=600
@@ -431,7 +433,7 @@ main() {
   echo ""
   echo "========================================================"
   echo "Theater Seat Booking demo setup completed successfully."
-  echo "Application is running on: http://localhost:${PORT}"
+  echo "Application is running on: ${FRONTEND_BASE_URL}"
   echo "SeaweedFS S3 is running on: ${S3_ENDPOINT}"
   echo "Database is running on: PostgreSQL 18"
   echo "Queue worker is running via systemd: ${APP_NAME}-queue-worker.service"

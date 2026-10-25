@@ -22,6 +22,7 @@ pub struct AppConfig {
     pub smtp_username: Option<String>,
     pub smtp_password: Option<String>,
     pub smtp_from_email: String,
+    pub frontend_base_url: String,
 }
 
 impl AppConfig {
@@ -80,6 +81,11 @@ impl AppConfig {
                 .filter(|s| !s.is_empty()),
             smtp_from_email: env::var("SMTP_FROM_EMAIL")
                 .unwrap_or_else(|_| "Theater Booking <noreply@theaterbooking.local>".to_string()),
+            frontend_base_url: env::var("FRONTEND_BASE_URL")
+                .ok()
+                .map(|s| s.trim().trim_end_matches('/').to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "http://localhost:5173".to_string()),
         }
     }
 }

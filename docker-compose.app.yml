@@ -15,6 +15,7 @@ services:
       - DATABASE_URL=postgres://postgres:example@postgres:5432/postgres
       - JWT_SECRET=theater_booking_poc_jwt_secret_key_1234567890_super_secure
       - PORT=3000
+      - FRONTEND_BASE_URL=${FRONTEND_BASE_URL:-http://localhost:5173}
       - HOLD_TTL_SECONDS=600
       - POLL_INTERVAL_MS=1000
       - MAX_BOOKINGS_PER_USER=4

@@ -164,6 +164,7 @@ All read from `.env` (loaded by `dotenvy`) with safe defaults for local dev:
 | `DATABASE_URL` | `postgres://postgres:example@localhost:5432/postgres` | PostgreSQL connection string |
 | `JWT_SECRET` | `theater_booking_poc_jwt_secret_key_default_12345` | HMAC key for JWT signing |
 | `PORT` | `3000` | Axum server port |
+| `FRONTEND_BASE_URL` | `http://localhost:5173` | Frontend base URL for checkout redirects (e.g. `http://<vps-ip>:3000`) |
 | `HOLD_TTL_SECONDS` | `600` | Seat hold expiry (10 min) |
 | `POLL_INTERVAL_MS` | `1000` | Queue worker polling interval |
 | `MAX_BOOKINGS_PER_USER` | `4` | Max active held seats per user globally |
