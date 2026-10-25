@@ -41,6 +41,17 @@ check_root() {
 install_prerequisites() {
   echo "Installing system prerequisites..."
   export DEBIAN_FRONTEND=noninteractive
+
+  # Ensure glibc >= 2.38 compatibility on older Debian systems (e.g. Debian 12 bookworm)
+  if [ -f /etc/debian_version ] && ! grep -qi ubuntu /etc/os-release 2>/dev/null; then
+    local glibc_ver
+    glibc_ver=$(getconf GNU_LIBC_VERSION 2>/dev/null | awk '{print $2}' || true)
+    if [ -z "$glibc_ver" ] || [ "$(printf '%s\n2.38' "$glibc_ver" | sort -V | head -n1)" != "2.38" ]; then
+      echo "Configuring Debian trixie repository for glibc >= 2.38 compatibility..."
+      echo "deb http://deb.debian.org/debian trixie main" > /etc/apt/sources.list.d/trixie.list
+    fi
+  fi
+
   apt-get update -qq
   apt-get install -y -qq \
     curl \
@@ -49,7 +60,9 @@ install_prerequisites() {
     lsb-release \
     tar \
     jq \
-    sudo
+    sudo \
+    libc6 \
+    libc-bin
 }
 
 # Configures the PostgreSQL PGDG repository and installs PostgreSQL 18 on bare metal.
