@@ -16,6 +16,7 @@ S3_SECRET_KEY="${S3_SECRET_KEY:-miniominio}"
 S3_BUCKET="${S3_BUCKET:-theater-documents}"
 S3_REGION="${S3_REGION:-us-east-1}"
 JWT_SECRET="${JWT_SECRET:-theater_booking_poc_jwt_secret_key_1234567890_super_secure}"
+RUST_LOG="${RUST_LOG:-info,theater_seat_booking=debug,queue_worker=debug}"
 
 # Asserts that the executing user has root privileges.
 #
@@ -302,7 +303,7 @@ setup_environment_config() {
   echo "Writing environment configuration to ${target_dir}/.env..."
 
   cat <<EOF > "${target_dir}/.env"
-RUST_LOG=info,theater_seat_booking=debug
+RUST_LOG=${RUST_LOG}
 PORT=${PORT}
 DATABASE_URL=${DATABASE_URL}
 JWT_SECRET=${JWT_SECRET}
@@ -324,16 +325,16 @@ EOF
   chmod 0600 "${target_dir}/.env"
 }
 
-# Configures and starts the systemd service with automatic restart.
+# Configures and starts systemd services for both API and queue worker with automatic restart.
 #
 # Arguments:
 #   $1 - Target installation directory (e.g., "/app/theater-seat-booking")
 #
 # Example usage:
-#   setup_systemd_service "/app/theater-seat-booking"
-setup_systemd_service() {
+#   setup_systemd_services "/app/theater-seat-booking"
+setup_systemd_services() {
   local target_dir="$1"
-  echo "Configuring systemd service for ${APP_NAME}..."
+  echo "Configuring systemd services for ${APP_NAME} and queue worker..."
 
   cat <<EOF > /etc/systemd/system/${APP_NAME}.service
 [Unit]
@@ -356,9 +357,41 @@ LimitNOFILE=65536
 WantedBy=multi-user.target
 EOF
 
+  cat <<EOF > /etc/systemd/system/${APP_NAME}-queue-worker.service
+[Unit]
+Description=Theater Seat Booking Queue Worker
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=${RUN_USER}
+Group=${RUN_GROUP}
+WorkingDirectory=${target_dir}
+EnvironmentFile=${target_dir}/.env
+ExecStart=${target_dir}/queue_worker
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
   systemctl daemon-reload
-  systemctl enable --now "${APP_NAME}.service"
-  echo "Service ${APP_NAME} enabled and started."
+  systemctl enable --now "${APP_NAME}.service" "${APP_NAME}-queue-worker.service"
+  echo "Services ${APP_NAME} and ${APP_NAME}-queue-worker enabled and started."
+}
+
+# Backward-compatible wrapper for setup_systemd_services.
+#
+# Arguments:
+#   $1 - Target installation directory (e.g., "/app/theater-seat-booking")
+#
+# Example usage:
+#   setup_systemd_service "/app/theater-seat-booking"
+setup_systemd_service() {
+  setup_systemd_services "$@"
 }
 
 # Executes the database migrations and demo data seeding.
@@ -393,7 +426,7 @@ main() {
   chown -R "${RUN_USER}:${RUN_GROUP}" "$APP_DIR"
 
   run_migrations_and_seed "$APP_DIR"
-  setup_systemd_service "$APP_DIR"
+  setup_systemd_services "$APP_DIR"
 
   echo ""
   echo "========================================================"
@@ -401,6 +434,7 @@ main() {
   echo "Application is running on: http://localhost:${PORT}"
   echo "SeaweedFS S3 is running on: ${S3_ENDPOINT}"
   echo "Database is running on: PostgreSQL 18"
+  echo "Queue worker is running via systemd: ${APP_NAME}-queue-worker.service"
   echo "========================================================"
 }
 
