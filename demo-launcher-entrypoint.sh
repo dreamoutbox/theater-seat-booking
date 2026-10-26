@@ -9,7 +9,7 @@ RUN_GROUP="theater"
 GITHUB_REPO="${GITHUB_REPO:-dreamoutbox/theater-seat-booking}"
 RELEASE_TAG="${RELEASE_TAG:-latest}"
 PORT="${PORT:-3000}"
-FRONTEND_BASE_URL="${FRONTEND_BASE_URL:-http://localhost:${PORT}}"
+FRONTEND_BASE_URL="${FRONTEND_BASE_URL:-}"
 DATABASE_URL="${DATABASE_URL:-postgres://postgres:example@localhost:5432/postgres}"
 S3_ENDPOINT="${S3_ENDPOINT:-http://127.0.0.1:9000}"
 S3_ACCESS_KEY="${S3_ACCESS_KEY:-miniominio}"
@@ -292,6 +292,37 @@ setup_run_user() {
   fi
 }
 
+# Resolves the frontend base URL from user override or by detecting the server's public IP.
+#
+# Arguments:
+#   $1 - Current PORT value (e.g., 3000)
+#   $2 - Current FRONTEND_BASE_URL override (optional)
+#
+# Returns:
+#   Resolved frontend base URL string
+#
+# Example usage:
+#   FRONTEND_BASE_URL=$(resolve_frontend_base_url "$PORT" "$FRONTEND_BASE_URL")
+resolve_frontend_base_url() {
+  local port="$1"
+  local configured="${2:-}"
+
+  if [ -n "$configured" ]; then
+    echo "$configured"
+    return 0
+  fi
+
+  echo "Attempting to detect server public IP via https://api.ipify.org/..." >&2
+  local public_ip
+  public_ip=$(curl -fsSL --max-time 5 https://api.ipify.org/ 2>/dev/null || true)
+
+  if [ -n "$public_ip" ]; then
+    echo "http://${public_ip}:${port}"
+  else
+    echo "http://localhost:${port}"
+  fi
+}
+
 # Writes the production environment configuration file.
 #
 # Arguments:
@@ -423,6 +454,8 @@ main() {
   setup_s3_bucket "$S3_BUCKET"
   setup_run_user "$RUN_USER"
   fetch_and_extract_release "$APP_DIR"
+  FRONTEND_BASE_URL=$(resolve_frontend_base_url "$PORT" "$FRONTEND_BASE_URL")
+  echo "Configuring frontend base URL: ${FRONTEND_BASE_URL}"
   setup_environment_config "$APP_DIR"
 
   chown -R "${RUN_USER}:${RUN_GROUP}" "$APP_DIR"

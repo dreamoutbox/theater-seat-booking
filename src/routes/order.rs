@@ -1,7 +1,7 @@
 use axum::{
     Json,
     extract::{Path, Query, State},
-    http::StatusCode,
+    http::{HeaderMap, StatusCode, header},
 };
 use repository::{
     EventRepository, OrderDetail, OrderRepository, RefundDetail, RefundRepository,
@@ -535,10 +535,47 @@ pub struct CreateCheckoutSessionResponse {
     pub session_id: String,
 }
 
+/// Resolves the base URL for payment redirect callbacks.
+///
+/// Uses the client's `Origin` or `Referer` HTTP header when valid, ensuring
+/// that checkout redirection works on remote VPS servers without relying on
+/// hardcoded localhost or misconfigured local settings.
+///
+/// # Arguments
+/// * `headers` - Incoming HTTP request headers
+/// * `configured_base_url` - Fallback base URL from `AppConfig`
+///
+/// # Example
+/// ```rust
+/// let base = resolve_redirect_base_url(&headers, "http://localhost:5173");
+/// ```
+fn resolve_redirect_base_url<'a>(headers: &'a HeaderMap, configured_base_url: &'a str) -> &'a str {
+    let header_val = headers
+        .get(header::ORIGIN)
+        .or_else(|| headers.get(header::REFERER))
+        .and_then(|val| val.to_str().ok())
+        .map(|s| s.trim_end_matches('/'));
+
+    if let Some(val) = header_val {
+        if let Some(rest) = val.strip_prefix("http://") {
+            let host_port = rest.split('/').next().unwrap_or(rest);
+            let len = "http://".len() + host_port.len();
+            return &val[..len];
+        } else if let Some(rest) = val.strip_prefix("https://") {
+            let host_port = rest.split('/').next().unwrap_or(rest);
+            let len = "https://".len() + host_port.len();
+            return &val[..len];
+        }
+    }
+
+    configured_base_url.trim_end_matches('/')
+}
+
 pub async fn create_checkout_session(
     Path(order_id): Path<Uuid>,
     auth_user: AuthenticatedUser,
     State(state): State<AppState>,
+    headers: HeaderMap,
 ) -> Result<Json<CreateCheckoutSessionResponse>, (StatusCode, Json<serde_json::Value>)> {
     // Fetch order to verify ownership and get amount
     let order_opt = OrderRepository::find_order_detail_by_id(&state.pool, order_id)
@@ -576,7 +613,7 @@ pub async fn create_checkout_session(
         ));
     }
 
-    let base_url = state.config.frontend_base_url.trim_end_matches('/');
+    let base_url = resolve_redirect_base_url(&headers, &state.config.frontend_base_url);
     let success_url = format!("{base_url}/orders/{order_id}?payment=success");
     let cancel_url = format!(
         "{base_url}/showtimes/{}/booking?payment=cancelled&order_id={order_id}",
